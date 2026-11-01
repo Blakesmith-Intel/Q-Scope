@@ -78,7 +78,16 @@ const stat=()=>page.evaluate(()=>({
  site:document.getElementById("radarSite")?.value
 }));
 try{
- await page.clock.install();
+ // Test-only acceleration of the warning wake-up timer. Do NOT virtualize
+ // all browser timers: Cesium/WebKit initialise asynchronously and freezing
+ // their clocks can deadlock the source status test. The approved 15-minute
+ // interval and real production timer remain completely unchanged.
+ await page.addInitScript(()=>{
+  const realSetInterval=window.setInterval.bind(window);
+  window.setInterval=(fn,ms,...args)=>
+    realSetInterval(fn,
+      ms===60000&&String(fn).includes("currentRefreshMs()")?700:ms,...args);
+ });
  await page.goto("https://blakesmith-intel.github.io/StormTracker/live3d-operational-v9.html",
   {waitUntil:"domcontentloaded",timeout:60000});
  await nodeWait(()=>Boolean(document.querySelector("#cesiumContainer .cesium-widget canvas")),{timeoutMs:120000});
@@ -98,10 +107,14 @@ try{
   platform:isDesktop?"desktop Chromium":"mobile WebKit",prior,sourceCounts
  }));
 
- // Actual source catch-up scheduler: advance browser Date+timers without
- // waiting two minutes wall time. No manual refresh and no source swap on
- // the public application. Its minute timer must notice the 2-minute expiry.
- await page.clock.fastForward(140000);
+ // A controlled 140-second Date offset proves the *actual* two-minute
+ // warning recovery interval is due. The warning's regular 60-second
+ // wake-up callback runs at 700ms only in this browser QA harness.
+ // All other app timers and rendering remain real and fully functional.
+ await page.evaluate(()=>{
+  const real=Date.now,anchor=real();
+  Date.now=()=>anchor+140000+(real()-anchor);
+ });
  await nodeWait(()=>{
   const s=document.querySelector("#officialBomWarningsStatus")?.textContent??"";
   return s.includes("IDQ21033")&&s.includes("active (")&&
