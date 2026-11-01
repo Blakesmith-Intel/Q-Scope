@@ -12,6 +12,7 @@ export function createRadarRequestPressureGuard({
 }={}) {
   const inflight=new Map(), negative=new Map(), queue=[];
   let active=0,blockedUntil=0,blockedStatus=0;
+  let consecutiveRefusals=0,lastRefusalAt=0;
   const metrics={started:0,joined:0,negativeHits:0,blocked:0,peakActive:0};
   const statusError=(status,reason="")=>{
     const e=new Error("Image request failed: HTTP "+status+(reason?" ("+reason+")":""));
@@ -41,10 +42,20 @@ export function createRadarRequestPressureGuard({
             negative.set(item.url,{until:now()+negativeTtlMs,status});
             if(negative.size>320)negative.delete(negative.keys().next().value);
           }
-          // A single 502/503/504 on one WMTS tile is NOT a national
-          // failure. Only permission/rate refusals open the brief circuit.
-          if(status===403||status===429){
-            const until=now()+deniedCooldownMs;
+          // A single HTTP 403 on a geographic WMTS tile may be local to
+          // that query. Do NOT block every radar on one refused tile.
+          // Three fresh refusals in 30 seconds or one explicit HTTP 429
+          // indicate wider access pressure and justify brief backoff.
+          const t=now();
+          if(status===403){
+            consecutiveRefusals=(t-lastRefusalAt<=30000)
+              ? consecutiveRefusals+1 : 1;
+            lastRefusalAt=t;
+          } else if(status!==429 && status!==400){
+            consecutiveRefusals=0;
+          }
+          if(status===429 || (status===403 && consecutiveRefusals>=3)){
+            const until=t+deniedCooldownMs;
             if(until>blockedUntil){blockedUntil=until;blockedStatus=status;}
           }
           item.reject(error);
