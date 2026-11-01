@@ -10,7 +10,7 @@ import {
   discoverBoundedBomReflectivityHistory,
   loadBomReflectivityMosaicAtTime,
   reflectivityWindowForRegion
-} from "./bom-wmts-loop-v2.js?v=20261101-region-independent-v10-2-39";
+} from "./bom-wmts-loop-v2.js?v=20261101-source-verified-recovery-v10-2-40";
 
 import {
   RadarWorkerClient
