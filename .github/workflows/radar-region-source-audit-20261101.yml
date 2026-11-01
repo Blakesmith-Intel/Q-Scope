@@ -1,0 +1,21 @@
+name: Radar 30-minute cross-region live source audit (one-off)
+on:
+  push:
+    branches: [fix/radar-region-loop-20261101]
+    paths:
+      - .github/workflows/radar-region-source-audit-20261101.yml
+      - scripts/probe-radar-region-loop-20261101.mjs
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Probe a bounded set of source-published timestamps, comparing region corner and centre
+        run: node scripts/probe-radar-region-loop-20261101.mjs
