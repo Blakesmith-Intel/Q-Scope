@@ -7,6 +7,10 @@ on:
       - scripts/probe-radar-region-loop-20261101.mjs
       - scripts/probe-full-regional-wmts-20261101.mjs
       - scripts/test-radar-region-switch-browser-20261101.mjs
+      - scripts/apply-radar-auto-refresh-v1.py
+      - frontend/src/live3d-operational-v9.js
+      - frontend/src/live-loop-refresh-v1.js
+      - frontend/src/bom-wmts-loop-v2.js
   workflow_dispatch:
 permissions:
   contents: read
