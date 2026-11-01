@@ -174,7 +174,7 @@ assert data.count(mount_anchor)==1
 data=data.replace(mount_anchor,mount_anchor+'\n'+rain_mount,1)
 
 # Warning imagery remains below measured radar and independent of storm science.
-warnings_import='import {initialiseOfficialBomWarningPolygons} from "./context-layers/bom-warning-operational-v1.js?v=20261030-four-idq-menu-v1";'
+warnings_import='import {initialiseOfficialBomWarningPolygons} from "./context-layers/bom-warning-operational-v1.js?v=20261101-v10-2-46-live-polygon-catchup";'
 assert 'initialiseOfficialBomWarningPolygons' not in data
 data=data.replace('import {\n  initialiseOperationalQfdTechnicalRescues\n}',warnings_import+'\nimport {\n  initialiseOperationalQfdTechnicalRescues\n}',1)
 data=data.replace(mount_anchor,mount_anchor+'\ninitialiseOfficialBomWarningPolygons({viewer,CesiumRef:Cesium,getRadarLayer:()=>surfaceLayer,cameraController:mapCamera});',1)
