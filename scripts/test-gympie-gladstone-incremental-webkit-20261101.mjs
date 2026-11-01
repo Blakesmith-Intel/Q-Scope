@@ -34,6 +34,7 @@ async function stable(region){
   const id=x=>document.getElementById(x);
   return {region:id("radarSite")?.value,label:id("hybridFrameLabel")?.textContent,
    status:id("status")?.textContent,diagnostic:window.__stormtrackerRadarDiagnostics?.(),
+   pressure:window.__stormtrackerRelayPressureDiagnostics?.(),
    graphics:window.__stormtrackerGraphicsDiagnostics?.()};
  });
 }
@@ -48,6 +49,15 @@ try{
   const baseline=await stable(region);
   const baselineCount=Number((baseline.label||"").split("/")[1]);
   assert(baselineCount>=1,"No real BoM frame at "+region);
+  assert(baseline.pressure?.peakActive>0 && baseline.pressure.peakActive<=2,
+    "Radar WMTS source not protected by shared two-request limit in review path");
+  // The immediately preceding authoritative source audit verifies six fully
+  // readable tilesets for these sites; 5/5 in the browser is then a real
+  // application defect, not a missing BoM source observation.
+  if(["08","23","66"].includes(region))
+    assert.equal(baselineCount,6,
+      "BoM publishes six source-complete frames but UI loaded "+baseline.label+
+      " at radar "+region);
   assert.equal(baseline.diagnostic?.lifecycle?.bootCount,1,
     "An unexpected page restart occurred before refresh checks");
   const initialCanvas=await page.locator("#cesiumContainer canvas").count();
@@ -74,6 +84,7 @@ try{
       refresh:snapshot.diagnostic?.automatic,
       incremental:snapshot.diagnostic?.incremental,
       memory:snapshot.diagnostic?.lifecycle?.memory,
+      sourcePressure:snapshot.pressure,
       tileFailures:snapshot.diagnostic?.tileFailures?.slice(-4),
       imageryLayers:snapshot.graphics?.imageryLayers}));
   }
