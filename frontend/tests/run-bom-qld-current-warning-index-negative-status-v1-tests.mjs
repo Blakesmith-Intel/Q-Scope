@@ -78,4 +78,57 @@ const noActiveIndex={...index,activeCodes:[]};
 assert.equal(reconcileLatestBoMWarnings([{notice:canceled,warnings:[]}],
  {complete:false,nowMs:now,qldCurrentIndex:noActiveIndex}).products.IDQ21033.status,"cancelled");
 
+// 1 November 2026: a BoM "Warnings current" LIST can contain a cancellation
+// link. It is an authoritative *inactive* product, not an active warning.
+// This used to show "current in BoM listing; polygon awaiting verification"
+// long after IDQ21033 and IDQ21035 had been cancelled.
+const cancellationListing=fakePage({
+ created:"09:46",
+ indexLinks:'<li><a href="/products/IDQ21035.shtml"><span>Cancellation of Detailed Severe Thunderstorm Warning</span></a></li>'
+}).replace('>Severe Thunderstorm Warning</a>',
+ '>Cancellation of Severe Thunderstorm Warning for Wide Bay and Burnett Forecast District.</a>');
+const cancelledIndex=parseCurrentQldBoMWarningsIndex(cancellationListing,{nowMs:now});
+assert(cancelledIndex?.verified);
+assert.deepEqual(cancelledIndex.activeCodes,[],
+ "A cancellation listed under Warnings current is NOT an active warning");
+const currentClear=reconcileLatestBoMWarnings([
+ {notice:latestNotice,warnings:[{
+  id:"old-regional",official:true,productCode:"IDQ21033",state:"QLD",
+  issuedUtc:latestNotice.issuedUtc,expiresUtc:latestNotice.expiresUtc
+ }]},
+ {notice:{...latestNotice,productCode:"IDQ21035"},warnings:[]}
+],{complete:false,nowMs:now,qldCurrentIndex:cancelledIndex});
+assert.equal(currentClear.products.IDQ21033.status,"no-active",
+ "Fresh official index must supersede older 'issued' national CAP history");
+assert.equal(currentClear.products.IDQ21035.status,"no-active");
+assert.deepEqual(currentClear.warnings,[],
+ "No stale polygons after official current-list cancellation");
+assert.match(describeOfficialBomWarningState({
+ products:currentClear.products,selected:"IDQ21033"
+}).message,/No current warnings/);
+assert.match(describeOfficialBomWarningState({
+ products:currentClear.products,selected:"IDQ21035"
+}).message,/No current warnings/);
+assert.equal(describeOfficialBomWarningState({
+ products:currentClear.products
+}).message,"No current warnings");
+const issuedAfterIndex={...latestNotice,issuedUtc:"2026-10-30T09:47:00Z"};
+const newerActive=reconcileLatestBoMWarnings([
+ {notice:issuedAfterIndex,warnings:[]}
+],{complete:false,nowMs:now,qldCurrentIndex:cancelledIndex});
+assert.equal(newerActive.products.IDQ21033.status,"geometry-unavailable",
+ "A real CAP warning issued AFTER the index was generated must stay active");
+const newerCancel=reconcileLatestBoMWarnings([
+ {notice:{...issuedAfterIndex,status:"cancelled"},warnings:[]}
+],{complete:false,nowMs:now,qldCurrentIndex:index});
+assert.equal(newerCancel.products.IDQ21033.status,"cancelled",
+ "A new CAP cancellation overrides an older index that still lists active");
+const bothActiveSameProduct=fakePage({indexLinks:
+ '<li><a href="/warning/severe-thunderstorm-warning/IDQ21035">Cancellation of Detailed warning</a></li>'+
+ '<li><a href="/warning/severe-thunderstorm-warning/IDQ21035">Severe Thunderstorm Warning for South East Queensland</a></li>'
+});
+assert.deepEqual(parseCurrentQldBoMWarningsIndex(bothActiveSameProduct,{nowMs:now}).activeCodes,
+ ["IDQ21033","IDQ21035"],
+ "One cancelled regional event must not hide an independently active event for the same product");
+
 console.log("PASS real 30-Oct BoM source scenario: current regional warning and 2 prospective GIS shapes, detailed product no current, observed intense rain not upgraded, independent index all-clear fail-closed");
