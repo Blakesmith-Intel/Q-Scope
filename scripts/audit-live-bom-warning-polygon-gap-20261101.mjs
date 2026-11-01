@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Non-deploying live investigation; never fabricate official warning geometry.
+// Post-deployment read-only rerun for official 1 Nov cancelled-warning negative reporting.
 import {bomCapRssLinks,parseBomCapProductNotice,parseOfficialBomCap}
   from "../frontend/src/context-layers/bom-warning-cap-source-v1.js";
 import {fetchCurrentQldBoMWarningsIndex}
