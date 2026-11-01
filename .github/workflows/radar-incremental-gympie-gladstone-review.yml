@@ -65,6 +65,11 @@ jobs:
           node --check _site/src/live3d-operational-v9.js
           node --check _site/src/bom-wmts-loop-v2.js
           node --check _site/src/continuous-playback-v1.js
+          # Verify the ACTUAL Pages /preview/ runtime, not only a root URL
+          # that silently enables a different set of radar recovery flags.
+          mkdir -p _site/preview/radar-refresh-review
+          rsync -a --exclude='/preview/' _site/ _site/preview/radar-refresh-review/
+          grep -Fq 'OPERATOR_RADAR_REVIEW' _site/preview/radar-refresh-review/src/live3d-operational-v9.js
       - name: Install mobile WebKit and desktop Chromium
         run: |
           npm install --no-save --ignore-scripts playwright@1.58.2
