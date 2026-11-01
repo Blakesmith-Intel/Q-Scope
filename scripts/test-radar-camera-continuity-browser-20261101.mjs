@@ -33,20 +33,22 @@ async function mapState(){
   status:document.querySelector("#status")?.textContent?.trim()
  }));
 }
-async function loadSix(region){
+async function loadAvailableRadar(region){
+ // Camera continuity must NOT depend on BoM publishing six complete scans.
+ // A shortened but genuine live loop is independently checked by source QA.
  await page.waitForFunction(region=>{
   const selector=document.querySelector("#radarSite");
   const label=document.querySelector("#hybridFrameLabel")?.textContent||"";
   return selector?.value===region && selector.disabled===false &&
-    /[1-6]\/6/.test(label);
+    /[1-9]\d*\/[1-9]\d*/.test(label);
  },region,{timeout:150000});
 }
 const site="https://blakesmith-intel.github.io/StormTracker/live3d-operational-v9.html?qaTownLabels=1&cameraLockQA=20261101";
 try{
  await page.goto(site,{waitUntil:"domcontentloaded",timeout:60000});
- await loadSix("66");
+ await loadAvailableRadar("66");
  await page.locator("#radarSite").selectOption("56");
- await loadSix("56");
+ await loadAvailableRadar("56");
  await page.evaluate(()=>{
   window.__stormtrackerTownLabelTestCamera(144.45,-23.41,235000,-43);
  });
@@ -90,7 +92,7 @@ try{
  near(restored.camera.range,before.camera.range,0.01);
  near(restored.camera.heading,before.camera.heading,0.00001);
  near(restored.camera.pitch,before.camera.pitch,0.00001);
- await loadSix("56");
+ await loadAvailableRadar("56");
  const final=await mapState();
  near(final.camera.longitude,before.camera.longitude);
  near(final.camera.latitude,before.camera.latitude);
