@@ -60,6 +60,13 @@ assert.match(runtime, /frame\?\.sourceMetadata\?\.region !== region/);
 assert.match(packager, /copyfile\("frontend\/src\/radar-source\.js"/);
 assert.match(packager, /copyfile\("frontend\/src\/radar-request-pressure-v1\.js"/);
 assert.match(packager, /V10\.2\.39 RADAR CROSS-SITE LIVE RECOVERY/);
+assert.match(runtime, /createRadarViewportSession/);
+assert.match(runtime, /recoveredRadarView\?\.radarSiteId \?\? DEFAULT_RADAR_SITE_ID/);
+assert.match(runtime, /if\(!operatorCameraChosen\)resetView\(\)/);
+assert.match(runtime, /configureRadarSite\(\); resetView\(\); saveOperatorRadarView\(\)/);
+assert.match(packager, /frontend\/src\/radar-viewport-continuity-v1\.js/);
+assert.match(packager, /V10\.2\.41 OPERATOR CAMERA CONTINUITY/);
+
 assert.match(runtime, /radarFrameCache\.has\(entry\.observedUtc\)/);
 assert.match(runtime, /getRadarFrames\(region, cacheCutoff\)/);
 assert.match(packager, /copyfile\("frontend\/src\/live-loop-refresh-v1\.js"/);
@@ -77,9 +84,14 @@ if (existsSync(fileURLToPath(packagedEngine))) {
   assert.match(build, /V10\.2\.38 VERIFIED RADAR HISTORY/);
   assert.match(build, /V10\.2\.39 RADAR CROSS-SITE LIVE RECOVERY/);
   assert.match(build, /V10\.2\.40 VERIFIED WMTS RESILIENCE/);
+  assert.match(build, /V10\.2\.41 OPERATOR CAMERA CONTINUITY/);
+  assert.match(live, /operatorCameraChosen/);
+  assert.match(live, /recoveredRadarView/);
+  assert.match(read("_site/src/radar-viewport-continuity-v1.js"), /RADAR_VIEW_SESSION_KEY/);
+
   assert.match(read("_site/src/radar-source.js"), /verifiedWmtsBlobs/);
   assert.match(read("_site/src/radar-request-pressure-v1.js"), /negativeTtlMs=45000/);
-  assert.match(read("_site/index.html"), /v10\.2\.40-radar-wmts-resilience-/);
-  assert.match(read("_site/live3d-operational-v9.html"), /v10\.2\.40-radar-wmts-resilience-/);
+  assert.match(read("_site/index.html"), /v10\.2\.41-radar-camera-continuity-/);
+  assert.match(read("_site/live3d-operational-v9.html"), /v10\.2\.41-radar-camera-continuity-/);
 }
 console.log("PASS radar auto refresh production contract, real published catch-up across sites, busy deferred retry, cadence, diagnostics and build overlay");
