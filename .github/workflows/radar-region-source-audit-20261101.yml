@@ -16,6 +16,11 @@ on:
       - frontend/src/radar-request-pressure-v1.js
       - frontend/tests/run-wmts-400-idr74-502-cascade-20261018-tests.mjs
   workflow_dispatch:
+# One live observation QA at a time: avoid multiple pushes flooding the
+# same public BoM tiles and inducing avoidable HTTP 403 refusals.
+concurrency:
+  group: source-verified-radar-qa-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -29,10 +34,11 @@ jobs:
           node-version: '24'
       - name: Probe a bounded set of source-published timestamps, comparing region corner and centre
         run: node scripts/probe-radar-region-loop-20261101.mjs
-      - name: Verify complete mosaics of the six latest published frames across multiple radar sites
-        run: node scripts/probe-full-regional-wmts-20261101.mjs
+      # The mobile WebKit job below decodes all genuine six-frame mosaics,
+      # so there is no need to download hundreds of the same tiles here.
 
   browser-site-switch:
+    needs: mobile-webkit-source
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -74,6 +80,7 @@ jobs:
           if-no-files-found: ignore
 
   mobile-webkit-source:
+    needs: audit
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
