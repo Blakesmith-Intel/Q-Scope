@@ -10,7 +10,7 @@ The source runtime sets Mt Stapylton as the initial default and calls `resetView
 
 ## Narrow correction
 - Store the operator-selected physical radar ID and full camera target (latitude/longitude, range, heading, pitch, target height) in safe bounded **per-tab sessionStorage**.
-- On same-tab Safari reload/iframe restart, restore only a known radar ID and validated recent view (up to six hours old). A genuinely new tab still defaults to Mt Stapylton as previously approved.
+- On same-tab Safari reload/iframe restart, restore only a known radar ID and validated recent view (for the lifetime of that operator tab). A genuinely new tab still defaults to Mt Stapylton as previously approved.
 - Do not let asynchronous model/terrain startup call `resetView()` after the operator has changed the camera or selected a different radar.
 - Save after real camera gestures, selected-radar changes, radar marker re-centre, and explicit Reset, and on tab pagehide. No camera reposition is added to automatic refresh.
 - Keep all existing user-triggered camera actions: primary-radar selection, Fit selected radars, explicit Reset, manual pan/zoom/rotation/tilt, and specific warning focus behaviour.
