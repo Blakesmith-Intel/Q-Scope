@@ -131,7 +131,7 @@ jobs:
       - name: Checkout tested radar refresh candidate for isolated operator QA
         uses: actions/checkout@v4
         with:
-          ref: 152a367bca60f2c01e6c1e62ad65e9ced7f84247
+          ref: 4e1032497b03af9de9935a2a93a5905b53a8c1a8
           path: checked/radar-refresh-review
           persist-credentials: false
 
@@ -258,7 +258,7 @@ jobs:
         run: |
           set -euo pipefail
           # Pin to the tested source, never a floating feature branch.
-          test "$(git -C checked/radar-refresh-review rev-parse HEAD)" = "152a367bca60f2c01e6c1e62ad65e9ced7f84247"
+          test "$(git -C checked/radar-refresh-review rev-parse HEAD)" = "4e1032497b03af9de9935a2a93a5905b53a8c1a8"
           # The normal operational build has already completed. Compare its
           # accepted root assets before and after producing ONLY preview files.
           sha256sum _site/index.html _site/live3d-operational-v9.html \
@@ -279,7 +279,7 @@ jobs:
           rsync -a --exclude='/preview/' \
             checked/radar-refresh-review/_site/ \
             _site/preview/radar-refresh-review/
-          printf 'REVIEW BUILD from tested source 152a367bca60f2c01e6c1e62ad65e9ced7f84247; NOT OPERATIONAL PRODUCTION\n' \
+          printf 'REVIEW BUILD from tested source 4e1032497b03af9de9935a2a93a5905b53a8c1a8; NOT OPERATIONAL PRODUCTION\n' \
             > _site/preview/radar-refresh-review/REVIEW.txt
           python - <<'PY'
           from pathlib import Path
