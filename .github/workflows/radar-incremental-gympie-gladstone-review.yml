@@ -1,4 +1,4 @@
-name: Review system-wide incremental radar (genuine BoM, mobile)
+name: Review system-wide incremental radar (genuine BoM, mobile and desktop)
 on:
   pull_request:
     branches: [main]
@@ -61,16 +61,18 @@ jobs:
           node --check _site/src/live3d-operational-v9.js
           node --check _site/src/bom-wmts-loop-v2.js
           node --check _site/src/continuous-playback-v1.js
-      - name: Install mobile WebKit
+      - name: Install mobile WebKit and desktop Chromium
         run: |
           npm install --no-save --ignore-scripts playwright@1.58.2
-          npx playwright install --with-deps webkit
+          npx playwright install --with-deps webkit chromium
       - name: Repeated real radar checks across seven regions and GPU/browser continuity
         run: |
           python -m http.server 8137 --bind 127.0.0.1 --directory _site >/tmp/st-radar-review.log 2>&1 &
           node scripts/test-gympie-gladstone-incremental-webkit-20261101.mjs
-      - name: Require genuine WMTS frame insertion without restarting player or page
+      - name: Require genuine WMTS frame insertion without mobile Safari player/page restart
         run: node scripts/test-incremental-append-real-wmts-webkit-20261101.mjs
+      - name: Require same genuine WMTS frame insertion without desktop Chromium player/page restart
+        run: STORMTRACKER_BROWSER=desktop node scripts/test-incremental-append-real-wmts-webkit-20261101.mjs
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -78,4 +80,5 @@ jobs:
           path: |
             /tmp/incremental-radar-webkit-failure.png
             /tmp/radar-incremental-real-append-failure.png
+            /tmp/radar-incremental-desktop-append-failure.png
           if-no-files-found: ignore
