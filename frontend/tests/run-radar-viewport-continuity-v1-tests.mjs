@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {
  createRadarViewportSession,validateRadarViewportRecord,
- RADAR_VIEW_SESSION_MAX_AGE_MS,RADAR_VIEW_SESSION_KEY
+ RADAR_VIEW_SESSION_KEY
 } from "../src/radar-viewport-continuity-v1.js";
 const sites={"66":{name:"Mt Stapylton"},"56":{name:"Longreach"}};
 const camera={
@@ -41,7 +41,7 @@ assert.equal(tab.save("56",camera),true);
 storage.set(RADAR_VIEW_SESSION_KEY,"corrupted JSON");
 assert.equal(tab.restore(),null,"Broken session data is nonfatal");
 assert.equal(tab.save("56",camera),true);
-t+=RADAR_VIEW_SESSION_MAX_AGE_MS+1;
-assert.equal(tab.restore(),null,
- "Yesterday's operator viewport must not persist into a new working session");
+t+=72*60*60*1000;
+assert.equal(tab.restore().radarSiteId,"56",
+ "A radar incident spanning multiple days must not silently reset to Mt Stapylton within the same tab");
 console.log("PASS operator radar viewport remains at Longreach across same-tab Safari reload and validates saved coordinates.");
