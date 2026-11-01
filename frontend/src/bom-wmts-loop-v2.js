@@ -218,6 +218,28 @@ function createCanvas(width, height) {
   throw new Error("No browser canvas implementation is available.");
 }
 
+// Testable source-only retry; every success is still a decoded authentic
+// PNG for the EXACT published timestamp and tile coordinate.
+export async function fetchWmtsPreflightTile(url,fetchTile,{
+  wait=ms=>new Promise(resolve=>setTimeout(resolve,ms)),
+  retryDelayMs=750
+}={}){
+  if(!url||typeof fetchTile!=="function")
+    throw new TypeError("WMTS preflight URL and source tile loader required");
+  try{
+    return await fetchTile(url);
+  }catch(error){
+    const message=String(error?.message??error);
+    const code=Number(error?.status)||Number(/HTTP\\s+(\\d{3})/.exec(message)?.[1])||0;
+    // BoM 400 = unpublished/rejected time. 403 = denied. 429 = relay
+    // cooldown. Never blindly retry and amplify any of these failures.
+    if([400,403,429].includes(code)||/relay cooldown|queue full/i.test(message))
+      throw error;
+    await wait(retryDelayMs);
+    return fetchTile(url);
+  }
+}
+
 export async function loadVerifiedNationalMosaicAtTime(observedUtc, region = 'SEQ') {
   if (!observedUtc) throw new Error("observedUtc is required.");
   const window = reflectivityWindowForRegion(region);
@@ -251,7 +273,11 @@ export async function loadVerifiedNationalMosaicAtTime(observedUtc, region = 'SE
   const first=tasks[0];
   let firstImage;
   try{
-    firstImage=await fetchReadableImage(first.url);
+    // One brief transient retry for the SOURCE-PROOF preflight tile. A single
+    // 502/503/network hiccup must not silently remove an otherwise published
+    // five-minute frame from the operator loop. A real 400/403/429 remains
+    // terminal for this attempt and is not hammered or fabricated.
+    firstImage=await fetchWmtsPreflightTile(first.url,fetchReadableImage);
   }catch(error){
     if(/HTTP\s+400\b/.test(String(error?.message??error)))
       unavailableTime.reject(observedUtc,region);
