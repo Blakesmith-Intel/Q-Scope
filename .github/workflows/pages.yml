@@ -1676,7 +1676,10 @@ jobs:
   seal_radar_cross_site_live:
     name: Seal V10.2.39 cross-site radar auto-follow only after published-site acceptance
     needs: deploy
-    if: github.ref == 'refs/heads/main'
+    # Immutable V10.2.39 was accepted at this original release commit.
+    # Later maintenance deployments must not attempt to reseal it or compare
+    # its frozen tag against the newer GITHUB_SHA.
+    if: github.ref == 'refs/heads/main' && github.sha == '12024a83749d8a4e435874b64d5e36ecb911d858'
     runs-on: ubuntu-latest
     permissions:
       contents: write
