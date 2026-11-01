@@ -250,3 +250,8 @@ If an operator sees **no readable radar tiles**, a partial frame count or an une
 The V10.2.40 internal change reuses source-verified PNGs, limits simultaneous tile requests, isolates single-tile failures, protects radar switching from stale cache writes, and supports automatic in-tab recovery. It **does not change** radar site positions, 3-D science, imagery colour thresholds, the five-minute refresh interval, Doppler source rules, approved rainfall/AEP or flood gauges, or any BoM warning semantics. Reload the site once after a published release to obtain its new script identity.
 
 See [V10.2.40 source and acceptance notes](RELEASE_NOTES_V10.2.40.md). Native iPhone Safari field acceptance should still be completed by an operator; automated WebKit/Chromium tests alone do not establish sustained field reliability.
+
+
+## 1 November 2026 — radar map position remains under operator control (V10.2.41)
+
+Automatic BoM radar-frame updates must **never** change the selected radar, zoom, centre, bearing or tilt. When operating around Longreach or another radar site, the map stays where you put it while newer real observations load. A same-tab Safari page restoration also restores the last operator-selected radar and camera view, for the lifetime of that operator tab; a genuinely new tab starts at Mt Stapylton as usual. Manual radar selection and the explicit Reset/Fit map controls still move the map when deliberately requested. There is no change to the five-minute radar refresh or other situational-awareness layers. See [V10.2.41 release notes](RELEASE_NOTES_V10.2.41.md).

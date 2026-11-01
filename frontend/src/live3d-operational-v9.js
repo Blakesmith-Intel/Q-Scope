@@ -1,5 +1,6 @@
 import { QLD_RADAR_SITES } from "./qld-radar-sites-v1.js";
 import { BORDER_RADAR_SITES, primaryRadarDopplerSites } from "./border-radar-sites-v1.js";
+import {createRadarViewportSession} from "./radar-viewport-continuity-v1.js?v=20261101-operator-camera-persist";
 import {createSupplementalDopplerDisplay, supportedSecondaryWindSites,
   waitForSecondaryWindPreparation} from "./multi-doppler-display-v1.js?v=v10-wind-sites-20261017-sync-qa-v1";
 import { createRadarSiteNameOverlay } from "./context-layers/radar-site-name-overlay-v1.js?v=nsw-border-radar-v1";
@@ -401,6 +402,28 @@ const cameraPerformance =
 
 const DEFAULT_RADAR_SITE_ID = "66"; // Brisbane (Mt Stapylton)
 previousPrimaryRadarId=DEFAULT_RADAR_SITE_ID;
+// The default applies only to a genuinely NEW tab. Automatic BoM updates and
+// same-tab Safari page restorations must not force an operator back to 66.
+const radarViewSession=createRadarViewportSession({
+  storage:(()=>{try{return window.sessionStorage;}catch{return null;}})(),
+  sites:BORDER_RADAR_SITES
+});
+const recoveredRadarView=radarViewSession.restore();
+let operatorCameraChosen=Boolean(recoveredRadarView);
+let pendingViewportSave=null;
+function saveOperatorRadarView(){
+  if(pendingViewportSave!==null){
+    clearTimeout(pendingViewportSave);
+    pendingViewportSave=null;
+  }
+  if(!mapCamera)return;
+  radarViewSession.save($("radarSite")?.value,mapCamera.getState());
+}
+function scheduleOperatorRadarViewSave(){
+  if(pendingViewportSave!==null)clearTimeout(pendingViewportSave);
+  pendingViewportSave=setTimeout(saveOperatorRadarView,250);
+}
+window.addEventListener("pagehide",saveOperatorRadarView);
 
 const CORE_HOME =
   Object.freeze({
@@ -468,7 +491,11 @@ mapCamera =
     home:
       CORE_HOME,
 
-    onInteraction: () => cameraPerformance.pulse(),
+    onInteraction: () => {
+      operatorCameraChosen=true;
+      cameraPerformance.pulse();
+      scheduleOperatorRadarViewSave();
+    },
     onNavigationStart: () => {
       basemapManager?.setNavigationActive(true);
       queenslandTownLabels?.setNavigationActive(true);
@@ -1412,8 +1439,11 @@ for (const site of Object.values(BORDER_RADAR_SITES).sort((a,b) => a.name.locale
 }
 // Primary alone owns storm tracks and inferred 3-D science. Extra sites
 // show source-timed reflectivity OR their own BoM native Doppler on wind mode.
-$("radarSite").value = DEFAULT_RADAR_SITE_ID;
+$("radarSite").value = recoveredRadarView?.radarSiteId ?? DEFAULT_RADAR_SITE_ID;
+previousPrimaryRadarId=selectedRadarRegion();
 configureRadarSite();
+if(recoveredRadarView?.camera)
+  mapCamera.setView(recoveredRadarView.camera);
 function refreshAdditionalRadarChoices(){
   const primary=selectedRadarRegion();
   additionalRadarSiteIds=chooseSupplementalRadarSites(primary,
@@ -1522,7 +1552,8 @@ const radarSiteNames=createRadarSiteNameOverlay({
     const selector=$("radarSite");
     if(!Object.hasOwn(BORDER_RADAR_SITES,id))return;
     if(selector.value===id){
-      resetView();
+      operatorCameraChosen=true;
+      resetView(); saveOperatorRadarView();
       scene.requestRender();
       return;
     }
@@ -5253,7 +5284,9 @@ async function initialise() {
       );
     });
 
-  resetView();
+  // Model/terrain startup is asynchronous. Do not overwrite a camera pose
+  // already chosen by an operator while those dependencies were loading.
+  if(!operatorCameraChosen)resetView();
 
   updateLoopButtonLabel();
 
@@ -5301,7 +5334,9 @@ $("radarSite").addEventListener("change", () => runSourceLoad(async () => {
       [...additionalRadarSiteIds,previousPrimaryRadarId],BORDER_RADAR_SITES);
   }
   previousPrimaryRadarId=nextPrimary;
-  configureRadarSite(); resetView(); clearDopplerOverlay();
+  operatorCameraChosen=true;
+  configureRadarSite(); resetView(); saveOperatorRadarView();
+  clearDopplerOverlay();
   refreshAdditionalRadarChoices();
   if(INCREMENTAL_VOLUME_PREVIEW)
     supplementalVolumeDisplay?.pruneSites(additionalRadarSiteIds);
@@ -5614,7 +5649,8 @@ $("pointSize").addEventListener(
 $("resetButton").addEventListener(
   "click",
   () => {
-    resetView();
+    operatorCameraChosen=true;
+    resetView(); saveOperatorRadarView();
   }
 );
 

@@ -46,7 +46,7 @@ jobs:
   radar-production-package:
     # Run the full pinned-site build only on this scoped radar reliability
     # branch; routine feature validation remains the existing fast job.
-    if: contains(fromJSON('["fix/radar-region-loop-20261101","fix/radar-wmts-source-acceptance-20261101"]'), github.ref_name) || github.head_ref == 'fix/radar-wmts-source-acceptance-20261101'
+    if: contains(fromJSON('["fix/radar-region-loop-20261101","fix/radar-wmts-source-acceptance-20261101","fix/radar-auto-refresh-camera-lock-20261101"]'), github.ref_name) || github.head_ref == 'fix/radar-auto-refresh-camera-lock-20261101'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -83,6 +83,11 @@ jobs:
           node frontend/tests/run-radar-auto-refresh-v10-2-37-tests.mjs
           grep -Fq 'V10.2.39 RADAR CROSS-SITE LIVE RECOVERY' _site/BUILD.txt
           grep -Fq 'V10.2.40 VERIFIED WMTS RESILIENCE' _site/BUILD.txt
+          grep -Fq 'V10.2.41 OPERATOR CAMERA CONTINUITY' _site/BUILD.txt
+          grep -Fq 'recoveredRadarView' _site/src/live3d-operational-v9.js
+          grep -Fq 'createRadarViewportSession' _site/src/radar-viewport-continuity-v1.js
+          node --check _site/src/radar-viewport-continuity-v1.js
+          node frontend/tests/run-radar-viewport-continuity-v1-tests.mjs
           grep -Fq 'verifiedWmtsBlobs' _site/src/radar-source.js
           grep -Fq 'negativeTtlMs=45000' _site/src/radar-request-pressure-v1.js
           grep -Fq 'published.slice(-9).reverse()' _site/src/bom-wmts-loop-v2.js

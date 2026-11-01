@@ -232,6 +232,18 @@ replace_once(
     return;'''
 )
 
+
+# A source-data polling cycle must never make the map camera behave like a
+# new page. Restore only a validated per-tab user selection and camera pose.
+replace_once("import {createSupplementalDopplerDisplay, supportedSecondaryWindSites,","import {createRadarViewportSession} from \"./radar-viewport-continuity-v1.js?v=20261101-operator-camera-persist\";\nimport {createSupplementalDopplerDisplay, supportedSecondaryWindSites,")
+replace_once("const DEFAULT_RADAR_SITE_ID = \"66\"; // Brisbane (Mt Stapylton)\npreviousPrimaryRadarId=DEFAULT_RADAR_SITE_ID;\n","const DEFAULT_RADAR_SITE_ID = \"66\"; // Brisbane (Mt Stapylton)\npreviousPrimaryRadarId=DEFAULT_RADAR_SITE_ID;\n// The default applies only to a genuinely NEW tab. Automatic BoM updates and\n// same-tab Safari page restorations must not force an operator back to 66.\nconst radarViewSession=createRadarViewportSession({\n  storage:(()=>{try{return window.sessionStorage;}catch{return null;}})(),\n  sites:BORDER_RADAR_SITES\n});\nconst recoveredRadarView=radarViewSession.restore();\nlet operatorCameraChosen=Boolean(recoveredRadarView);\nlet pendingViewportSave=null;\nfunction saveOperatorRadarView(){\n  if(pendingViewportSave!==null){\n    clearTimeout(pendingViewportSave);\n    pendingViewportSave=null;\n  }\n  if(!mapCamera)return;\n  radarViewSession.save($(\"radarSite\")?.value,mapCamera.getState());\n}\nfunction scheduleOperatorRadarViewSave(){\n  if(pendingViewportSave!==null)clearTimeout(pendingViewportSave);\n  pendingViewportSave=setTimeout(saveOperatorRadarView,250);\n}\nwindow.addEventListener(\"pagehide\",saveOperatorRadarView);\n")
+replace_once("    onInteraction: () => cameraPerformance.pulse(),","    onInteraction: () => {\n      operatorCameraChosen=true;\n      cameraPerformance.pulse();\n      scheduleOperatorRadarViewSave();\n    },")
+replace_once("$(\"radarSite\").value = DEFAULT_RADAR_SITE_ID;\nconfigureRadarSite();","$(\"radarSite\").value = recoveredRadarView?.radarSiteId ?? DEFAULT_RADAR_SITE_ID;\npreviousPrimaryRadarId=selectedRadarRegion();\nconfigureRadarSite();\nif(recoveredRadarView?.camera)\n  mapCamera.setView(recoveredRadarView.camera);")
+replace_once("  resetView();\n\n  updateLoopButtonLabel();","  // Model/terrain startup is asynchronous. Do not overwrite a camera pose\n  // already chosen by an operator while those dependencies were loading.\n  if(!operatorCameraChosen)resetView();\n\n  updateLoopButtonLabel();")
+replace_once("  previousPrimaryRadarId=nextPrimary;\n  configureRadarSite(); resetView(); clearDopplerOverlay();","  previousPrimaryRadarId=nextPrimary;\n  operatorCameraChosen=true;\n  configureRadarSite(); resetView(); saveOperatorRadarView();\n  clearDopplerOverlay();")
+replace_once("    if(selector.value===id){\n      resetView();\n      scene.requestRender();\n      return;\n    }","    if(selector.value===id){\n      operatorCameraChosen=true;\n      resetView(); saveOperatorRadarView();\n      scene.requestRender();\n      return;\n    }")
+replace_once("$(\"resetButton\").addEventListener(\n  \"click\",\n  () => {\n    resetView();\n  }\n);","$(\"resetButton\").addEventListener(\n  \"click\",\n  () => {\n    operatorCameraChosen=true;\n    resetView(); saveOperatorRadarView();\n  }\n);")
+
 app.write_text(data, encoding="utf-8")
 copyfile("frontend/src/live-loop-refresh-v1.js", site / "src/live-loop-refresh-v1.js")
 # The sealed production bundle historically used an older radar-source and
@@ -239,6 +251,7 @@ copyfile("frontend/src/live-loop-refresh-v1.js", site / "src/live-loop-refresh-v
 # and 45-second tile rejection policy into actual production, not QA only.
 copyfile("frontend/src/radar-source.js", site / "src/radar-source.js")
 copyfile("frontend/src/radar-request-pressure-v1.js", site / "src/radar-request-pressure-v1.js")
+copyfile("frontend/src/radar-viewport-continuity-v1.js", site / "src/radar-viewport-continuity-v1.js")
 
 # Both the outer iframe and the inner ES-module need a new immutable URL key:
 # returning iOS Safari tabs otherwise continue using the old running loader.
@@ -249,7 +262,7 @@ for relative, marker in (
     page = site / relative
     html = page.read_text(encoding="utf-8")
     assert html.count(marker) == 1, f"Cannot refresh production browser cache: {marker}"
-    html = html.replace(marker, marker + "v10.2.40-radar-wmts-resilience-", 1)
+    html = html.replace(marker, marker + "v10.2.41-radar-camera-continuity-", 1)
     page.write_text(html, encoding="utf-8")
 
 # Preserve the existing V10.2.38 marker, and append a new independent
@@ -267,12 +280,19 @@ with (site / "BUILD.txt").open("a", encoding="utf-8") as build:
         "V10.2.40 VERIFIED WMTS RESILIENCE: published scan recovery, bounded PNG "
         "tile cache, transient request isolation and cross-site cache safety 2026-11-01\n"
     )
+    build.write(
+        "V10.2.41 OPERATOR CAMERA CONTINUITY: preserve selected radar and camera "
+        "during new frames, delayed app initialization and Safari tab reload 2026-11-01\n"
+    )
 assert "discoverBoundedBomReflectivityHistory(now,5,region)" not in data
 assert "discoverBoundedBomReflectivityHistory(now,180,region)" in data
 assert "recordRadarAutoRefreshAudit" in data
 assert "LIVE_LOOP_BUSY_RETRY_MS" in (site / "src/live-loop-refresh-v1.js").read_text()
+assert "recoveredRadarView" in data
+assert "radarViewportContinuityNoOp" not in data
+assert (site / "src/radar-viewport-continuity-v1.js").exists()
 assert "verifiedWmtsBlobs" in (site / "src/radar-source.js").read_text()
 assert "negativeTtlMs=45000" in (site / "src/radar-request-pressure-v1.js").read_text()
 assert "frame?.sourceMetadata?.region !== region" in data
 assert "manual site load failed; automatic retry queued" in data
-print("RADAR_SOURCE_RESILIENCE_V10_2_40_PACKAGED")
+print("RADAR_OPERATOR_CAMERA_V10_2_41_PACKAGED")

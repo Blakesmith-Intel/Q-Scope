@@ -1821,3 +1821,75 @@ jobs:
           test "$(git ls-remote origin "refs/tags/$tag^{}" | cut -f1)" = "$release_sha"
           test "$(git ls-remote origin "refs/heads/$restore" | cut -f1)" = "$release_sha"
           echo "SEALED $tag at $release_sha; all older frozen releases remain untouched"
+
+  seal_radar_camera_41:
+    name: Seal V10.2.41 radar operator camera after public Pages acceptance
+    needs: deploy
+    # Never repeat seal creation for later unrelated deployments.
+    if: github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'V10.2.41:')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - name: Verify public operator camera, source release, then seal new refs
+        env:
+          GH_TOKEN: ${{ secrets.STORMTRACKER_RELEASE_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          release_sha="$GITHUB_SHA"
+          tag="v10.2.41"
+          restore="restore/v10.2.41"
+          test -f docs/RELEASE_NOTES_V10.2.41.md
+          grep -Fq 'V10.2.41 OPERATOR CAMERA CONTINUITY' scripts/apply-radar-auto-refresh-v1.py
+          previous_tag="$(git ls-remote origin 'refs/tags/v10.2.40^{}' | cut -f1)"
+          previous_restore="$(git ls-remote origin 'refs/heads/restore/v10.2.40' | cut -f1)"
+          test -n "$previous_tag" && test "$previous_tag" = "$previous_restore" ||
+            { echo "Prior immutable radar refs disagree; refuse camera release seal"; exit 1; }
+          base="https://blakesmith-intel.github.io/StormTracker"
+          published=false
+          for attempt in $(seq 1 12); do
+            query="?cameraRelease=$release_sha&attempt=$attempt"
+            build="$(curl -fsSL --max-time 20 "$base/BUILD.txt$query" || true)"
+            runtime="$(curl -fsSL --max-time 20 "$base/src/live3d-operational-v9.js$query" || true)"
+            module="$(curl -fsSL --max-time 20 "$base/src/radar-viewport-continuity-v1.js$query" || true)"
+            landing="$(curl -fsSL --max-time 20 "$base/index.html$query" || true)"
+            if grep -Fq 'V10.2.41 OPERATOR CAMERA CONTINUITY' <<< "$build" &&
+               grep -Fq 'recoveredRadarView?.radarSiteId ?? DEFAULT_RADAR_SITE_ID' <<< "$runtime" &&
+               grep -Fq 'if(!operatorCameraChosen)resetView()' <<< "$runtime" &&
+               grep -Fq 'saveOperatorRadarView' <<< "$runtime" &&
+               grep -Fq 'RADAR_VIEW_SESSION_KEY' <<< "$module" &&
+               grep -Fq 'v10.2.41-radar-camera-continuity-' <<< "$landing"; then
+              published=true
+              break
+            fi
+            sleep 5
+          done
+          test "$published" = true ||
+            { echo "Refuse V10.2.41 seal: production camera continuity not verifiable"; exit 1; }
+          old_tag="$(git ls-remote origin "refs/tags/$tag^{}" | cut -f1)"
+          old_restore="$(git ls-remote origin "refs/heads/$restore" | cut -f1)"
+          if [ -n "$old_tag" ] && [ -n "$old_restore" ]; then
+            test "$old_tag" = "$old_restore" ||
+              { echo "Immutable camera references disagree; no mutation"; exit 1; }
+            echo "$tag already sealed at $old_tag; older refs unchanged"
+            exit 0
+          fi
+          test -z "$old_tag" || test "$old_tag" = "$release_sha"
+          test -z "$old_restore" || test "$old_restore" = "$release_sha"
+          if [ -z "$old_restore" ]; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/heads/$restore" -f sha="$release_sha" >/dev/null
+          fi
+          if [ -z "$old_tag" ]; then
+            obj="$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/tags" \
+              -f tag="$tag" \
+              -f message="StormTracker V10.2.41: operator camera preserved through radar frame refresh and Safari restarts" \
+              -f object="$release_sha" -f type=commit --jq .sha)"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/tags/$tag" -f sha="$obj" >/dev/null
+          fi
+          test "$(git ls-remote origin "refs/tags/$tag^{}" | cut -f1)" = "$release_sha"
+          test "$(git ls-remote origin "refs/heads/$restore" | cut -f1)" = "$release_sha"
+          echo "SEALED $tag at $release_sha; all earlier tags and restore refs untouched"
