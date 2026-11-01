@@ -21,10 +21,12 @@ assert.match(runtime, /const DEFAULT_RADAR_SITE_ID = "66"/);
 assert.match(runtime, /QLD_RADAR_SITES\[DEFAULT_RADAR_SITE_ID\]\.longitude/);
 assert.match(runtime, /QLD_RADAR_SITES\[DEFAULT_RADAR_SITE_ID\]\.latitude/);
 assert.match(runtime, /if \(site\.id !== DEFAULT_RADAR_SITE_ID\) \$\("radarSite"\)\.append\(option\)/);
-assert.match(runtime, /\$\("radarSite"\)\.value = DEFAULT_RADAR_SITE_ID;\s*configureRadarSite\(\)/);
+assert.match(runtime, /\$\("radarSite"\)\.value = recoveredRadarView\?\.radarSiteId \?\? DEFAULT_RADAR_SITE_ID/);
+assert.match(runtime, /previousPrimaryRadarId=selectedRadarRegion\(\)/);
+assert.match(runtime, /if\(!operatorCameraChosen\)resetView\(\)/);
 assert.match(runtime, /function selectedRadarRegion\(\) \{ return \$\("radarSite"\)\.value; \}/);
 assert.match(runtime, /function resetView\(\) \{\s*const site = BORDER_RADAR_SITES\[selectedRadarRegion\(\)\]/);
-assert.match(runtime, /resetView\(\);\s*updateLoopButtonLabel\(\)/);
+assert.match(runtime, /if\(!operatorCameraChosen\)resetView\(\);\s*updateLoopButtonLabel\(\)/);
 
 // ID 66 must have real geography and a single genuine Doppler source rather
 // than the three-site regional mosaic previously selected at startup.
@@ -39,4 +41,4 @@ assert.match(html,/type="hidden" id="dopplerOverlayRadar"/,
   "Primary radar selection must own Doppler behind the scenes");
 assert.match(runtime,/\$\("dopplerOverlayRadar"\)\.value=ids\[0\]\?\?""/,
   "Internal Doppler source always follows the selected physical radar");
-console.log("Startup radar contract passed: one primary radar selection, no SEQ mosaic or separate Doppler site control.");
+console.log("Startup radar contract passed: new tabs default to Mt Stapylton, same-tab operator view is retained.");
