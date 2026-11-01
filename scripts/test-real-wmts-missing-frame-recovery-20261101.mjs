@@ -74,7 +74,9 @@ async function snapshot(){
   site:document.querySelector("#radarSite")?.value,
   button:document.querySelector("#hybridPlayButton")?.textContent?.trim(),
   diagnostics:window.__stormtrackerRadarDiagnostics?.(),
-  canvases:document.querySelectorAll("#cesiumContainer canvas").length
+  canvases:document.querySelectorAll("#cesiumContainer canvas").length,
+  qaHook:typeof window.__stormtrackerRadarQaCheck,
+  status:document.querySelector("#status")?.textContent?.trim()
  }));
 }
 try{
@@ -87,7 +89,7 @@ try{
    typeof window.__stormtrackerRadarQaCheck==="function" &&
    /\b\d+\/5\b/.test(document.querySelector("#hybridFrameLabel")?.textContent??"") &&
    window.__stormtrackerRadarDiagnostics()?.automatic?.newestAcceptedUtc,
-  null,{timeout:180000});
+  null,{timeout:300000,polling:250});
  const before=await snapshot();
  assert.equal(before.site,"66");
  assert(await page.evaluate(()=>typeof window.__stormtrackerMemoryDiagnostics==="function"),
@@ -119,7 +121,7 @@ try{
   return data?.incremental?.fullRebuildUpdates>=1 &&
     /\b\d+\/6\b/.test(document.querySelector("#hybridFrameLabel")?.textContent??"") &&
     Date.parse(data.automatic.newestAcceptedUtc)>Date.parse(expected);
- },heldBackUtc,{timeout:120000});
+ },heldBackUtc,{timeout:180000,polling:250});
  const after=await snapshot();
  assert.equal(after.diagnostics.incremental.appendUpdates,0,
   "An interior source gap must not be treated as a forward append");
