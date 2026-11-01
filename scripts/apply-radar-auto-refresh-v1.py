@@ -96,13 +96,7 @@ replace_once(
       // applies bounded retry without resetting the normal 5-minute cadence.
       throw error;
     }
-    else setStatus(error.message, "error");
-  } finally {'''
-)
-replace_once(
-    '''    else setStatus(error.message, "error");
-  } finally {''',
-    '''    else {
+    else {
       setStatus(error.message, "error");
       recordRadarAutoRefreshAudit({
         failure:String(error?.message??error),
