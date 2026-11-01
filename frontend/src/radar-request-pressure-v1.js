@@ -4,7 +4,8 @@
 // service outage temporarily opens a circuit for THIS WMTS request class.
 export function createRadarRequestPressureGuard({
   maxConcurrent=3,maxPending=72,
-  negativeTtlMs=300000,deniedCooldownMs=30000,
+  // Published-but-not-ready BoM tiles can recover within a minute.
+  negativeTtlMs=45000,deniedCooldownMs=30000,
   serviceCooldownMs=15000,now=()=>Date.now()
 }={}) {
   const inflight=new Map(), negative=new Map(), queue=[];
@@ -38,10 +39,10 @@ export function createRadarRequestPressureGuard({
             negative.set(item.url,{until:now()+negativeTtlMs,status});
             if(negative.size>320)negative.delete(negative.keys().next().value);
           }
-          if(status===403||status===429||
-            status===502||status===503||status===504){
-            const until=now()+((status===403||status===429)
-              ?deniedCooldownMs:serviceCooldownMs);
+          // A single 502/503/504 on one WMTS tile is NOT a national
+          // failure. Only permission/rate refusals open the brief circuit.
+          if(status===403||status===429){
+            const until=now()+deniedCooldownMs;
             if(until>blockedUntil){blockedUntil=until;blockedStatus=status;}
           }
           item.reject(error);
