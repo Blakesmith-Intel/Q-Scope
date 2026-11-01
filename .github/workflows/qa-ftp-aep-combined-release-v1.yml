@@ -72,6 +72,13 @@ jobs:
         run: |
           bash scripts/build-current-site.sh
           python scripts/apply-ftp-aep-release-v10.py
+          # The live site uses the retained post-seal radar/camera overlay.
+          # Without this step the old fixture imports a non-existent runtime
+          # module and fails before Cesium starts; test the actual shipped app.
+          python scripts/apply-radar-auto-refresh-v1.py
+          test -s _site/src/radar-viewport-continuity-v1.js
+          test -s _site/src/radar-incremental-window-v1.js
+          test -s _site/src/radar-lifecycle-diagnostics-v1.js
           node --check _site/src/live3d-operational-v9.js
           node --check _site/src/bom-wmts-loop-v2.js
           ! test -e _site/src/ftp-reflectivity-operational-v1.js
