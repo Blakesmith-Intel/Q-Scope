@@ -151,7 +151,13 @@ async function validatedNationalTimes(now,region,publishedTimes,verifyTile=probe
  for(const observedUtc of published.slice(-3).reverse()){
   try{
    if(await verifyTile(observedUtc,region))
-    return history.filter(t=>t<=observedUtc);
+    // GetCapabilities may advertise stale observations that cannot be
+    // retrieved; keep only a bounded recent replay tail relative to the
+    // newest readable source scan. The browser's verified local archive
+    // independently serves longer historical loops.
+    const verifiedEpoch=Date.parse(observedUtc);
+    return history.filter(t=>Date.parse(t)<=verifiedEpoch &&
+      Date.parse(t)>=verifiedEpoch-55*60000);
   }catch(error){
    unavailableTime.reject(observedUtc);
    console.warn("National BoM reflectivity frame unavailable",observedUtc,
