@@ -3,7 +3,8 @@ import {readFileSync} from "node:fs";
 import {planIncrementalRadarWindow} from "../src/radar-incremental-window-v1.js";
 import {createContinuousPlayback} from "../src/continuous-playback-v1.js";
 import {installRadarLifecycleDiagnostics} from "../src/radar-lifecycle-diagnostics-v1.js";
-import {radarTileFailureSnapshot} from "../src/bom-wmts-loop-v2.js";
+import {radarTileFailureSnapshot,reflectivityWindowForRegion} from "../src/bom-wmts-loop-v2.js";
+import {BORDER_RADAR_SITES} from "../src/border-radar-sites-v1.js";
 
 const iso=n=>new Date(Date.UTC(2026,10,1,0,n)).toISOString().replace(".000Z","Z");
 const frame=n=>({observedUtc:iso(n),sourceMetadata:{region:"08"}});
@@ -25,6 +26,37 @@ const inferred={...frame(10),sourceMetadata:{region:"08",temporalInference:{meth
 assert.equal(planIncrementalRadarWindow([frame(5),inferred,frame(15)],series([5,10,15,20])),null);
 assert.equal(planIncrementalRadarWindow(first,next.map(f=>({...f,sourceMetadata:{region:"23"}}))),null);
 assert.equal(planIncrementalRadarWindow(first,series([5,10,15,15,25,30])),null);
+
+// Every registered QLD/NSW site uses the same source-true append contract.
+// A site-specific fix would leave unrelated regions vulnerable. Guard all
+// geographic WMTS windows and each site's independent frame selection.
+const sites=Object.keys(BORDER_RADAR_SITES);
+assert(sites.length>=20,"Registered radar-site catalogue unexpectedly shrank");
+for(const site of sites){
+ const window=reflectivityWindowForRegion(site);
+ assert(window.colStart>=0&&window.colEnd>=window.colStart,
+   "Invalid WMTS columns at radar "+site);
+ assert(window.rowStart>=0&&window.rowEnd>=window.rowStart,
+   "Invalid WMTS rows at radar "+site);
+ const at=n=>({...frame(n),sourceMetadata:{region:site}});
+ const prior=[0,5,10,15,20,25].map(at);
+ const following=[5,10,15,20,25,30].map(at);
+ const updated=planIncrementalRadarWindow(prior,following);
+ assert.equal(updated?.appended,1,"Shared incremental logic failed radar "+site);
+ assert.equal(updated?.dropped,1,"Oldest observation not retired at "+site);
+ assert.equal(planIncrementalRadarWindow(prior,[0,5,10,15,20,25].map(at)),null,
+   "No source advancement must not rebuild at "+site);
+ const partial=[0,5,15,20,25].map(at);
+ const repaired=[0,5,10,15,20,25,30].map(at);
+ assert.equal(planIncrementalRadarWindow(partial,repaired),null,
+   "Historical recovery must use chronological rebuild at "+site);
+ const otherSite=site==="66"?"23":"66";
+ assert.equal(planIncrementalRadarWindow(prior,following.map(f=>({...f,
+   sourceMetadata:{region:otherSite}}))),null,
+   "Cross-region frame injection accepted at "+site);
+}
+console.log("ALL_REGISTERED_RADARS_INCREMENTAL_CONTRACT_PASS",sites.length);
+
 
 const records=new Map();
 const storage={
