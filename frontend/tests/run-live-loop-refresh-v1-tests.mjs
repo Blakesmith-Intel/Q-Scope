@@ -197,14 +197,23 @@ assert.equal(scheduled.size, 0);
 let retries = 0;
 const failing = createLiveLoopRefresh({
   schedule, cancel,
-  refresh: () => { retries++; throw Error("fixture failure"); },
+  refresh: () => {
+    retries++;
+    if(retries===1) throw Error("fixture temporary source failure");
+    return true;
+  },
   onError: error => errors.push(error.message)
 });
 failing.start();
 await failing.check();
 assert.equal(retries, 1);
-assert.equal(errors.at(-1), "fixture failure");
-assert.deepEqual([...scheduled.values()].map(task=>task.delay), [300000]);
+assert.equal(errors.at(-1), "fixture temporary source failure");
+assert.deepEqual([...scheduled.values()].map(task=>task.delay).sort((a,b)=>a-b),
+  [60000,300000], "Real BoM failure gets a bounded 60s retry as well as original five-minute poll");
+trigger(60000);
+await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+assert.equal(retries, 2,"Next real source check retries automatically without a page reload");
+assert.deepEqual([...scheduled.values()].map(task=>task.delay),[300000]);
 failing.stop();
 assert.equal(scheduled.size, 0);
 console.log('Live loop checks passed: radar history, automatic cached-history rebuild detection, radar-only refresh independence from Doppler, fixed five-minute polling, foreground checks, busy retries, no overlaps and error recovery.');
