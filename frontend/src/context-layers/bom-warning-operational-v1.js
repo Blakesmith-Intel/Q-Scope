@@ -74,6 +74,31 @@ export function officialWarningAtPoint(warnings,longitude,latitude){
  return (warnings??[]).findLast(w=>warningContainsPoint(w.geometry,longitude,latitude))??null;
 }
 const WARNING_CODES=Object.freeze(["IDQ21035","IDQ21033","IDQ21037","IDQ21038"]);
+// Preserve the operator-approved NORMAL 15-minute warning polling. Only a
+// verified *active* warning with temporarily unavailable genuine GIS geometry
+// gets a bounded short recovery sequence until the source catches up.
+export const WARNING_GEOMETRY_RECOVERY_MS=2*60*1000;
+export const WARNING_GEOMETRY_RECOVERY_MAX=9;
+export function missingActiveBoMWarningGeometry(products={},warnings=[]){
+ const real=Array.isArray(warnings)?warnings:[];
+ return WARNING_CODES.filter(code=>{
+  const status=products?.[code]?.status;
+  return status==="geometry-unavailable"||status==="listed-active"||
+   (status==="active"&&!real.some(w=>w?.productCode===code));
+ });
+}
+export function officialWarningRefreshInterval({
+ products={},warnings=[],recoveryPolls=0,temporaryFailures=0
+}={}){
+ if(missingActiveBoMWarningGeometry(products,warnings).length&&
+    recoveryPolls<WARNING_GEOMETRY_RECOVERY_MAX)
+   return WARNING_GEOMETRY_RECOVERY_MS;
+ // A temporary network failure gets two bounded early retries, never a
+ // negative warning result and never unbounded request amplification.
+ if(temporaryFailures>0&&temporaryFailures<3)
+   return WARNING_GEOMETRY_RECOVERY_MS;
+ return INTERVAL_MS;
+}
 const THUNDERSTORM_CODES=Object.freeze(["IDQ21035","IDQ21033"]);
 const warningName=code=>code==="IDQ21035"?"IDQ21035 (Detailed SEQ storms)":
  code==="IDQ21033"?"IDQ21033 (Regional QLD storms)":
@@ -162,6 +187,21 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
  if(!viewer||!CesiumRef||![toggle,state,panel,content,title,dismiss,refreshBtn,locateBtn,filter,reportButton,reportDialog,reportClose,reportBody].every(Boolean))
   return {destroy(){}};
  let warnings=[],stormCells=[],stormCellSourceStatus="unavailable",imagery=null,lastAttemptAt=0,pending=null,timer=null,activeId="",destroyed=false,sourceStatus="unavailable",productStatuses={};
+ let geometryRecoveryPolls=0,geometryRecoverySignature="",temporaryFailures=0;
+ const currentRefreshMs=()=>officialWarningRefreshInterval({
+   products:productStatuses,warnings,recoveryPolls:geometryRecoveryPolls,
+   temporaryFailures
+ });
+ const recordRecoveryState=()=>{
+  const missing=missingActiveBoMWarningGeometry(productStatuses,warnings);
+  const signature=missing.map(code=>code+":"+
+   (productStatuses[code]?.issuedUtc??"current-index")).join("|");
+  if(!signature){geometryRecoverySignature="";geometryRecoveryPolls=0;return;}
+  if(signature!==geometryRecoverySignature){
+   geometryRecoverySignature=signature;geometryRecoveryPolls=0;
+  }else geometryRecoveryPolls=Math.min(WARNING_GEOMETRY_RECOVERY_MAX,
+   geometryRecoveryPolls+1);
+ };
  const canvas=viewer.scene.canvas;
  const report=(message,kind="normal")=>{
   state.textContent=message;state.dataset.kind=kind;
@@ -257,7 +297,9 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
  async function refresh({force=false}={}){
   if(!toggle.checked||destroyed)return;
   if(pending)return pending;
-  if(!force&&lastAttemptAt&&now()-lastAttemptAt<INTERVAL_MS){trimExpired();return;}
+  if(!force&&lastAttemptAt&&now()-lastAttemptAt<currentRefreshMs()){
+   trimExpired();return;
+  }
   report("Checking issued Bureau of Meteorology warning polygons…","loading");
   lastAttemptAt=now(); // Respect 15-minute cadence after timeouts as well.
   pending=(async()=>{
@@ -289,12 +331,16 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
     stormCellSourceStatus=data.stormCellSourceStatus??"unavailable";
     sourceStatus=data.status;
     productStatuses=data.products??{};
+    temporaryFailures=0;
+    recordRecoveryState();
     display();renderGroupsReport();
     if(activeId)openInfo(warnings.find(w=>w.id===activeId)??null);
     showProductStatus();
    }catch(error){
     // Fail closed: no stale polygons linger under radar as current warnings.
-    warnings=[];stormCells=[];stormCellSourceStatus="unavailable";sourceStatus="unavailable";productStatuses={};locateBtn.hidden=true;display();renderGroupsReport();openInfo(null);
+    warnings=[];stormCells=[];stormCellSourceStatus="unavailable";sourceStatus="unavailable";productStatuses={};
+    temporaryFailures=Math.min(3,temporaryFailures+1);
+    locateBtn.hidden=true;display();renderGroupsReport();openInfo(null);
     // An unverified check is NOT a confirmed no-warning report.
     // Keep a neutral operational advisory, rather than an alarming red error.
     report("Unable to confirm current BoM warnings — try refresh or check BoM","warning");
@@ -421,7 +467,9 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
  };
  const closeGroups=()=>reportDialog.close();
  const onToggle=()=>{
-  if(!toggle.checked){warnings=[];stormCells=[];stormCellSourceStatus="unavailable";productStatuses={};sourceStatus="unavailable";locateBtn.hidden=true;discard();openInfo(null);renderGroupsReport();
+  if(!toggle.checked){warnings=[];stormCells=[];stormCellSourceStatus="unavailable";productStatuses={};sourceStatus="unavailable";
+   geometryRecoveryPolls=0;geometryRecoverySignature="";temporaryFailures=0;
+   locateBtn.hidden=true;discard();openInfo(null);renderGroupsReport();
    report("BoM warning polygons off");return;}
   void refresh({force:true});
  };
@@ -497,7 +545,10 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
  window.addEventListener("pointermove",move,{capture:true,passive:true});
  window.addEventListener("pointerup",up,{capture:true,passive:true});
  window.addEventListener("pointercancel",clearPointer,{capture:true,passive:true});
- timer=setInterval(()=>{trimExpired();if(toggle.checked&&now()-lastAttemptAt>=INTERVAL_MS)void refresh();},60000);
+ timer=setInterval(()=>{
+  trimExpired();
+  if(toggle.checked&&now()-lastAttemptAt>=currentRefreshMs())void refresh();
+ },60000);
  locateBtn.hidden=true;
  report("BoM warning polygons off");
  return {refresh,destroy(){
