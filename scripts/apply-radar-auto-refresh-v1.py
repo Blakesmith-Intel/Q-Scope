@@ -100,6 +100,26 @@ replace_once(
   } finally {'''
 )
 replace_once(
+    '''    else setStatus(error.message, "error");
+  } finally {''',
+    '''    else {
+      setStatus(error.message, "error");
+      recordRadarAutoRefreshAudit({
+        failure:String(error?.message??error),
+        outcome:"manual site load failed; automatic retry queued"
+      });
+      // A failure when switching sites must recover in the existing tab.
+      // Allow BoM tile publication and 45-second negative caches to settle,
+      // then request a scheduler-managed background recovery.
+      if(manualRadarRecoveryTimer!==null)clearTimeout(manualRadarRecoveryTimer);
+      manualRadarRecoveryTimer=setTimeout(()=>{
+        manualRadarRecoveryTimer=null;
+        if(!document.hidden)void autoRefresh.check();
+      },50000);
+    }
+  } finally {'''
+)
+replace_once(
     '''document.addEventListener("visibilitychange", () => { if (!document.hidden) { autoRefresh.check(); independentDopplerRefresh.check(); } });''',
     '''function checkRadarOnForegroundReturn() {
   if (document.hidden) return;
@@ -159,6 +179,11 @@ replace_once(
       );'''
 )
 replace_once(
+    '''async function runSourceLoad(loader, background = false) {''',
+    '''let manualRadarRecoveryTimer=null;
+async function runSourceLoad(loader, background = false) {'''
+)
+replace_once(
     '''  if (sequenceLoading || !model) return;
   if (!background) motionTransition.cancel();''',
     '''  if (sequenceLoading || !model) return false;
@@ -171,6 +196,10 @@ replace_once(
     if (background) {''',
     '''  try {
     await loader();
+    if(manualRadarRecoveryTimer!==null){
+      clearTimeout(manualRadarRecoveryTimer);
+      manualRadarRecoveryTimer=null;
+    }
     return true;
   } catch (error) {
     if (background) {
@@ -251,4 +280,5 @@ assert "LIVE_LOOP_BUSY_RETRY_MS" in (site / "src/live-loop-refresh-v1.js").read_
 assert "verifiedWmtsBlobs" in (site / "src/radar-source.js").read_text()
 assert "negativeTtlMs=45000" in (site / "src/radar-request-pressure-v1.js").read_text()
 assert "frame?.sourceMetadata?.region !== region" in data
+assert "manual site load failed; automatic retry queued" in data
 print("RADAR_SOURCE_RESILIENCE_V10_2_40_PACKAGED")
