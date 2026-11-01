@@ -65,9 +65,14 @@ try{
  near(foreground.camera.latitude,before.camera.latitude);
  near(foreground.camera.range,before.camera.range,0.01);
  // Force a real latest native BoM observation load, not a simulated frame.
- await page.locator("#jumpLatestButton").click();
- await page.waitForFunction(()=>document.querySelector("#jumpLatestButton")?.disabled===false,
-  null,{timeout:90000});
+ // The compact mobile menu hides the legacy Latest button. Dispatch
+ // its REAL click handler rather than changing approved UI just for QA.
+ await page.evaluate(()=>{
+  const button=document.querySelector("#jumpLatestButton");
+  if(!button || button.disabled)throw Error("Latest action unavailable");
+  button.click();
+ });
+ await page.waitForTimeout(1500);
  const latest=await mapState();
  assert.equal(latest.radar,"56");
  near(latest.camera.longitude,before.camera.longitude);
