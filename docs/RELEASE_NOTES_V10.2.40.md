@@ -8,7 +8,7 @@ At 12:18 AEST official BoM WMTS GetCapabilities advertised nine source UTC obser
 ## Targeted repairs
 - Retry any genuinely advertised recent source timestamp if the three newest advertised scans have not-yet-readable tiles. Never probe invented time offsets; retain 45-minute source freshness requirement. Select newest source tile that actually verifies.
 - Shorten a transient HTTP 400 negative tile/time cache from five minutes to 45 seconds; keep region-local timestamp rejection. After cache expiry newly published tiles can be retried without reloading Safari.
-- Keep bounded three-in-flight WMTS request pressure and explicit 403/429 backoff. A single 502/503/504 no longer opens a national request circuit or rejects healthy radar sites.
+- Bound mobile WMTS requests to two concurrent tiles. One isolated 403 or 502/503/504 does not block every radar; three timely 403 refusals or an explicit HTTP 429 still apply a finite source-pressure cooldown. One concurrent WebKit run observed an actual isolated 403 from the relay's upstream response, motivating this safeguard.
 - Reuse up to 96 exact-time source-verified compressed BoM PNG blobs across neighbouring regions; images are decoded from verified bytes on reuse. This avoids large repeated tile downloads with a modest compressed-memory cap.
 - Prevent late completion of a previous radar's background cache warming from writing into another primary radar's timestamp cache.
 - On manual radar-site load error, visibly retain the error and schedule in-tab recovery after 50 seconds (45-second source-negative cooldown has expired). Keep five-minute automatic polling, two-second busy rechecks and one-minute source-error retry, with foreground reconciliation.
