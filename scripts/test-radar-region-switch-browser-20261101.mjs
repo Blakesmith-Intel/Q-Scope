@@ -25,7 +25,7 @@ async function snapshot(region,timeout=150000){
    const label=document.querySelector("#hybridFrameLabel")?.textContent?.trim()||"";
    const status=document.querySelector("#status")?.textContent||"";
    return el?.value===region && el.disabled===false &&
-      /\\b[1-9]\\d*\\/[1-9]\\d*\\b/.test(label) &&
+      /\b[1-9]\d*\/[1-9]\d*\b/.test(label) &&
       !/Loading frame|Checking available|Checking history/i.test(status);
  },{region},{timeout});
  const state=await page.evaluate(()=>{
@@ -36,7 +36,7 @@ async function snapshot(region,timeout=150000){
     window:id("loopDurationMinutes")?.value};
  });
  console.log("RADAR_OPERATIONAL_SITE_CHECK",JSON.stringify(state));
- assert(/\\b[1-9]\\d*\\/6\\b/.test(state.frames),"30-minute six measured scans missing at "+region+"; "+JSON.stringify(state));
+ assert(/\b[1-9]\d*\/6\b/.test(state.frames),"30-minute six measured scans missing at "+region+"; "+JSON.stringify(state));
  return state;
 }
 try{
