@@ -164,7 +164,11 @@ async function validatedNationalTimes(now,region,publishedTimes,verifyTile=probe
       Date.parse(t)>=verifiedEpoch-55*60000);
    }
   }catch(error){
-   unavailableTime.reject(observedUtc,region);
+   // A transient 502/503, timeout, or browser queue failure must not be
+   // quarantined as a withdrawn BoM observation for five minutes.
+   // Only an explicit 400 signals a source-rejected timestamp/tile.
+   if(Number(error?.status)===400 || /HTTP\\s+400\\b/.test(String(error?.message??error)))
+     unavailableTime.reject(observedUtc,region);
    console.warn("National BoM reflectivity frame unavailable",observedUtc,
     String(error?.message??error));
   }
