@@ -1,3 +1,17 @@
+# CURRENT ACCEPTED PRODUCTION — V10.2.42 (1 November 2026)
+
+**Confirmed functional by the operator at approximately 13:37 AEST on 1 November 2026.** This is the frozen documentation/recovery baseline for the **unchanged live V10.2.41 application**, including all V10.2.40 verified national BoM radar WMTS recovery, V10.2.41 selected-site/camera preservation, and the earlier approved flood, AEP, warnings, cyclone, road, outage and QFD capabilities.
+
+**Authoritative version:** annotated tag `v10.2.42` and same-commit `restore/v10.2.42`, following public deployment verification. Older annotated tags and restore branches remain untouched. Future development must start from this new frozen reference and pass operator acceptance before a distinct tagged release.
+
+[Detailed freeze contract](PRODUCTION_BASELINE_V10.2.42.md) · [Release notes](RELEASE_NOTES_V10.2.42.md) · [Operator guide](OPERATOR_GUIDE_CURRENT.md) · [Development handover](DEVELOPMENT_HANDOVER_CURRENT.md) · [Restore instructions](BASELINE_RESTORE.md) · [One-page PDF](STORMTRACKER_LAYERS_INFORMATION.pdf)
+
+The previous version notes retained below are **historical release records**, not competing current-baseline claims. Source/geometry/refresh and safety invariants stay frozen at the accepted production state. The independent Cloudflare relay and external agency feeds are not frozen by a Git tag.
+
+---
+
+## Earlier accepted release history (preserved)
+
 # V10.2.37 — radar auto-refresh reliability maintenance (31 October 2026)
 
 Approved scoped correction: preserve five-minute regular polling; promptly retry a busy or in-flight missed check without overlaps; retain immediate foreground checks; recover up to nine authentic BoM WMTS published observation frames instead of latest-only; record last auto check, accepted source time and any failure. Uses the existing pinned production engine plus a narrow after-build overlay. No Doppler, storm science, georeferencing, AEP/IFD, flood, warning, camera or map-layer modifications; older immutable release refs untouched. Production publication requires full source/packaged regressions and public Pages verification. See [V10.2.37 release notes](RELEASE_NOTES_V10.2.37.md).
