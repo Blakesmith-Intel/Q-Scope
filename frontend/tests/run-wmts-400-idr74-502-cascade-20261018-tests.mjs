@@ -25,6 +25,22 @@ assert.equal(await findLatestBomReflectivityTime(current,"74",{
   verifyNationalTile:async()=>true
 }),currentSamples.at(-1));
 
+// A temporary gateway error cannot quarantine a genuine later timestamp.
+const transientTimes=["2026-11-01T02:25:00Z","2026-11-01T02:30:00Z"];
+const transientNow=Date.parse("2026-11-01T02:35:00Z");
+let transientFail=true;
+const transientOptions={
+  publishedTimes:async()=>transientTimes,
+  verifyNationalTile:async time=>{
+    if(time===transientTimes[1] && transientFail){const error=Error("HTTP 503");error.status=503;throw error;}
+    return true;
+  }
+};
+assert.deepEqual(await discoverBoundedBomReflectivityHistory(transientNow,180,"23",transientOptions),[transientTimes[0]]);
+transientFail=false;
+assert.deepEqual(await discoverBoundedBomReflectivityHistory(transientNow,180,"23",transientOptions),transientTimes,
+  "Transient HTTP 503 on Gladstone must be retried, not treated as withdrawn source time");
+
 const guard=createWmtsTimeFailureGuard({now:()=>current,ttlMs:300000,maxEntries:2});
 assert.equal(guard.isRejected(old[0]),false);
 guard.reject(old[0]);
@@ -55,13 +71,14 @@ try{
  await assert.rejects(loadVerifiedNationalMosaicAtTime(invalid,"66"),
    /time preflight failed.*HTTP 400/);
  assert.equal(requests,1,"Twelve-tile 400 storm becomes ONE verified failing request");
- await assert.rejects(loadVerifiedNationalMosaicAtTime(invalid,"19"),
-   /cached source rejection/);
- assert.equal(requests,1,
-   "Negative time status is shared across radar sites, not keyed by tile URL");
- await assert.rejects(loadVerifiedNationalMosaicAtTime("2026-10-18T07:30:00Z","74"),
-   /HTTP 400/);
- assert.equal(requests,2,"Different source time isn't permanently blocked");
+ // A tile rejection in Mt Stapylton cannot poison a valid timestamp
+ // at Cairns (or any other region) on the same national WMTS clock.
+ await assert.rejects(loadVerifiedNationalMosaicAtTime(invalid,"19"),/HTTP 400/);
+ assert.equal(requests,2,"Different region must independently verify the same published UTC");
+ await assert.rejects(loadVerifiedNationalMosaicAtTime(invalid,"66"),/cached source rejection/);
+ assert.equal(requests,2,"Repeat bad tile at original site remains blocked");
+ await assert.rejects(loadVerifiedNationalMosaicAtTime("2026-10-18T07:30:00Z","74"),/HTTP 400/);
+ assert.equal(requests,3,"Different source time isn't permanently blocked");
  assert.ok(times[0].includes("TILEMATRIX=8"));
 }finally{globalThis.fetch=originalFetch;globalThis.OffscreenCanvas=originalOffscreen;}
 
@@ -87,4 +104,4 @@ t+=75001;
 assert.equal(await productCooldown.run(url(74,"202610180618"),
   async()=>{count++;return "source recovered"}),"source recovered");
 assert.equal(count,5,"Source automatically rechecks after 75 seconds");
-console.log("PASS stale GetCapabilities cutoff, WMTS one-request preflight, cross-site invalid-time cache, and isolated IDR74 3-frame cooldown with recovery.");
+console.log("PASS stale GetCapabilities cutoff, WMTS per-region nonpoisoning, one-request preflight, and isolated IDR74 cooldown.");

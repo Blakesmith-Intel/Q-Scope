@@ -27,11 +27,15 @@ export function createWmtsTimeFailureGuard({
   const rejected=new Map();
   const prune=()=>{for(const [time,until] of rejected)
     if(until<=now())rejected.delete(time);};
+  // A 400 on a tile is not proof the same published UTC is absent at
+  // another geographic tile footprint. Quarantine by site AND timestamp.
+  // A genuinely withdrawn time may fail at a second site independently.
+  const key=(time,region)=>String(region)+":"+String(time);
   return {
-    isRejected: time=>{prune();return (rejected.get(time)??0)>now();},
-    reject: time=>{prune();rejected.set(time,now()+ttlMs);
+    isRejected:(time,region="SEQ")=>{prune();return (rejected.get(key(time,region))??0)>now();},
+    reject:(time,region="SEQ")=>{prune();rejected.set(key(time,region),now()+ttlMs);
       while(rejected.size>maxEntries)rejected.delete(rejected.keys().next().value);},
-    clear: time=>rejected.delete(time),
+    clear:(time,region="SEQ")=>rejected.delete(key(time,region)),
     size:()=>{prune();return rejected.size;}
   };
 }
@@ -126,24 +130,24 @@ async function probeTimestamp(observedUtc, region = 'SEQ') {
 // value for dimension (time)" and HTTP 400 for unpublished timestamps.
 // Source freshness decides whether a new live scan can be discovered.
 // Replay eligibility independently preserves older genuine observations.
-export function publishedRadarHistoryTimes(times,now=Date.now()){
+export function publishedRadarHistoryTimes(times,now=Date.now(),region="SEQ"){
   const epoch=Number(now);
   return [...new Set(Array.isArray(times)?times:[])]
     .filter(time=>{
       const t=Date.parse(time);
       return Number.isFinite(t)&&Number.isFinite(epoch)&&
         t>=epoch-180*60000&&t<=epoch+5*60000&&
-        !unavailableTime.isRejected(time);
+        !unavailableTime.isRejected(time,region);
     }).sort();
 }
-function currentPublishedTimes(times,now=Date.now()){
+function currentPublishedTimes(times,now=Date.now(),region="SEQ"){
   const epoch=Number(now);
-  return publishedRadarHistoryTimes(times,now)
+  return publishedRadarHistoryTimes(times,now,region)
     .filter(time=>Date.parse(time)>=epoch-WMTS_SOURCE_FRESHNESS_MS);
 }
 async function validatedNationalTimes(now,region,publishedTimes,verifyTile=probeTimestamp){
- const history=publishedRadarHistoryTimes(await publishedTimes(),now);
- const published=currentPublishedTimes(history,now);
+ const history=publishedRadarHistoryTimes(await publishedTimes(),now,region);
+ const published=currentPublishedTimes(history,now,region);
  if(!published.length)
   throw Error("National BoM mosaic has no verified current observation timestamp");
  // BoM GetCapabilities may list times with missing 400 tiles. Check one REAL
@@ -160,7 +164,11 @@ async function validatedNationalTimes(now,region,publishedTimes,verifyTile=probe
       Date.parse(t)>=verifiedEpoch-55*60000);
    }
   }catch(error){
-   unavailableTime.reject(observedUtc);
+   // A transient 502/503, timeout, or browser queue failure must not be
+   // quarantined as a withdrawn BoM observation for five minutes.
+   // Only an explicit 400 signals a source-rejected timestamp/tile.
+   if(Number(error?.status)===400 || /HTTP\\s+400\\b/.test(String(error?.message??error)))
+     unavailableTime.reject(observedUtc,region);
    console.warn("National BoM reflectivity frame unavailable",observedUtc,
     String(error?.message??error));
   }
@@ -221,7 +229,7 @@ export async function loadVerifiedNationalMosaicAtTime(observedUtc, region = 'SE
   // Source times remain untrusted until a *real source pixel* loads. Probe
   // one tile BEFORE requesting the rest of the mosaic; previously each stale
   // time produced 9-16 simultaneous 400s, repeated per radar and prewarm.
-  if(unavailableTime.isRejected(observedUtc))
+  if(unavailableTime.isRejected(observedUtc,region))
     throw Error("BoM WMTS timestamp unavailable (cached source rejection): "+observedUtc);
   const first=tasks[0];
   let firstImage;
@@ -229,7 +237,7 @@ export async function loadVerifiedNationalMosaicAtTime(observedUtc, region = 'SE
     firstImage=await fetchReadableImage(first.url);
   }catch(error){
     if(/HTTP\s+400\b/.test(String(error?.message??error)))
-      unavailableTime.reject(observedUtc);
+      unavailableTime.reject(observedUtc,region);
     throw Error("BoM WMTS source time preflight failed at "+
       observedUtc+": "+String(error?.message??error));
   }
@@ -241,7 +249,7 @@ export async function loadVerifiedNationalMosaicAtTime(observedUtc, region = 'SE
     });
   }catch(error){
     if(/HTTP\s+400\b/.test(String(error?.message??error)))
-      unavailableTime.reject(observedUtc);
+      unavailableTime.reject(observedUtc,region);
     throw error;
   }
 
@@ -322,7 +330,8 @@ export async function loadBomReflectivityMosaicAtTime(
  // Keep one authentic capability snapshot during a multi-frame load.
  // Every individual PNG tile must still pass source verification.
  const sourceTimes=publishedRadarHistoryTimes(
-  Array.isArray(knownPublishedTimes)?knownPublishedTimes:await publishedReflectivityTimes()
+  Array.isArray(knownPublishedTimes)?knownPublishedTimes:await publishedReflectivityTimes(),
+  Date.now(),region
  );
  if(!sourceTimes.includes(observedUtc))
   throw Error("BoM high-resolution frame not published in bounded history: "+observedUtc);

@@ -10,7 +10,7 @@ import {
   discoverBoundedBomReflectivityHistory,
   loadBomReflectivityMosaicAtTime,
   reflectivityWindowForRegion
-} from "./bom-wmts-loop-v2.js?v=20261101-source-history-replay";
+} from "./bom-wmts-loop-v2.js?v=20261101-region-independent-v10-2-39";
 
 import {
   RadarWorkerClient
@@ -140,7 +140,7 @@ import {
   automaticRefreshEndUtc,
   hasNewMatchedProducts,
   createLiveLoopRefresh
-} from "./live-loop-refresh-v1.js?v=20261031-radar-refresh-v1";
+} from "./live-loop-refresh-v1.js?v=20261101-radar-live-follow-v10-2-39";
 import { createContinuousPlayback } from "./continuous-playback-v1.js?v=9.16.10";
 import { buildTrackThreatCone } from "./track-threat-cone-v1.js?v=v9-cone-observed-tip-v3";
 import {
@@ -4337,6 +4337,12 @@ async function loadHybridSequence(automatic = false) {
     });
     $("autoRefreshNote").textContent =
       "BoM new imagery currently unavailable · retaining last genuine displayed radar scan";
+    // Keep rendered real imagery, but tell the scheduler this check failed:
+    // it must retry without a manual reload, not report a successful poll.
+    if (automatic) throw new Error(
+      "BoM radar discovery unavailable: " +
+      String(sourceResult.error?.message ?? sourceResult.error)
+    );
     return;
   }
   if(resolvedSource.cachedOnly)
@@ -4709,6 +4715,10 @@ async function loadHybridSequence(automatic = false) {
   }
 
   const oldTime = hybridFrames[hybridFrameIndex]?.observedUtc;
+  // Operators parked on Latest must follow genuine newly accepted scans.
+  // Preserve a deliberately scrubbed historical position instead.
+  const wasFollowingLatest = automatic && !isCombined &&
+    hybridFrames.length > 0 && hybridFrameIndex === hybridFrames.length - 1;
   const resume = automatic ? playback.isPlaying() : true;
   $("hybridFrameSlider").disabled = true;
   $("hybridPlayButton").disabled = true;
@@ -4738,7 +4748,9 @@ async function loadHybridSequence(automatic = false) {
   hybridTrackVolumes = [];
   hybridDopplerFrameStates = [];
   hybridFrameIndex = automatic
-    ? Math.max(0,hybridFrames.findIndex(frame=>frame.observedUtc===oldTime))
+    ? (wasFollowingLatest
+      ? hybridFrames.length - 1
+      : Math.max(0,hybridFrames.findIndex(frame=>frame.observedUtc===oldTime)))
     : 0;
   if(isCombined && automatic) hybridFrameIndex=0; // New Doppler cycle starts both streams together.
   // Keep the current Doppler layer visible while the replacement frame is
@@ -5003,6 +5015,9 @@ async function runSourceLoad(loader, background = false) {
         ? `Auto update: Doppler ${failedRadar} unavailable; retrying.`
         : "Auto update: newest matched images unavailable; retrying.";
       $("autoRefreshNote").title = error.message;
+      // An automatic source failure is not a successful refresh. Scheduler
+      // applies bounded retry without resetting the normal 5-minute cadence.
+      throw error;
     }
     else setStatus(error.message, "error");
   } finally {
@@ -5361,7 +5376,16 @@ $("loopDurationMinutes").addEventListener("change", () => {
   updateLoopButtonLabel();
   if (!sequenceLoading) runSourceLoad(loadHybridSequence);
 });
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { autoRefresh.check(); independentDopplerRefresh.check(); } });
+function checkRadarOnForegroundReturn() {
+  if (document.hidden) return;
+  void autoRefresh.check();
+  void independentDopplerRefresh.check();
+}
+// iOS Safari can restore a frozen tab with pageshow/focus but no reliable
+// visibilitychange. The scheduler coalesces duplicate events.
+document.addEventListener("visibilitychange", checkRadarOnForegroundReturn);
+window.addEventListener("pageshow", checkRadarOnForegroundReturn);
+window.addEventListener("focus", checkRadarOnForegroundReturn);
 $("jumpLatestButton").addEventListener("click", async () => {
   if (sequenceLoading) return;
   await playback.pause();

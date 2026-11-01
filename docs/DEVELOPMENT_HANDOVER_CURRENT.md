@@ -1,3 +1,13 @@
+# V10.2.39 — cross-site radar replay plus automatic latest-frame follow (1 November 2026)
+
+V10.2.38 had two confirmed user-facing defects: one-frame loops in non-Brisbane Queensland radar sites despite a national WMTS source carrying valid six-frame histories, and failure to visibly advance the Latest frame without page reload.
+
+Live 1 Nov 2026 source audit tested centre/corner real PNGs at 11 QLD sites, plus every tile for six successive frames in six geographically separate regions; BoM WMTS source imagery was available. Corrections in `frontend/src/bom-wmts-loop-v2.js` make negative timestamp cache scoped to site+UTC, and apply the five-minute cache only to explicit HTTP 400, not ordinary 502/503/gateway timeouts. Existing `radarFrameCache` remains reset on site selection. Operational runtime `frontend/src/live3d-operational-v9.js` follows the newest observation when already viewing Latest, preserves intentional historic scrubbing, propagates failures from background loads, and checks on Safari visibilitychange/pageshow/focus. The copied `frontend/src/live-loop-refresh-v1.js` keeps its fixed 300-second poll and 2-second busy retry, with 60-second bounded source-failure retry. No invented observations; all original pixels and observedUTC retained.
+
+See [V10.2.39 release notes](RELEASE_NOTES_V10.2.39.md), multi-region real tile probes and mobile browser regression. Existing science, rainfall, warnings and flood controls unchanged.
+
+---
+
 # V10.2.38 — verified BoM radar history when published WMTS lags (1 November 2026)
 
 The 1 November mobile incident showed Mt Stapylton 10:45 (5/5) and Gladstone 10:30 (1/1) at 11:10 AEST, versus 11:00 on BoM's updated map. The V10.2.37 auto-poll release was successfully deployed; the subsequent root cause is a separate WMTS replay-selection defect. `frontend/src/bom-wmts-loop-v2.js` used `WMTS_SOURCE_FRESHNESS_MS=45 minutes` both for identifying a current WMTS update and for accepting older source-advertised historical replay frames. A genuinely delayed source therefore lost older five-minute scans; re-querying GetCapabilities per frame could additionally race source-window rotation. **V10.2.38 separates source freshness from replay eligibility**, retains a 55-minute authentic source-advertised tail relative to the newest tile-verified timestamp (capped at nine), and passes one discovery snapshot to individual frame loads and optional cache warming. Each complete PNG tile mosaic must still pass actual source checks. Previously validated browser observations remain eligible for 60/120/180-minute windows; no synthetic or expired radar frames are substituted.

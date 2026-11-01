@@ -401,7 +401,7 @@ assert "parsePublishedReflectivityTimes" in (
     site / "src/bom-wmts-published-times-v1.js").read_text()
 assert "WMTS_SOURCE_FRESHNESS_MS" in (
     site / "src/bom-wmts-loop-v2.js").read_text()
-assert "unavailableTime.reject(observedUtc)" in (
+assert "unavailableTime.reject(observedUtc,region)" in (
     site / "src/bom-wmts-loop-v2.js").read_text()
 assert "sourceFailures=new Map()" in (
     site / "src/bom-doppler-intake-v3.js").read_text()

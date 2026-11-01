@@ -46,7 +46,7 @@ jobs:
   radar-production-package:
     # Run the full pinned-site build only on this scoped radar reliability
     # branch; routine feature validation remains the existing fast job.
-    if: github.ref_name == 'fix/radar-wmts-verified-history-20261101' || github.head_ref == 'fix/radar-wmts-verified-history-20261101'
+    if: github.ref_name == 'fix/radar-region-loop-20261101' || github.head_ref == 'fix/radar-region-loop-20261101'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -81,7 +81,8 @@ jobs:
           node --check _site/src/live-loop-refresh-v1.js
           node --check _site/src/live3d-operational-v9.js
           node frontend/tests/run-radar-auto-refresh-v10-2-37-tests.mjs
-          grep -Fq 'V10.2.38 VERIFIED RADAR HISTORY' _site/BUILD.txt
+          grep -Fq 'V10.2.39 RADAR CROSS-SITE LIVE RECOVERY' _site/BUILD.txt
+          grep -Fq 'LIVE_LOOP_SOURCE_RETRY_MS = 60000' _site/src/live-loop-refresh-v1.js
           grep -Fq 'LIVE_LOOP_BUSY_RETRY_MS = 2000' _site/src/live-loop-refresh-v1.js
           grep -Fq 'discoverBoundedBomReflectivityHistory(now,180,region)' _site/src/live3d-operational-v9.js
           ! grep -Fq 'discoverBoundedBomReflectivityHistory(now,5,region)' _site/src/live3d-operational-v9.js

@@ -103,15 +103,18 @@ export function hasNewMatchedProducts(previous, next) {
 }
 
 export const LIVE_LOOP_BUSY_RETRY_MS = 2000;
+export const LIVE_LOOP_SOURCE_RETRY_MS = 60000;
 
 // Maintain the established five-minute polling cadence independently of
 // request duration. A concurrent manual/site load is not a successful poll:
 // retry it promptly without overlapping requests or fabricating observations.
 export function createLiveLoopRefresh({
   refresh, onError, schedule = setTimeout, cancel = clearTimeout,
-  interval = LIVE_LOOP_REFRESH_MS, busyRetryMs = LIVE_LOOP_BUSY_RETRY_MS
+  interval = LIVE_LOOP_REFRESH_MS, busyRetryMs = LIVE_LOOP_BUSY_RETRY_MS,
+  sourceRetryMs = LIVE_LOOP_SOURCE_RETRY_MS
 }) {
-  let timer = null, busyTimer = null, active = false, pending = null;
+  let timer = null, busyTimer = null, sourceTimer = null,
+    active = false, pending = null;
   let missedWhileLoading = false;
   function armPoll() {
     if (!active || timer != null) return;
@@ -130,6 +133,15 @@ export function createLiveLoopRefresh({
       void check();
     }, busyRetryMs);
   }
+  function armSourceRetry() {
+    // A real failure is retried after a controlled one-minute cooldown,
+    // while the independent regular five-minute poll remains armed.
+    if (!active || sourceTimer != null) return;
+    sourceTimer = schedule(() => {
+      sourceTimer = null;
+      void check();
+    }, sourceRetryMs);
+  }
   function check() {
     if (!active) return Promise.resolve();
     if (pending) {
@@ -142,11 +154,18 @@ export function createLiveLoopRefresh({
       cancel(busyTimer);
       busyTimer = null;
     }
+    if (sourceTimer != null) {
+      cancel(sourceTimer);
+      sourceTimer = null;
+    }
     pending = Promise.resolve().then(refresh).then(result => {
-      // false means the application was busy or not ready. A genuine
-      // source failure is handled normally by the existing five-minute poll.
+      // false means the engine was occupied. A genuine source failure
+      // throws and schedules bounded recovery without hammering WMTS.
       if (result === false) armBusyRetry();
-    }).catch(error => onError?.(error)).finally(() => {
+    }).catch(error => {
+      try { onError?.(error); }
+      finally { armSourceRetry(); }
+    }).finally(() => {
       pending = null;
       if (missedWhileLoading) {
         missedWhileLoading = false;
@@ -162,7 +181,8 @@ export function createLiveLoopRefresh({
       missedWhileLoading = false;
       if (timer != null) cancel(timer);
       if (busyTimer != null) cancel(busyTimer);
-      timer = busyTimer = null;
+      if (sourceTimer != null) cancel(sourceTimer);
+      timer = busyTimer = sourceTimer = null;
     },
     check
   };
