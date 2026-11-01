@@ -8,7 +8,7 @@ The WMTS adapter applied the 45-minute current-source freshness cutoff to older 
 
 ## Change
 
-- Use the 45-minute freshness gate only to select a current live source. Preserve a bounded 180-minute history of up to nine genuine advertised WMTS timestamps, separately from live freshness.
+- Use the 45-minute freshness gate only to select a current live source. Preserve up to nine genuine advertised WMTS timestamps within a 55-minute tail of the latest readable source scan, separately from the 45-minute live freshness rule. Keep longer 60/120/180-minute replay in the verified browser archive, not by hammering withdrawn upstream WMTS tiles.
 - Preserve one authentic discovery snapshot for the entire load. Each image tile still must pass genuine HTTP and pixel verification. No guessed, substituted or reconstructed observed images.
 - Retain the original five-minute poll, two-second busy retry, foreground check, Doppler/3-D and all existing incident, warning, flood and rainfall layers.
 - Bust the iOS Safari launcher, embedded runtime and WMTS module cache keys.
