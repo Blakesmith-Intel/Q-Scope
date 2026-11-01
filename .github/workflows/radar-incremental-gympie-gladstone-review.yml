@@ -5,6 +5,8 @@ on:
     paths:
       - "frontend/src/**"
       - "frontend/tests/**"
+      - "frontend/src/radar-source.js"
+      - "frontend/src/bom-wmts-loop-v2.js"
       - "scripts/apply-radar-auto-refresh-v1.py"
       - "scripts/audit-gympie-gladstone-wmts-20261101.mjs"
       - "scripts/audit-all-radar-wmts-spotcheck-20261101.mjs"
@@ -25,6 +27,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: {node-version: "24"}
+      - name: Verify universal review/production tile-pressure guard and transient preflight retry
+        run: node frontend/tests/run-radar-wmts-pressure-preflight-v10-2-44-tests.mjs
       - name: Verify actual six published timestamps and every Gympie/Gladstone tile
         run: node scripts/audit-gympie-gladstone-wmts-20261101.mjs
       - name: Verify published imagery samples for every registered QLD/NSW radar region
