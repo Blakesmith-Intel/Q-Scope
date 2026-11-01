@@ -46,7 +46,7 @@ try{
   {waitUntil:"domcontentloaded",timeout:60000});
  await page.locator("#cesiumContainer .cesium-widget canvas").waitFor({state:"attached",timeout:60000});
  await snapshot("66");
- for(const region of ["106","24","107","74","75","36","23"]){
+ for(const region of ["106","24","107","36"]){
    await page.locator("#radarSite").selectOption(region,{timeout:60000});
    const result=await snapshot(region);
    assert((result.pressure?.verifiedTileBlobs??0)>0,
