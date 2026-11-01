@@ -41,7 +41,9 @@ try{
  await page.goto("https://blakesmith-intel.github.io/StormTracker/live3d-operational-v9.html?qaIncrementalRadar=1",
   {waitUntil:"domcontentloaded",timeout:60000});
  await page.locator("#cesiumContainer .cesium-widget canvas").waitFor({state:"attached"});
- for(const region of ["08","23"]){
+ // Two previously failing locations plus five geographically and operationally
+ // different radars exercise the same system-wide renderer and scheduler.
+ for(const region of ["08","23","66","106","56","107","36"]){
   await page.locator("#radarSite").selectOption(region);
   const baseline=await stable(region);
   const baselineCount=Number((baseline.label||"").split("/")[1]);
@@ -49,7 +51,8 @@ try{
   assert.equal(baseline.diagnostic?.lifecycle?.bootCount,1,
     "An unexpected page restart occurred before refresh checks");
   const initialCanvas=await page.locator("#cesiumContainer canvas").count();
-  for(let check=0;check<4;check++){
+  const repeatChecks=(region==="08"||region==="23")?4:2;
+  for(let check=0;check<repeatChecks;check++){
    await page.evaluate(async()=>window.__stormtrackerRadarQaCheck());
    const snapshot=await stable(region);
    assert.equal(snapshot.diagnostic?.lifecycle?.bootCount,1,
@@ -77,9 +80,9 @@ try{
  }
  assert(navigations.length===1,
   "Unexpected browser document navigations during source polls: "+navigations.join(","));
- console.log("INCREMENTAL_GYMPIE_GLADSTONE_WEBKIT_PASS");
+ console.log("INCREMENTAL_MULTI_REGION_WEBKIT_PASS");
 }catch(error){
- console.log("INCREMENTAL_GYMPIE_GLADSTONE_WEBKIT_FAIL",
+ console.log("INCREMENTAL_MULTI_REGION_WEBKIT_FAIL",
    JSON.stringify({error:String(error),errors:errors.slice(-12),navigations}));
  await page.screenshot({path:"/tmp/incremental-radar-webkit-failure.png"}).catch(()=>{});
  throw error;
