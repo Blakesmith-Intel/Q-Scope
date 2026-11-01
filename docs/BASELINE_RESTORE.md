@@ -1,3 +1,22 @@
+# StormTracker — V10.2.42 immutable recovery baseline (1 November 2026)
+
+**Latest operator-approved stable production:** V10.2.42, documenting and freezing the field-confirmed V10.2.41 app without any weather functionality change. [Production baseline contract](PRODUCTION_BASELINE_V10.2.42.md) · [Release notes](RELEASE_NOTES_V10.2.42.md) · [Operator guide](OPERATOR_GUIDE_CURRENT.md).
+
+## Authoritative restore references
+
+- The **annotated** tag `v10.2.42` must peel to the **exact same commit** as branch `restore/v10.2.42`. Verify both independently after publication; neither reference is ever repointed.
+- To inspect: `git fetch origin --tags` then `git rev-parse 'v10.2.42^{}'` and `git rev-parse origin/restore/v10.2.42`; the SHAs must match. For a new feature, `git switch -c feature/<scope> v10.2.42` after replacing `<scope>` with a descriptive name.
+- An **operational rollback** is performed by creating a **new** reviewed commit/PR from the frozen restore source and redeploying it, with public build/source checks and operator confirmation. Never reset `main`, force-push immutable branches or move old annotated tags.
+- Preserve immutable V10.2.41 and V10.2.40 source refs and all preceding versions. The accepted site includes genuine source-verified WMTS, active-tab five-minute polling, multi-site error isolation, and camera continuity. Do not substitute older radar/Doppler science or overwrite rainfall/flood/warning controls during recovery.
+- GitHub Pages is a browser **static app**. It does not freeze or roll back the separately operated `stormtracker-bom-relay` Cloudflare Worker, BoM feeds, IFD service, road/outage/river agency services or external internet. Verify all independently if restoring.
+- Only a verified healthy warning source with zero active results can show **No current warnings**. Unreadable/stale observations must remain unavailable; never manufacture original radar scans or map geometry.
+
+**Release and operator test evidence:** [V10.2.40 WMTS recovery](RELEASE_NOTES_V10.2.40.md), [V10.2.41 Longreach camera continuity](RELEASE_NOTES_V10.2.41.md), [V10.2.42 freeze](RELEASE_NOTES_V10.2.42.md); physical iPhone operator acceptance was explicitly recorded on 1 November 2026.
+
+---
+
+## Earlier recovery records (preserved as historical provenance)
+
 # StormTracker — current V10.2.26 recovery and rollback reference
 
 > **Current accepted operator release:** V10.2.26 is a **documentation-only freeze** of the fully deployed and tested V10.2.25 warning feature. Its pages bundle retains immutable original V10.2.0 radar and storm-science source. [Final release notes](RELEASE_NOTES_V10.2.26.md) · [V10.2.25 functionality](RELEASE_NOTES_V10.2.25.md) · [operator guide](OPERATOR_GUIDE_CURRENT.md). Preserve all previous tags: especially `v10.2.25` / `restore/v10.2.25` at `d9620f6cbc411bfee029d9fa9d170752aa7c34f2`. Create `v10.2.26` and `restore/v10.2.26` at the exact **new documentation commit** only after website verification. Never retag a previously accepted SHA.

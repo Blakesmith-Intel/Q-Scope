@@ -1894,3 +1894,78 @@ jobs:
           test "$(git ls-remote origin "refs/tags/$tag^{}" | cut -f1)" = "$release_sha"
           test "$(git ls-remote origin "refs/heads/$restore" | cut -f1)" = "$release_sha"
           echo "SEALED $tag at $release_sha; all earlier tags and restore refs untouched"
+
+  seal_accepted_v10_2_42:
+    name: Seal operator-accepted V10.2.42 immutable production baseline
+    needs: deploy
+    # The release is a single accepted documentary freeze, never a repeat of
+    # historical tag creation when a later enhancement mentions this version.
+    if: github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'V10.2.42:')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify exact accepted source, published-site content and sealed references
+        env:
+          GH_TOKEN: ${{ secrets.STORMTRACKER_RELEASE_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          release_sha="$GITHUB_SHA"
+          tag="v10.2.42"
+          restore="restore/v10.2.42"
+          test -s docs/RELEASE_NOTES_V10.2.42.md
+          test -s docs/PRODUCTION_BASELINE_V10.2.42.md
+          test -s docs/STORMTRACKER_LAYERS_INFORMATION.pdf
+          git fetch --tags origin --quiet
+          git diff --exit-code 'v10.2.41^{}' "$release_sha" -- frontend scripts relay config ||
+            { echo "Refuse freeze: operator-accepted V10.2.41 runtime changed"; exit 1; }
+          old_tag="$(git ls-remote origin 'refs/tags/v10.2.41^{}' | cut -f1)"
+          old_restore="$(git ls-remote origin 'refs/heads/restore/v10.2.41' | cut -f1)"
+          test -n "$old_tag" && test "$old_tag" = "$old_restore" ||
+            { echo "Refuse freeze: previous sealed release refs mismatch"; exit 1; }
+          base="https://blakesmith-intel.github.io/StormTracker"
+          published=false
+          for attempt in $(seq 1 12); do
+            query="?acceptedFreeze=$release_sha&attempt=$attempt"
+            build="$(curl -fsSL --max-time 20 "$base/BUILD.txt$query" || true)"
+            app="$(curl -fsSL --max-time 20 "$base/src/live3d-operational-v9.js$query" || true)"
+            session="$(curl -fsSL --max-time 20 "$base/src/radar-viewport-continuity-v1.js$query" || true)"
+            wmts="$(curl -fsSL --max-time 20 "$base/src/bom-wmts-loop-v2.js$query" || true)"
+            if grep -Fq 'V10.2.41 OPERATOR CAMERA CONTINUITY' <<< "$build" &&
+               grep -Fq 'V10.2.40 VERIFIED WMTS RESILIENCE' <<< "$build" &&
+               grep -Fq 'recoveredRadarView?.radarSiteId ?? DEFAULT_RADAR_SITE_ID' <<< "$app" &&
+               grep -Fq 'if(!operatorCameraChosen)resetView()' <<< "$app" &&
+               grep -Fq 'RADAR_VIEW_SESSION_KEY' <<< "$session" &&
+               grep -Fq 'published.slice(-9).reverse()' <<< "$wmts"; then
+              published=true
+              break
+            fi
+            sleep 5
+          done
+          test "$published" = true ||
+            { echo "Refuse freeze: current public accepted radar/camera assets unverified"; exit 1; }
+          existing_tag="$(git ls-remote origin "refs/tags/$tag^{}" | cut -f1)"
+          existing_restore="$(git ls-remote origin "refs/heads/$restore" | cut -f1)"
+          if [ -n "$existing_tag" ] || [ -n "$existing_restore" ]; then
+            test "$existing_tag" = "$release_sha" &&
+              test "$existing_restore" = "$release_sha" ||
+              { echo "Refuse mutation: existing V10.2.42 refs point elsewhere"; exit 1; }
+            echo "Already sealed $tag at $release_sha; untouched"
+            exit 0
+          fi
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f ref="refs/heads/$restore" -f sha="$release_sha" >/dev/null
+          tag_object="$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/tags" \
+            -f tag="$tag" \
+            -f message="StormTracker V10.2.42: immutable operator-accepted 1 November 2026 production baseline; no operational changes after V10.2.41" \
+            -f object="$release_sha" -f type=commit --jq .sha)"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f ref="refs/tags/$tag" -f sha="$tag_object" >/dev/null
+          test "$(git ls-remote origin "refs/tags/$tag^{}" | cut -f1)" = "$release_sha"
+          test "$(git ls-remote origin "refs/heads/$restore" | cut -f1)" = "$release_sha"
+          echo "IMMUTABLE PRODUCTION BASELINE SEALED $tag and $restore at $release_sha"
+          echo "Older frozen tags/restore branches untouched; future changes require new releases"

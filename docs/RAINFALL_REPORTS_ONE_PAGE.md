@@ -1,8 +1,8 @@
 # StormTracker — rainfall reports (quick reference)
 
-**New read-only reports | Operator information sheet | 22 October 2026**
+**Read-only rainfall reports | Originally introduced 22 October 2026 | Current V10.2.42 operator menu confirmed 1 November 2026**
 
-**Where to find them:** Layers → Significant rain. The **Rainfall totals report** and **AEP Notable+ report** buttons are directly beside each other below the rainfall controls. Choose **Since 9 am**, **Last hour**, or **24hrs to 9am** first; both reports follow this selection.
+**Where to find them (accepted V10.2.42 menu):** expand **Rainfall Observations**; select the significant rainfall period and open the reports. The **Rainfall totals report** and **AEP Notable+ report** buttons are directly beside each other below the rainfall controls. Choose **Since 9 am**, **Last hour**, or **24hrs to 9am** first; both reports follow this selection.
 
 | Report | Open from | What it shows |
 |---|---|---|

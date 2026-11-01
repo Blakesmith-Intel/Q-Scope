@@ -1,7 +1,9 @@
 # StormTracker — current operator guide
-**Edition:** 1 November 2026 | **Applies to:** V10.2.39 cross-site radar loop and live automatic-refresh reliability, including V10.2.38 source-published replay, V10.2.37 scheduler, cyclone subsection and unchanged four-section navigation.
+**Edition:** 1 November 2026 | **Applies to:** **V10.2.42 immutable operator-accepted baseline** (working V10.2.41 application, V10.2.40 verified WMTS resilience and all previously approved navigation, flood, rainfall, warning and community-impact layers).
 **Open:** https://blakesmith-intel.github.io/StormTracker/  
 **Technical handover:** [DEVELOPMENT_HANDOVER_CURRENT.md](DEVELOPMENT_HANDOVER_CURRENT.md)
+**Frozen release:** [V10.2.42 accepted baseline](PRODUCTION_BASELINE_V10.2.42.md) · [Release notes](RELEASE_NOTES_V10.2.42.md) · [One-page operator reference](OPERATOR_QUICK_REFERENCE_V10.2.42.md) · [Shareable PDF](STORMTRACKER_LAYERS_INFORMATION.pdf). **Operator confirmed all functionality working on an iPhone on 1 November 2026.** All future feature proposals start from this frozen version; no new functions or visual changes are included here.
+
 
 > **Purpose and safety:** StormTracker brings together official source observations and selected public incident information for situational awareness. It is **not** a Bureau of Meteorology (BoM) warning service, an incident dispatch system, or a replacement for agency procedures. For warnings, evacuation advice and operational decisions, consult the original issuing authority. Some displays (3-D clouds, storm tracks, projected cones and rapid-rise arrows) are estimates and **not official warnings**.
 

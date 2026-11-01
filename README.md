@@ -1,4 +1,24 @@
-# StormTracker — V10.2.26 documented production baseline (V10.2.25 warning functionality)
+# StormTracker — V10.2.42 immutable operator-accepted production baseline
+
+**Current accepted release (1 November 2026): V10.2.42.** The operator confirmed the working V10.2.41 application on a physical iPhone after source-verified V10.2.40 radar recovery and the V10.2.41 Longreach camera-retention correction. V10.2.42 is a **documentation, verified rollback and release-workflow freeze only**; it does not change the accepted live weather application, features or timing.
+
+**Production:** https://blakesmith-intel.github.io/StormTracker/  
+**Frozen source:** annotated `v10.2.42` and matching immutable `restore/v10.2.42` (created only after Pages acceptance).  
+**Feature development:** branch from `v10.2.42`, keep changes off production, run the full scientific/source and mobile/browser regression gates, require operator acceptance, and cut a **new** tagged release for approved enhancements. Never repoint a historical tag or restore branch.
+
+**Start with:** [authoritative production baseline](docs/PRODUCTION_BASELINE_V10.2.42.md) · [release notes](docs/RELEASE_NOTES_V10.2.42.md) · [operator guide](docs/OPERATOR_GUIDE_CURRENT.md) · [one-page PDF](docs/STORMTRACKER_LAYERS_INFORMATION.pdf) · [development handover](docs/DEVELOPMENT_HANDOVER_CURRENT.md) · [rollback](docs/BASELINE_RESTORE.md) · [future enhancements](docs/ACTIVE_WISHLIST.md).
+
+**Non-negotiables:** five-minute radar polling, true timestamped BoM WMTS frames, bounded failed-source recovery and multi-region isolation; user-owned camera that never resets on radar updates; approved Doppler and inferred 3-D boundaries, warning/cyclone source validation, rainfall/AEP, flood severity and crossings, outages, roads, incidents and original geography. Healthy verified zero warning feeds are **No current warnings**; unreadable/unverified feeds are **unavailable**, never fabricated all-clears. No hidden future feature changes are included.
+
+**Scope of immutability:** Git source/build/documentation and restore refs, not live BoM data, downstream agency feeds or the separately deployed Cloudflare relay.
+
+---
+
+## Archived README snapshot — previous 27 October V10.2.26 release
+
+The material below records earlier release history and is retained for provenance. Where it describes V10.2.26 as the "current" version, that is historical; the V10.2.42 documents linked above now control.
+
+### Historical V10.2.26 documented production baseline (V10.2.25 warning functionality)
 
 > **Current release 27 October 2026:** [Operator guide](docs/OPERATOR_GUIDE_CURRENT.md) · [current development handover](docs/DEVELOPMENT_HANDOVER_CURRENT.md) · [final documentation freeze](docs/RELEASE_NOTES_V10.2.26.md) · [BoM severe-warning feature release](docs/RELEASE_NOTES_V10.2.25.md) · [restore instructions](docs/BASELINE_RESTORE.md). **V10.2.26 is documentation-only**; it retains the exact accepted V10.2.25 optional BoM severe-warning code, previously sealed V10.2.24 maintenance functions, and immutable V10.2.0 native radar/3-D science foundation. Old tags are never overwritten.
 

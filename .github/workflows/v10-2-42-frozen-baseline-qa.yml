@@ -1,0 +1,74 @@
+name: V10.2.42 immutable accepted baseline evidence
+on:
+  push:
+    branches: [release/v10.2.42-operator-accepted-frozen-baseline-20261101]
+  pull_request:
+    paths:
+      - docs/**
+      - README.md
+      - .github/workflows/seal-verified-warning-v10.2.29.yml
+      - .github/workflows/v10-2-42-frozen-baseline-qa.yml
+permissions:
+  contents: read
+jobs:
+  freeze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Assert the last operator-accepted runtime and source are byte-identical
+        run: |
+          set -euo pipefail
+          git fetch --tags origin --quiet
+          git diff --exit-code 'v10.2.41^{}' HEAD -- frontend scripts relay config
+          echo 'OPERATOR_ACCEPTED_RUNTIME_UNCHANGED_V10_2_41'
+      - name: Install PDF document validation utilities
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils
+      - name: Verify current documentation and the actual one-page PDF
+        run: |
+          set -euo pipefail
+          for p in \
+            README.md \
+            docs/RELEASE_NOTES_V10.2.42.md \
+            docs/PRODUCTION_BASELINE_V10.2.42.md \
+            docs/OPERATOR_GUIDE_CURRENT.md \
+            docs/DEVELOPMENT_HANDOVER_CURRENT.md \
+            docs/CURRENT_ACCEPTED_BASELINE.md \
+            docs/BASELINE_RESTORE.md \
+            docs/ACTIVE_WISHLIST.md \
+            docs/OPERATOR_QUICK_REFERENCE_V10.2.42.md \
+            docs/STORMTRACKER_LAYERS_INFORMATION.pdf; do
+            test -s "$p" || { echo "Missing documentation: $p"; exit 1; }
+          done
+          pdfinfo docs/STORMTRACKER_LAYERS_INFORMATION.pdf | tee /tmp/stormtracker-pdfinfo.txt
+          grep -Eq '^Pages:[[:space:]]+1$' /tmp/stormtracker-pdfinfo.txt
+          pdftotext docs/STORMTRACKER_LAYERS_INFORMATION.pdf /tmp/stormtracker-quickref-text.txt
+          grep -Fq 'Situational awareness at a glance' /tmp/stormtracker-quickref-text.txt
+          grep -Fq 'RADAR & STORM ANALYSIS' /tmp/stormtracker-quickref-text.txt
+          grep -Fq 'COMMUNITY IMPACTS' /tmp/stormtracker-quickref-text.txt
+          grep -Fq 'V10.2.42' /tmp/stormtracker-quickref-text.txt
+          pdftoppm -f 1 -l 1 -scale-to 900 -png -singlefile \
+            docs/STORMTRACKER_LAYERS_INFORMATION.pdf /tmp/stormtracker-doc-render
+          test -s /tmp/stormtracker-doc-render.png
+          grep -Fq 'V10.2.42' README.md
+          grep -Fq 'V10.2.42' docs/OPERATOR_GUIDE_CURRENT.md
+          grep -Fq 'V10.2.42' docs/DEVELOPMENT_HANDOVER_CURRENT.md
+          grep -Fq 'V10.2.42' docs/CURRENT_ACCEPTED_BASELINE.md
+          grep -Fq 'V10.2.42' docs/BASELINE_RESTORE.md
+          echo 'PRODUCTION_DOCUMENTATION_AND_PDF_PASS'
+      - name: Verify old version refs and one-time legacy warning-seal guard
+        run: |
+          set -euo pipefail
+          for version in v10.2.29 v10.2.40 v10.2.41; do
+            original="$(git rev-parse "$version^{}")"
+            restore="$(git ls-remote origin "refs/heads/restore/$version" | cut -f1)"
+            test -n "$restore" && test "$original" = "$restore" ||
+              { echo "Previously frozen $version refs do not match"; exit 1; }
+          done
+          grep -Fq "head_sha == '7e45ce450d83aa04a6f50b13ede2dfd35d995e9e'" \
+            .github/workflows/seal-verified-warning-v10.2.29.yml
+          echo 'OLDER_RELEASES_PRESERVED_AND_LEGACY_RESEAL_DISABLED'
