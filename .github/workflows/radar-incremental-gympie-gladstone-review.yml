@@ -12,6 +12,7 @@ on:
       - "scripts/audit-all-radar-wmts-spotcheck-20261101.mjs"
       - "scripts/test-gympie-gladstone-incremental-webkit-20261101.mjs"
       - "scripts/test-incremental-append-real-wmts-webkit-20261101.mjs"
+      - "scripts/test-real-wmts-missing-frame-recovery-20261101.mjs"
       - ".github/workflows/radar-incremental-gympie-gladstone-review.yml"
 permissions:
   contents: read
@@ -82,6 +83,10 @@ jobs:
         run: node scripts/test-incremental-append-real-wmts-webkit-20261101.mjs
       - name: Require same genuine WMTS frame insertion without desktop Chromium player/page restart
         run: STORMTRACKER_BROWSER=desktop node scripts/test-incremental-append-real-wmts-webkit-20261101.mjs
+      - name: Reproduce and repair genuine 5-of-5 missing middle frame on mobile WebKit
+        run: node scripts/test-real-wmts-missing-frame-recovery-20261101.mjs
+      - name: Reproduce and repair genuine 5-of-5 missing middle frame on desktop Chromium
+        run: STORMTRACKER_BROWSER=desktop node scripts/test-real-wmts-missing-frame-recovery-20261101.mjs
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -90,4 +95,6 @@ jobs:
             /tmp/incremental-radar-webkit-failure.png
             /tmp/radar-incremental-real-append-failure.png
             /tmp/radar-incremental-desktop-append-failure.png
+            /tmp/radar-mobile-missing-frame-failure.png
+            /tmp/radar-desktop-missing-frame-failure.png
           if-no-files-found: ignore
