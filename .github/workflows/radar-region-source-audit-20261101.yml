@@ -5,6 +5,7 @@ on:
     paths:
       - .github/workflows/radar-region-source-audit-20261101.yml
       - scripts/probe-radar-region-loop-20261101.mjs
+      - scripts/probe-full-regional-wmts-20261101.mjs
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,3 +20,5 @@ jobs:
           node-version: '24'
       - name: Probe a bounded set of source-published timestamps, comparing region corner and centre
         run: node scripts/probe-radar-region-loop-20261101.mjs
+      - name: Verify complete mosaics of the six latest published frames across multiple radar sites
+        run: node scripts/probe-full-regional-wmts-20261101.mjs
