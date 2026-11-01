@@ -1,4 +1,14 @@
-# CURRENT ACCEPTED PRODUCTION — V10.2.45 (1 November 2026)
+# CURRENT ACCEPTED PRODUCTION — V10.2.46 (1 November 2026)
+
+**New immutable baseline:** `v10.2.46`, matching `restore/v10.2.46`, after successful public Pages verification. This source-verified active-warning polygon recovery hotfix retains all V10.2.45 radar and situational-awareness capabilities. The healthy BoM warnings polling interval is still 15 minutes; only an active warning missing an original polygon gets bounded two-minute catch-up checks. No invented geometry, false all-clears or changes to approved warning map styling.
+
+**New work starts solely from V10.2.46.** V10.2.45 and all earlier frozen source refs remain untouched.
+
+[Release notes](RELEASE_NOTES_V10.2.46.md) · [Production baseline](PRODUCTION_BASELINE_V10.2.46.md) · [Operator guide](OPERATOR_GUIDE_CURRENT.md).
+
+---
+
+# HISTORICAL ACCEPTED PRODUCTION — V10.2.45 (1 November 2026)
 
 **Operator-approved:** exact QA-tested cross-platform incremental BoM WMTS playback and genuine missing-frame recovery. The operational root is the release target; historical `v10.2.42` and all prior seals are preserved untouched. Publication and tag/restore verification are part of the final release gate, not inferred from source checks alone.
 

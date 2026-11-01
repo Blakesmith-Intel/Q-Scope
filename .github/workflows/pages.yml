@@ -203,7 +203,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           root=Path("_site")
-          revision="v10.2.45-production-source-verified-20261101-"
+          revision="v10.2.45-production-source-verified-20261101-v10.2.46-warning-source-catchup-20261101-"
           pairs=(
             ("index.html","live3d-operational-v9.html?v="),
             ("live3d-operational-v9.html","src/live3d-operational-v9.js?v="),
@@ -225,6 +225,12 @@ jobs:
           PY
           grep -Fq 'v10.2.45-production-source-verified-20261101-' _site/index.html
           grep -Fq 'V10.2.45 OPERATOR-APPROVED PRODUCTION' _site/BUILD.txt
+          grep -Fq 'v10-2-46-live-polygon-catchup' _site/src/live3d-operational-v9.js
+          grep -Fq 'WARNING_GEOMETRY_RECOVERY_MS=2*60*1000' _site/src/context-layers/bom-warning-operational-v1.js
+          grep -Fq 'WARNING_GEOMETRY_RECOVERY_MAX=9' _site/src/context-layers/bom-warning-operational-v1.js
+          grep -Fq 'INTERVAL_MS=15*60*1000' _site/src/context-layers/bom-warning-operational-v1.js
+          node frontend/tests/run-bom-warning-live-geometry-catchup-v10-2-46-tests.mjs
+          echo 'V10.2.46 VERIFIED BOM WARNING POLYGON CATCH-UP' >> _site/BUILD.txt
           node --check _site/src/live-loop-refresh-v1.js
           node --check _site/src/live3d-operational-v9.js
           node frontend/tests/run-radar-auto-refresh-v10-2-37-tests.mjs
@@ -772,6 +778,36 @@ jobs:
           ! grep -Fq 'RADAR QA PREVIEW — production unaffected' <<< "$html"
           echo "PUBLIC_PRODUCTION_V10_2_45_RADAR_RELEASE_VERIFIED $GITHUB_SHA"
 
+      - name: Verify published V10.2.46 authentic warning polygon catch-up on production root
+        env:
+          PAGES_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          base="${PAGES_URL%/}"
+          passed=0
+          for attempt in $(seq 1 12); do
+            suffix="?release=$GITHUB_SHA&warning=$attempt"
+            html="$(curl -fsSL --max-time 20 "$base/index.html$suffix" || true)"
+            manifest="$(curl -fsSL --max-time 20 "$base/BUILD.txt$suffix" || true)"
+            engine="$(curl -fsSL --max-time 20 "$base/src/live3d-operational-v9.js$suffix" || true)"
+            warning="$(curl -fsSL --max-time 20 "$base/src/context-layers/bom-warning-operational-v1.js$suffix" || true)"
+            if grep -Fq 'v10.2.46-warning-source-catchup-20261101-' <<< "$html" &&
+               grep -Fq 'V10.2.46 VERIFIED BOM WARNING POLYGON CATCH-UP' <<< "$manifest" &&
+               grep -Fq 'v10-2-46-live-polygon-catchup' <<< "$engine" &&
+               grep -Fq 'planIncrementalRadarWindow(hybridFrames,displayFrames)' <<< "$engine" &&
+               grep -Fq 'WARNING_GEOMETRY_RECOVERY_MS=2*60*1000' <<< "$warning" &&
+               grep -Fq 'WARNING_GEOMETRY_RECOVERY_MAX=9' <<< "$warning" &&
+               grep -Fq 'INTERVAL_MS=15*60*1000' <<< "$warning" &&
+               grep -Fq 'missingActiveBoMWarningGeometry(productStatuses,warnings)' <<< "$warning"; then
+              passed=1
+              break
+            fi
+            sleep 3
+          done
+          test "$passed" = 1
+          ! grep -Fq 'RADAR QA PREVIEW — production unaffected' <<< "$html"
+          echo "PUBLIC_V10_2_46_WARNING_POLYGON_RECOVERY_VERIFIED $GITHUB_SHA"
+
   seal_v10_2_45:
     name: Seal V10.2.45 only after accepted production-root verification
     needs: deploy
@@ -821,6 +857,56 @@ jobs:
           test "$(git ls-remote origin 'refs/tags/v10.2.42^{}' | cut -f1)" = "$old_tag"
           test "$(git ls-remote origin 'refs/heads/restore/v10.2.42' | cut -f1)" = "$old_restore"
           echo "IMMUTABLE_STORMTRACKER_V10_2_45_SEALED $release_sha"
+
+  seal_v10_2_46:
+    name: Seal V10.2.46 only after accepted production-root verification
+    needs: deploy
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.event.head_commit.message == 'Seal V10.2.46 warning polygon recovery production baseline'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Create never-movable annotated release and matching restore commit
+        env:
+          GH_TOKEN: ${{ secrets.STORMTRACKER_RELEASE_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          release_sha="$GITHUB_SHA"
+          tag="v10.2.46"
+          restore="restore/v10.2.46"
+          # Audit previous immutable seal; never update the old release.
+          old_tag="$(git ls-remote origin 'refs/tags/v10.2.45^{}' | cut -f1)"
+          old_restore="$(git ls-remote origin 'refs/heads/restore/v10.2.45' | cut -f1)"
+          test "$old_tag" = "3051662e4ad124dcdfee5c19e955b6172c70fef7"
+          test "$old_restore" = "$old_tag"
+          grep -Fq 'V10.2.46 — immutable production baseline' docs/PRODUCTION_BASELINE_V10.2.46.md
+          grep -Fq 'V10.2.46 — source-verified active BoM warning polygon recovery' docs/RELEASE_NOTES_V10.2.46.md
+          test "$(git rev-parse HEAD)" = "$release_sha"
+          current_tag="$(git ls-remote origin "refs/tags/$tag^{}" | cut -f1)"
+          current_restore="$(git ls-remote origin "refs/heads/$restore" | cut -f1)"
+          test -z "$current_tag" || test "$current_tag" = "$release_sha"
+          test -z "$current_restore" || test "$current_restore" = "$release_sha"
+          if [ -z "$current_tag" ]; then
+            tag_object="$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/tags" \
+              -f tag="$tag" \
+              -f message="StormTracker V10.2.46 - operator approved source-verified active BoM warning polygon catch-up and preserved radar replay (1 November 2026)" \
+              -f object="$release_sha" -f type="commit" --jq .sha)"
+            test -n "$tag_object"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/tags/$tag" -f sha="$tag_object" >/dev/null
+          fi
+          if [ -z "$current_restore" ]; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/heads/$restore" -f sha="$release_sha" >/dev/null
+          fi
+          test "$(git ls-remote origin "refs/tags/$tag^{}" | cut -f1)" = "$release_sha"
+          test "$(git ls-remote origin "refs/heads/$restore" | cut -f1)" = "$release_sha"
+          test "$(git ls-remote origin 'refs/tags/v10.2.45^{}' | cut -f1)" = "$old_tag"
+          test "$(git ls-remote origin 'refs/heads/restore/v10.2.45' | cut -f1)" = "$old_restore"
+          echo "IMMUTABLE_STORMTRACKER_V10_2_46_SEALED $release_sha"
 
   # The release-creation job below belongs to the original V10.2.28
   # commit only. Never re-run its historical source/doc checks or try to

@@ -1,8 +1,8 @@
 # StormTracker — current operator guide
-**Edition:** 1 November 2026 | **Applies to:** **V10.2.45 operator-approved production radar reliability baseline**, preserving all previously approved navigation, flood, rainfall, warning and community-impact layers.
+**Edition:** 1 November 2026 | **Applies to:** **V10.2.46 warning polygon source-recovery baseline**, with V10.2.45 radar and all other accepted layers unchanged.
 **Open:** https://blakesmith-intel.github.io/StormTracker/  
 **Technical handover:** [DEVELOPMENT_HANDOVER_CURRENT.md](DEVELOPMENT_HANDOVER_CURRENT.md)
-**Frozen release:** [V10.2.45 accepted baseline](PRODUCTION_BASELINE_V10.2.45.md) · [Release notes](RELEASE_NOTES_V10.2.45.md) · [One-page operator reference](OPERATOR_QUICK_REFERENCE_V10.2.45.md) · [Shareable existing PDF](STORMTRACKER_LAYERS_INFORMATION.pdf). **Operator approved the cross-platform radar recovery QA for promotion on 1 November 2026.** All further enhancements start from this new immutable release; previously accepted non-radar controls and safety behaviours remain unchanged.
+**Frozen release:** [V10.2.46 baseline](PRODUCTION_BASELINE_V10.2.46.md) · [Release notes](RELEASE_NOTES_V10.2.46.md) · [Quick reference](OPERATOR_QUICK_REFERENCE_V10.2.46.md) · [Shareable PDF](STORMTRACKER_LAYERS_INFORMATION.pdf). All future work starts from V10.2.46; earlier frozen releases remain untouched.
 
 
 > **Purpose and safety:** StormTracker brings together official source observations and selected public incident information for situational awareness. It is **not** a Bureau of Meteorology (BoM) warning service, an incident dispatch system, or a replacement for agency procedures. For warnings, evacuation advice and operational decisions, consult the original issuing authority. Some displays (3-D clouds, storm tracks, projected cones and rapid-rise arrows) are estimates and **not official warnings**.
@@ -10,6 +10,12 @@
 **Finding this guide from the map:** select the small **Operator guide ↗** text link in the existing StormTracker sidebar heading. It opens this up-to-date guide in a separate browser tab and leaves the active weather map, controls and information panels unchanged.
 
 **Public information sheet:** [StormTracker — layers and features (PDF)](STORMTRACKER_LAYERS_INFORMATION.pdf) — a concise shareable overview for new users. This is a guide to features, not a live weather bulletin.
+
+## V10.2.46 — Automatic recovery when active BoM warning polygons are unavailable
+
+If IDQ21033/IDQ21035 or other official severe warning products are **active**, but the original published GIS polygon is not yet available, the status correctly says **“active; awaiting updated BoM polygon”**. This is NOT an all-clear. StormTracker now automatically rechecks the official warning feed after **two minutes**, up to **nine** short checks per active issue, then resumes the usual **15-minute polling interval**. It resumes normal interval immediately when genuine source polygon geometry arrives. A limited early retry is also made after temporary source failures; manual **Refresh** checks at once.
+
+Only BoM-source-verified geographic vertices can appear; no guessed boundary from warning-area prose, outdated polygon or substitute storm cell may be displayed. Regional and detailed warning products, LDMG/DDMG intersection reports, original BoM issue/expiry, map and radar continuity and all warning symbols are unchanged. If the original source remains unavailable, use the official BoM warning and agency procedures. Absence of a polygon does **not** mean absence of a warning.
 
 ## V10.2.45 — Verified radar six-frame recovery and continuous playback
 

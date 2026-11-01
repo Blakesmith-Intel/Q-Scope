@@ -1,4 +1,14 @@
-# V10.2.45 — CURRENT IMMUTABLE OPERATOR-ACCEPTED PRODUCTION BASELINE (1 November 2026)
+# V10.2.46 — CURRENT IMMUTABLE PRODUCTION BASELINE (1 November 2026)
+
+**Operator-reported issue:** active BoM IDQ21033 and IDQ21035 lacked current verified polygons until the original GIS2Web-derived service caught up. The frontend's otherwise correct 15-minute automatic poll was too slow when an active source had no geometry. The fix uses bounded two-minute catch-up (at most nine checks per warning issue) and at most two early transport-error retries, reverts to 15-minute healthy checks, and retains fail-closed source truth. No other feed, polygon renderer, RADAR, 3-D, AEP, flood, cyclone, or UI modification.
+
+**Evidence:** live original Queensland BoM CAP/current-index/ArcGIS and relay audits; [independent mobile WebKit and desktop Chromium missing-to-present polygon recovery tests](https://github.com/Blakesmith-Intel/StormTracker/actions/runs/41283214838). Both recovered 2 regional and 6 detailed genuine warning polygons without a map/page restart.
+
+**Mandatory base for further work: `v10.2.46`.** Preserve V10.2.45 at `3051662e4ad124dcdfee5c19e955b6172c70fef7`; older immutable refs are never repointed. Require operator acceptance and distinct production release/tag/restore refs for every later change. [Current baseline](PRODUCTION_BASELINE_V10.2.46.md) · [Release notes](RELEASE_NOTES_V10.2.46.md) · [Guide](OPERATOR_GUIDE_CURRENT.md).
+
+---
+
+# Historical V10.2.45 immutable production baseline (1 November 2026)
 
 **Approved upgrade:** operator-tested six-frame native BoM radar recovery, source-real rolling frame append without playback timer restart, source pressure and transient tile/metadata retries, no page/camera reset and real QLD/NSW regional coverage. Both mobile WebKit and desktop Chromium independently passed 5/5 → 6/6 recovery on the actual QA route and actual newly available frame insertion. The compiled operational site is independently verified at the public root before creation of `v10.2.45` and `restore/v10.2.45`. The previous V10.2.42 freeze remains untouched.
 

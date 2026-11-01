@@ -1,4 +1,14 @@
-# StormTracker — V10.2.45 immutable recovery baseline (1 November 2026)
+# StormTracker — V10.2.46 immutable recovery baseline (1 November 2026)
+
+**Authoritative production refs:** annotated `v10.2.46` and identical-commit `restore/v10.2.46`; verify their peeled and branch SHAs are identical after production Pages release-gate success. No old refs may ever be moved; V10.2.45 tag/restore remain at `3051662e4ad124dcdfee5c19e955b6172c70fef7` and older seals remain unchanged.
+
+**To start future work:** `git fetch origin --tags`, then `git switch -c feature/<scope> v10.2.46`. Rollbacks must be new reviewed commits from the frozen source; never force-reset main or retag. Preserve genuine BoM GIS warning polygons, 15-minute healthy warnings polling, bounded missing-geometry catch-up, radar continuity, all approved operational source contracts and honest negative reporting.
+
+[Current release notes](RELEASE_NOTES_V10.2.46.md) · [new production contract](PRODUCTION_BASELINE_V10.2.46.md).
+
+---
+
+# Historical StormTracker V10.2.45 recovery baseline (1 November 2026)
 
 **Current operator-approved production seal:** `v10.2.45` (annotated) and `restore/v10.2.45`, created and checked only after successful public Pages deployment and production-radar source verification. Both must peel to exactly the same SHA. Older `v10.2.42` and `restore/v10.2.42` must remain at `7b9df1e4b235ed91a12eb3edd17655984643f0b2`.
 
