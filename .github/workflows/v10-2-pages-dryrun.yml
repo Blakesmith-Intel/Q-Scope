@@ -63,7 +63,7 @@ jobs:
           grep -Fq 'SIGNIFICANT_RAINFALL_RELAY' _site/src/context-layers/significant-rainfall-operational-v1.js
           test -s _site/favicon.svg
           grep -Fq 'WMTS_SOURCE_FRESHNESS_MS' _site/src/bom-wmts-loop-v2.js
-          grep -Fq 'unavailableTime.reject(observedUtc)' _site/src/bom-wmts-loop-v2.js
+          grep -Fq 'unavailableTime.reject(observedUtc,region)' _site/src/bom-wmts-loop-v2.js
           grep -Fq 'sourceFailures=new Map()' _site/src/bom-doppler-intake-v3.js
           grep -Fq 'wmts-stale400-radar74-circuit-favicon-v1-20261018' _site/src/live3d-operational-v9.js
           grep -Fq 'retainConfirmedFloodStations' _site/src/context-layers/river-official-flood-persistence-v1.js
