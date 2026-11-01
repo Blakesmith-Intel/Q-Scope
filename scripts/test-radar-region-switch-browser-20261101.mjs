@@ -33,7 +33,8 @@ async function snapshot(region,timeout=150000){
   return {region:id("radarSite")?.value,frames:id("hybridFrameLabel")?.textContent,
     status:id("status")?.textContent,source:id("sourceTime")?.textContent,
     available:id("sharedHistoryNote")?.textContent,auto:id("autoRefreshNote")?.textContent,
-    window:id("loopDurationMinutes")?.value};
+    window:id("loopDurationMinutes")?.value,
+    pressure:globalThis.__stormtrackerRelayPressureDiagnostics?.()};
  });
  console.log("RADAR_OPERATIONAL_SITE_CHECK",JSON.stringify(state));
  assert(/\b[1-9]\d*\/6\b/.test(state.frames),"30-minute six measured scans missing at "+region+"; "+JSON.stringify(state));
@@ -44,9 +45,11 @@ try{
   {waitUntil:"domcontentloaded",timeout:60000});
  await page.locator("#cesiumContainer .cesium-widget canvas").waitFor({state:"attached",timeout:60000});
  await snapshot("66");
- for(const region of ["23","08","19"]){
+ for(const region of ["106","24","107","74","75","36","23"]){
    await page.locator("#radarSite").selectOption(region,{timeout:60000});
-   await snapshot(region);
+   const result=await snapshot(region);
+   assert((result.pressure?.verifiedTileBlobs??0)>0,
+      "Production mobile build did not load verified WMTS blob cache at "+region);
  }
  console.log("RADAR_OPERATIONAL_CROSS_SITE_30MIN_PASS");
 }catch(error){
