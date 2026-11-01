@@ -369,7 +369,7 @@ jobs:
           curl --fail --silent --show-error --location --retry 7 --retry-delay 2 "$base/favicon.svg" | grep -Fq '<svg'
           wmts_fix="$(curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors "$base/src/bom-wmts-loop-v2.js")"
           grep -Fq 'WMTS_SOURCE_FRESHNESS_MS' <<< "$wmts_fix"
-          grep -Fq 'unavailableTime.reject(observedUtc)' <<< "$wmts_fix"
+          grep -Fq 'unavailableTime.reject(observedUtc,region)' <<< "$wmts_fix"
           wind_fix="$(curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors "$base/src/bom-doppler-intake-v3.js")"
           grep -Fq 'sourceFailures=new Map()' <<< "$wind_fix"
           flood_cache="$(curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors "$base/src/context-layers/river-official-flood-persistence-v1.js")"
