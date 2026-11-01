@@ -438,7 +438,7 @@ jobs:
           grep -Fq 'discoverBoundedBomReflectivityHistory(now,180,region)' <<< "$live_engine"
           live_refresh="$(curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors "$base/src/live-loop-refresh-v1.js")"
           grep -Fq 'LIVE_LOOP_BUSY_RETRY_MS = 2000' <<< "$live_refresh"
-          grep -Fq 'V10.2.37 RADAR AUTO REFRESH' <<< "$root"
+          grep -Fq 'V10.2.38 VERIFIED RADAR HISTORY' <<< "$root"
           history_source="$(curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors "$base/src/context-layers/bom-recent-river-history-v1.js")"
           grep -Fq 'if(explicitlyTidal && !classified && !lastConfirmed && !crossingReached)return null' <<< "$history_source"
           grep -Fq 'if(!classified && !lastConfirmed && !inland && !crossingReached)return null' <<< "$history_source"
@@ -1570,7 +1570,7 @@ jobs:
           echo "SEALED V10.2.28 negative reporting; historical V10.2.27 unchanged"
 
   seal_radar_refresh:
-    name: Seal V10.2.37 radar refresh only after published-site acceptance
+    name: Seal V10.2.38 verified radar replay only after published-site acceptance
     needs: deploy
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -1586,10 +1586,10 @@ jobs:
         run: |
           set -euo pipefail
           release_sha="$GITHUB_SHA"
-          tag="v10.2.37"
-          restore="restore/v10.2.37"
-          test -f docs/RELEASE_NOTES_V10.2.37.md
-          grep -Fq 'V10.2.37 RADAR AUTO REFRESH' scripts/apply-radar-auto-refresh-v1.py
+          tag="v10.2.38"
+          restore="restore/v10.2.38"
+          test -f docs/RELEASE_NOTES_V10.2.38.md
+          grep -Fq 'V10.2.38 VERIFIED RADAR HISTORY' scripts/apply-radar-auto-refresh-v1.py
           prior_tag="$(git ls-remote origin 'refs/tags/v10.2.36^{}' | cut -f1)"
           prior_restore="$(git ls-remote origin refs/heads/restore/v10.2.36 | cut -f1)"
           if [ -n "$prior_tag" ] || [ -n "$prior_restore" ]; then
@@ -1602,7 +1602,7 @@ jobs:
             build="$(curl -fsSL --max-time 20 "$base/BUILD.txt$query" || true)"
             runtime="$(curl -fsSL --max-time 20 "$base/src/live3d-operational-v9.js$query" || true)"
             scheduler="$(curl -fsSL --max-time 20 "$base/src/live-loop-refresh-v1.js$query" || true)"
-            if grep -Fq 'V10.2.37 RADAR AUTO REFRESH' <<< "$build" &&
+            if grep -Fq 'V10.2.38 VERIFIED RADAR HISTORY' <<< "$build" &&
                grep -Fq 'discoverBoundedBomReflectivityHistory(now,180,region)' <<< "$runtime" &&
                grep -Fq 'recordRadarAutoRefreshAudit' <<< "$runtime" &&
                grep -Fq 'LIVE_LOOP_BUSY_RETRY_MS = 2000' <<< "$scheduler"; then
@@ -1627,7 +1627,7 @@ jobs:
           fi
           if [ -z "$existing_tag" ]; then
             tag_object="$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/tags" \
-              -f tag="$tag" -f message="StormTracker V10.2.37: five-minute radar refresh, busy retry, genuine missed BoM frame recovery and diagnostics; previous releases immutable" \
+              -f tag="$tag" -f message="StormTracker V10.2.38: verified published replay despite WMTS lag, preserved five-minute poll; previous releases immutable" \
               -f object="$release_sha" -f type=commit --jq .sha)"
             gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
               -f ref="refs/tags/$tag" -f sha="$tag_object" >/dev/null
