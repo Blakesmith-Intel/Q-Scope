@@ -1644,7 +1644,6 @@ jobs:
   seal_radar_cross_site_live:
     name: Seal V10.2.39 cross-site radar auto-follow only after published-site acceptance
     needs: deploy
-    # This legacy seal belongs only to its original immutable commit.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -1663,8 +1662,6 @@ jobs:
           restore="restore/v10.2.39"
           test -f docs/RELEASE_NOTES_V10.2.39.md
           grep -Fq 'V10.2.39 RADAR CROSS-SITE LIVE RECOVERY' scripts/apply-radar-auto-refresh-v1.py
-          wmts="$(curl -fsSL --max-time 20 "https://blakesmith-intel.github.io/StormTracker/src/bom-wmts-loop-v2.js?radarSeal=$GITHUB_SHA" || true)"
-          grep -Fq 'isRejected(time,region)' <<< "$wmts" || { echo 'Region-isolated radar rejection not published'; exit 1; }
           prior_tag="$(git ls-remote origin 'refs/tags/v10.2.38^{}' | cut -f1)"
           prior_restore="$(git ls-remote origin refs/heads/restore/v10.2.38 | cut -f1)"
           if [ -n "$prior_tag" ] || [ -n "$prior_restore" ]; then
@@ -1677,13 +1674,15 @@ jobs:
             build="$(curl -fsSL --max-time 20 "$base/BUILD.txt$query" || true)"
             runtime="$(curl -fsSL --max-time 20 "$base/src/live3d-operational-v9.js$query" || true)"
             scheduler="$(curl -fsSL --max-time 20 "$base/src/live-loop-refresh-v1.js$query" || true)"
+            wmts="$(curl -fsSL --max-time 20 "$base/src/bom-wmts-loop-v2.js$query" || true)"
             if grep -Fq 'V10.2.39 RADAR CROSS-SITE LIVE RECOVERY' <<< "$build" &&
                grep -Fq 'discoverBoundedBomReflectivityHistory(now,180,region)' <<< "$runtime" &&
                grep -Fq 'recordRadarAutoRefreshAudit' <<< "$runtime" &&
                grep -Fq 'const wasFollowingLatest = automatic' <<< "$runtime" &&
                grep -Fq 'checkRadarOnForegroundReturn' <<< "$runtime" &&
                grep -Fq 'LIVE_LOOP_BUSY_RETRY_MS = 2000' <<< "$scheduler" &&
-               grep -Fq 'LIVE_LOOP_SOURCE_RETRY_MS = 60000' <<< "$scheduler"; then
+               grep -Fq 'LIVE_LOOP_SOURCE_RETRY_MS = 60000' <<< "$scheduler" &&
+               grep -Fq 'isRejected(time,region)' <<< "$wmts"; then
               published=true
               break
             fi
