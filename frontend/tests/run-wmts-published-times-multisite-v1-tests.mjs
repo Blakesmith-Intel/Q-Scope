@@ -76,6 +76,33 @@ assert.deepEqual(await discoverBoundedBomReflectivityHistory(clock,180,"19",{
   publishedTimes:async()=>[stamp(45),stamp(50),stamp(55)],
   verifyNationalTile:async()=>true}),
   [stamp(45),stamp(50),stamp(55)]);
+// A single genuine BoM metadata abort must recover transparently, without
+// altering the official UTC list or resetting the same tab's radar window.
+let transientChecks=0;
+const transientMetadata=createPublishedReflectivityTimeSource({
+  cacheMs:120000,retryDelayMs:0,
+  fetchImpl:async()=>{
+    transientChecks++;
+    if(transientChecks===1)throw Object.assign(
+      new Error("The user aborted a request."),{name:"AbortError"});
+    return new Response(caps(samples),{status:200});
+  }
+});
+assert.deepEqual(await transientMetadata(),samples);
+assert.equal(transientChecks,2,"Exactly one bounded metadata retry was allowed");
+assert.deepEqual(await transientMetadata(),samples);
+assert.equal(transientChecks,2,"Successful retry must be cached by ordinary TTL");
+let refusedChecks=0;
+const refusedMetadata=createPublishedReflectivityTimeSource({
+  retryDelayMs:0,fetchImpl:async()=>{
+    refusedChecks++;
+    return new Response("Forbidden",{status:403});
+  }
+});
+await assert.rejects(refusedMetadata(),/HTTP 403/);
+assert.equal(refusedChecks,1,"A denied source must never be hammered");
+console.log("PASS_ONE_TRANSIENT_BOM_METADATA_RETRY_WITHOUT_INVENTING_SCANS");
+
 console.log("PASS real BoM GetCapabilities timestamps used at every radar, XML layer isolation, 9 genuine frames, one shared 120-sec cache, no speculative WMTS 400 site-load probes.");
 
 

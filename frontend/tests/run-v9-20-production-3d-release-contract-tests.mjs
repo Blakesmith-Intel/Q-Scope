@@ -10,7 +10,8 @@ const opacity=read("../src/volume-display-opacity-v1.js");
 const packageScript=read("../../scripts/build-current-site.sh");
 // Enable exact operator-accepted implementation on the production document,
 // while preserving it on preview and not on the older diagnostic preview.
-assert.match(runtime,/const INCREMENTAL_VOLUME_PREVIEW\s*=\s*window\.location\.pathname\.includes\("\/preview\/incremental-3d\/"\)\s*\|\|\s*\(\/\\\/live3d-operational-v9\\\.html\$\//);
+assert.match(runtime,/const OPERATOR_RADAR_REVIEW\s*=\s*window\.location\.pathname\.includes\("\/preview\/radar-refresh-review\/"\)/);
+assert.match(runtime,/const INCREMENTAL_VOLUME_PREVIEW\s*=\s*window\.location\.pathname\.includes\("\/preview\/incremental-3d\/"\)\s*\|\|\s*OPERATOR_RADAR_REVIEW/);
 assert.match(runtime,/!window\.location\.pathname\.includes\("\/preview\/"\)/);
 assert.match(runtime,/const PUBLISHED_PRODUCTION_RUNTIME\s*=/);
 assert.match(runtime,/const incrementalVolumeRenderer=INCREMENTAL_VOLUME_PREVIEW/);

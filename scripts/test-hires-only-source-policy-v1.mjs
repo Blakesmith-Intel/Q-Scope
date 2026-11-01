@@ -32,7 +32,12 @@ assert(!source.includes("loadFtpReflectivityMosaicAtTime("),
  "Live rain radar can NEVER load low-resolution FTP images");
 assert(!source.includes("discoverFtpReflectivityHistory("),
  "Rain radar history can NEVER return legacy FTP timestamps");
-assert(source.includes("return loadVerifiedNationalMosaicAtTime(observedUtc,region)"));
+// A transient retry still invokes only the exact same genuine WMTS
+// high-resolution loader, never a legacy/low-resolution substitute.
+assert(source.includes("loadVerified=loadVerifiedNationalMosaicAtTime"));
+assert(source.includes("return await loadVerified(observedUtc,region)"));
+assert(source.includes("return loadVerified(observedUtc,region)"));
+assert(source.includes("retryableWmtsMosaicFailure(error)"));
 const policy=readFileSync("frontend/src/hires-radar-loop-policy-v1.js","utf8");
 assert(policy.includes('frame?.sourceId==="BOM-MOSAIC"'));
 assert.equal(measuredHiResRainWindow(times,"30").plan.every(x=>x.kind==="observed"),true);

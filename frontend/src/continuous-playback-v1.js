@@ -20,8 +20,13 @@ export function createContinuousPlayback({ count, currentIndex, showFrame, delay
       // unrenderable source frame. The last successfully displayed observation
       // stays visible; the next attempt advances to the next genuine frame.
       let cursor = currentIndex();
+      let lastAccepted = cursor;
       let failedSteps = 0;
       while (playing && token === generation && count() > 1) {
+        // A rolling source window can retire old scans while the player runs.
+        // Rebase the private cursor to the actually displayed observation;
+        // keep the failed-step cursor only when a tile could not render.
+        if (currentIndex() !== lastAccepted) cursor = currentIndex();
         const startedAt = performance.now();
         const target = (cursor + 1) % count();
         const presented = await showFrame(target);
@@ -35,6 +40,7 @@ export function createContinuousPlayback({ count, currentIndex, showFrame, delay
           cursor = currentIndex();
           failedSteps = 0;
         }
+        lastAccepted = currentIndex();
         // Account for render time; never introduce an extra full-frame wait.
         const remaining = Math.max(0, delay() - (performance.now() - startedAt));
         if (remaining > 0) {

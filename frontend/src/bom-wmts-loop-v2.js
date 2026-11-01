@@ -40,6 +40,20 @@ export function createWmtsTimeFailureGuard({
   };
 }
 const unavailableTime=createWmtsTimeFailureGuard();
+// Read-only bounded per-region WMTS failure evidence; no invented tiles and no
+// new requests. Includes exact UTC and tile col/row already reported by loader.
+const wmtsFrameFailures=[];
+function logWmtsFailure(region,observedUtc,reason){
+ const message=String(reason?.message??reason).slice(0,1100);
+ wmtsFrameFailures.push({region,observedUtc,utc:new Date().toISOString(),
+   message,tiles:[...message.matchAll(/tile (\d+)\/(\d+): ([^;]+)/g)]
+     .map(m=>({col:Number(m[1]),row:Number(m[2]),reason:m[3]}))});
+ if(wmtsFrameFailures.length>48)wmtsFrameFailures.shift();
+}
+export function radarTileFailureSnapshot(region=null){
+ return wmtsFrameFailures.filter(entry=>region==null||entry.region===region)
+   .map(entry=>({...entry,tiles:entry.tiles.map(tile=>({...tile}))}));
+}
 
 // Current BOM observed-weather WMTS matrix metadata for native zoom 8.
 const MATRIX = Object.freeze({
@@ -171,6 +185,7 @@ async function validatedNationalTimes(now,region,publishedTimes,verifyTile=probe
    // Only an explicit 400 signals a source-rejected timestamp/tile.
    if(Number(error?.status)===400 || /HTTP\s+400\b/.test(String(error?.message??error)))
      unavailableTime.reject(observedUtc,region);
+   logWmtsFailure(region,observedUtc,error);
    console.warn("National BoM reflectivity frame unavailable",observedUtc,
     String(error?.message??error));
   }
@@ -201,6 +216,28 @@ function createCanvas(width, height) {
   }
 
   throw new Error("No browser canvas implementation is available.");
+}
+
+// Testable source-only retry; every success is still a decoded authentic
+// PNG for the EXACT published timestamp and tile coordinate.
+export async function fetchWmtsPreflightTile(url,fetchTile,{
+  wait=ms=>new Promise(resolve=>setTimeout(resolve,ms)),
+  retryDelayMs=750
+}={}){
+  if(!url||typeof fetchTile!=="function")
+    throw new TypeError("WMTS preflight URL and source tile loader required");
+  try{
+    return await fetchTile(url);
+  }catch(error){
+    const message=String(error?.message??error);
+    const code=Number(error?.status)||Number(/HTTP\s+(\d{3})/.exec(message)?.[1])||0;
+    // BoM 400 = unpublished/rejected time. 403 = denied. 429 = relay
+    // cooldown. Never blindly retry and amplify any of these failures.
+    if([400,403,429].includes(code)||/relay cooldown|queue full/i.test(message))
+      throw error;
+    await wait(retryDelayMs);
+    return fetchTile(url);
+  }
 }
 
 export async function loadVerifiedNationalMosaicAtTime(observedUtc, region = 'SEQ') {
@@ -236,10 +273,16 @@ export async function loadVerifiedNationalMosaicAtTime(observedUtc, region = 'SE
   const first=tasks[0];
   let firstImage;
   try{
-    firstImage=await fetchReadableImage(first.url);
+    // One brief transient retry for the SOURCE-PROOF preflight tile. A single
+    // 502/503/network hiccup must not silently remove an otherwise published
+    // five-minute frame from the operator loop. A real 400/403/429 remains
+    // terminal for this attempt and is not hammered or fabricated.
+    firstImage=await fetchWmtsPreflightTile(first.url,fetchReadableImage);
   }catch(error){
     if(/HTTP\s+400\b/.test(String(error?.message??error)))
       unavailableTime.reject(observedUtc,region);
+    logWmtsFailure(region,observedUtc,
+      "tile "+first.col+"/"+first.row+": "+String(error?.message??error));
     throw Error("BoM WMTS source time preflight failed at "+
       observedUtc+": "+String(error?.message??error));
   }
@@ -252,6 +295,7 @@ export async function loadVerifiedNationalMosaicAtTime(observedUtc, region = 'SE
   }catch(error){
     if(/HTTP\s+400\b/.test(String(error?.message??error)))
       unavailableTime.reject(observedUtc,region);
+    logWmtsFailure(region,observedUtc,error);
     throw error;
   }
 
@@ -325,8 +369,25 @@ export async function loadVerifiedNationalMosaicAtTime(observedUtc, region = 'SE
   };
 }
 
+// Retry only genuine transient transport/decode failures, never a rejected
+// publication time, HTTP 403/429 cooldown or a source 400. The second request
+// is for the SAME authentic BoM UTC and EXACT same geographic WMTS tiles.
+// Never fill a partial frame with invented, older or transparent pixels.
+export function retryableWmtsMosaicFailure(error){
+ const message=String(error?.message??error);
+ if([400,403,429].includes(Number(error?.status)) ||
+    /HTTP\s+(?:400|403|429)\b|relay cooldown|queue full/i.test(message))
+   return false;
+ return [502,503,504].includes(Number(error?.status)) ||
+   /HTTP\s+5(?:02|03|04)\b|network|CORS|failed to fetch|abort|timed?\s*out|incomplete BoM reflectivity mosaic/i.test(message);
+}
+
 export async function loadBomReflectivityMosaicAtTime(
- observedUtc,region='SEQ',knownPublishedTimes=null
+ observedUtc,region='SEQ',knownPublishedTimes=null,{
+ loadVerified=loadVerifiedNationalMosaicAtTime,
+ wait=ms=>new Promise(resolve=>setTimeout(resolve,ms)),
+ retryDelayMs=900
+ }={}
 ){
  if(!observedUtc)throw Error("observedUtc is required");
  // Keep one authentic capability snapshot during a multi-frame load.
@@ -335,9 +396,20 @@ export async function loadBomReflectivityMosaicAtTime(
   Array.isArray(knownPublishedTimes)?knownPublishedTimes:await publishedReflectivityTimes(),
   Date.now(),region
  );
- if(!sourceTimes.includes(observedUtc))
+ if(!sourceTimes.includes(observedUtc)){
+  logWmtsFailure(region,observedUtc,"BoM published history excludes requested UTC");
   throw Error("BoM high-resolution frame not published in bounded history: "+observedUtc);
- return loadVerifiedNationalMosaicAtTime(observedUtc,region);
+ }
+ try{
+   return await loadVerified(observedUtc,region);
+ }catch(error){
+   if(!retryableWmtsMosaicFailure(error))throw error;
+   await wait(retryDelayMs);
+   // Preserve genuine source pixels and independently verified timestamps.
+   // If a transient persists, bubble it up for the existing 60-second
+   // scheduler recovery; retain any already verified frames in the browser.
+   return loadVerified(observedUtc,region);
+ }
 }
 
 export async function loadLatestBomReflectivityMosaic(now = Date.now(), region = 'SEQ') {
