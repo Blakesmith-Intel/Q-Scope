@@ -634,10 +634,13 @@ jobs:
           done
           echo 'Verified sealed V10.2.0 source 047b3bd1c66b0ed5f070d2298202f46d0cd8dae2, single UI, native multi-site BoM Doppler, previous full-quality 3-D, and V9.18 QA.'
 
+  # The release-creation job below belongs to the original V10.2.28
+  # commit only. Never re-run its historical source/doc checks or try to
+  # re-create immutable tags during subsequent radar releases.
   seal:
-    name: Seal verified cyclone release references
+    name: Legacy historical release sealing (original V10.2.28 commit only)
     needs: deploy
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.sha == '2df8f20141d4d450ba158157e6d125f7288de740'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -1572,6 +1575,35 @@ jobs:
           test "$(git ls-remote origin "refs/tags/$tag^{}" | cut -f1)" = "$release_sha"
           test "$(git ls-remote origin "refs/heads/$restore" | cut -f1)" = "$release_sha"
           echo "SEALED V10.2.28 negative reporting; historical V10.2.27 unchanged"
+
+  verify_frozen_v10_2_28:
+    name: Verify immutable V10.2.28 warning release references (read-only)
+    needs: deploy
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify V10.2.27 and V10.2.28 frozen tag/restore commit identities
+        run: |
+          set -euo pipefail
+          for release in v10.2.27 v10.2.28; do
+            case "$release" in
+              v10.2.27) expected="9cc1ff06c5b757a1a1ad08f62ddc31478b730406";;
+              v10.2.28) expected="2df8f20141d4d450ba158157e6d125f7288de740";;
+            esac
+            tag_sha="$(git ls-remote origin "refs/tags/$release^{}" | cut -f1)"
+            restore_sha="$(git ls-remote origin "refs/heads/restore/$release" | cut -f1)"
+            test -n "$tag_sha" && test "$tag_sha" = "$restore_sha" &&
+              test "$tag_sha" = "$expected" || {
+                echo "Immutable $release tag/restore reference mismatch; operator review required"
+                exit 1
+              }
+            echo "Verified frozen $release at $expected (no release ref changes)"
+          done
 
   seal_radar_refresh:
     name: Preserve historical V10.2.38 verified radar replay seal
