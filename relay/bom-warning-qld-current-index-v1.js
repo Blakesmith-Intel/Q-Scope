@@ -26,8 +26,14 @@ export function parseCurrentQldBoMWarningsIndex(html,{nowMs=Date.now()}={}){
  if(!Number.isFinite(dateMs)||dateMs>nowMs+5*60000||nowMs-dateMs>20*60000)return null;
  const body=html.slice(start,listEnd);
  const active=new Set();
- for(const m of body.matchAll(/<a\s+[^>]*href\s*=\s*["'](?:https?:\/\/(?:www\.)?bom\.gov\.au)?\/(?:products\/(IDQ\d{5})\.shtml|warning\/[\w-]+\/(IDQ\d{5}))(?:\?[^"']*)?["']/gi)){
+ // The Queensland "Warnings current" list ALSO links cancellation notices.
+ // An IDQ product link alone is not evidence that its warning is active.
+ // Only an explicitly non-cancellation entry is an active warning; this
+ // still supports another independently active entry for the same product.
+ for(const m of body.matchAll(/<a\s+[^>]*href\s*=\s*["'](?:https?:\/\/(?:www\.)?bom\.gov\.au)?\/(?:products\/(IDQ\d{5})\.shtml|warning\/[\w-]+\/(IDQ\d{5}))(?:\?[^"']*)?["'][^>]*>([\s\S]*?)<\/a>/gi)){
   const code=(m[1]||m[2]).toUpperCase();
+  const title=m[3].replace(/<[^>]*>/g," ").replace(/&(?:nbsp|amp);/gi," ").trim();
+  if(/\b(?:cancellation|cancelled|canceled|final)\b/i.test(title))continue;
   if(CODES.includes(code))active.add(code);
  }
  // All-clear is asserted only against THIS verified current-product listing,
