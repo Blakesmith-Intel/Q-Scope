@@ -9,10 +9,22 @@ const page=await browser.newPage({
 });
 page.setDefaultTimeout(420000);
 const faults=[];
+// Keep the public production Origin while serving our proposed package from
+// local QA files: the real BoM CORS relay authorises the production site,
+// not an arbitrary localhost origin.
+await page.route("https://blakesmith-intel.github.io/StormTracker/**",async route=>{
+  const url=new URL(route.request().url());
+  const local="http://127.0.0.1:8137"+url.pathname.replace("/StormTracker","")+url.search;
+  try{
+    const response=await fetch(local);
+    await route.fulfill({status:response.status,body:Buffer.from(await response.arrayBuffer()),
+      contentType:response.headers.get("content-type")||"application/octet-stream"});
+  }catch(e){await route.abort("failed");}
+});
 page.on("pageerror",e=>faults.push(String(e)));
 page.on("console",m=>{if(/HTTP 4|HTTP 5|incomplete BoM/i.test(m.text()))faults.push(m.text().slice(0,250));});
 try{
-  await page.goto("http://127.0.0.1:8137/ftp-aep-smoke.html",{waitUntil:"domcontentloaded"});
+  await page.goto("https://blakesmith-intel.github.io/StormTracker/ftp-aep-smoke.html",{waitUntil:"domcontentloaded"});
   const result=await page.evaluate(async()=>{
     const radar=await import("./src/bom-wmts-loop-v2.js?v=20261101-source-verified-recovery-v10-2-40");
     const {isVerifiedHiResRadarFrame}=await import("./src/hires-radar-loop-policy-v1.js");
