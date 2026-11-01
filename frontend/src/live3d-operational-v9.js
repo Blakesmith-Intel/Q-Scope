@@ -224,8 +224,15 @@ import {createSupplementalRadarVolumes}
 // the visually accepted incremental-3d browser preview. Older immutable
 // recovery builds are unaffected. Keep the established flag name for the
 // regression-tested downstream code and safeguards.
+// The isolated operator-acceptance preview MUST exercise the identical
+// bounded radar history and GPU/memory recovery path used at the production
+// root. A legacy /preview/ exclusion disabled it, letting the QA URL drop a
+// legitimate sixth BoM frame despite a green root-only browser test.
+const OPERATOR_RADAR_REVIEW =
+  window.location.pathname.includes("/preview/radar-refresh-review/");
 const INCREMENTAL_VOLUME_PREVIEW =
   window.location.pathname.includes("/preview/incremental-3d/") ||
+  OPERATOR_RADAR_REVIEW ||
   (/\/live3d-operational-v9\.html$/.test(window.location.pathname) &&
     !window.location.pathname.includes("/preview/"));
 const MODEL_URL =
