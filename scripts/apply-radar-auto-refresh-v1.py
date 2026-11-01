@@ -255,10 +255,6 @@ inject_once("const radarAutoRefreshAudit = {",source[start:end]+"const radarAuto
 start=source.index("const scene = viewer.scene;")
 end=source.index("// V9.20.0: limit surplus Cesium",start)
 inject_once("const scene = viewer.scene;\n",source[start:end])
-start=source.index("window.__stormtrackerRadarDiagnostics=()=>")
-end=source.index("const autoRefresh = createLiveLoopRefresh({",start)
-inject_once("const autoRefresh = createLiveLoopRefresh({",
-    source[start:end]+"const autoRefresh = createLiveLoopRefresh({")
 start=source.index("function buildTrackVolumeMap(")
 end=source.index("async function loadHybridSequence(automatic = false)",start)
 inject_once("async function loadHybridSequence(automatic = false)",
