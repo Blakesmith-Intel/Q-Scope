@@ -38,7 +38,9 @@ permissions:
   contents: read
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    # Playwright Chromium currently targets Ubuntu 24.04 (ubuntu-latest
+    # switched to unsupported Ubuntu 26.04 on GitHub-hosted runners).
+    runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
