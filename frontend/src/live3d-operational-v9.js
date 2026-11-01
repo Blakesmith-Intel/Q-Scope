@@ -142,7 +142,8 @@ import {
   hasNewMatchedProducts,
   createLiveLoopRefresh
 } from "./live-loop-refresh-v1.js?v=20261101-radar-live-follow-v10-2-39";
-import { createContinuousPlayback } from "./continuous-playback-v1.js?v=9.16.10";
+import { createContinuousPlayback } from "./continuous-playback-v1.js?v=20261101-incremental-cursor-v1";
+import {planIncrementalRadarWindow} from "./radar-incremental-window-v1.js?v=20261101-verified-append-v1";
 import { buildTrackThreatCone } from "./track-threat-cone-v1.js?v=v9-cone-observed-tip-v3";
 import {
   evaluateChronologicalTrackThreatCone,
@@ -816,6 +817,11 @@ let lastSourceDiscoveryTimes = [];
 let trackedThrough = null;
 const radarFrameCache = new Map();
 const radarResultCache = new Map();
+const radarIncrementalAudit = {
+  appendUpdates:0, fullRebuildUpdates:0, lastAppendUtc:null,
+  lastRetiredCount:0, lastAppendedCount:0
+};
+window.__stormtrackerRadarIncrementalAudit=()=>({...radarIncrementalAudit});
 const radarAutoRefreshAudit = {
   lastCheckUtc: null,
   newestAcceptedUtc: null,
@@ -4316,6 +4322,107 @@ async function loadDopplerSequence(automatic=false) {
   if(resume) playback.play();
 }
 
+function buildTrackVolumeMap(frame,result,previousByTrack) {
+    const segmentation =
+      result
+        ?.segmentations
+        ?.[0];
+
+    const volumeMap =
+      new Map();
+
+    for (
+      const track
+      of result?.tracks ?? []
+    ) {
+      const observation =
+        track.history?.find(
+          item =>
+            sameObservedInstant(
+              item.observed_utc,
+              frame.observedUtc
+            )
+        );
+
+      if (!observation) {
+        continue;
+      }
+
+      const volume =
+        buildMeasuredTrackVolume(
+          frame,
+          segmentation,
+          observation,
+          model,
+          {
+            occupancyThreshold:
+              Number(
+                $("occupancyThreshold").value
+              ),
+
+            minimumOutputDbz:
+              20,
+
+            // Display threshold no longer changes measured-cell inference styles.
+            displayThresholdDbz: 30,
+
+            basePointSize:
+              Number(
+                $("pointSize").value
+              )
+          }
+        );
+
+      if (!volume) {
+        continue;
+      }
+
+      // The stable QA renders the persistent, frame-wide 3-D volume.
+      // Preserve track top, trend and support metrics without keeping another
+      // complete set of redundant per-track 3-D point/footprint arrays for
+      // every observation in the 60/120/180-minute history.
+      const retainedVolume=INCREMENTAL_VOLUME_PREVIEW ? {
+        high_support_top_40_m_amsl:volume.high_support_top_40_m_amsl,
+        high_support_points:volume.high_support_points,
+        inferred_point_count:volume.inferred_point_count
+      } : volume;
+
+      const previous =
+        previousByTrack.get(
+          track.track_id
+        );
+
+      const trend =
+        previous
+          ? highSupportTop40Trend(
+              previous.volume,
+              previous.observedUtc,
+              retainedVolume,
+              frame.observedUtc
+            )
+          : null;
+
+      const record = {
+        volume:retainedVolume,
+        trend,
+        observedUtc:
+          frame.observedUtc
+      };
+
+      volumeMap.set(
+        track.track_id,
+        record
+      );
+
+      previousByTrack.set(
+        track.track_id,
+        record
+      );
+    }
+
+  return volumeMap;
+}
+
 async function loadHybridSequence(automatic = false) {
   if(selectedLoopSelection()===DOPPLER_AVAILABLE_LOOP_VALUE)
     return loadDopplerSequence(automatic);
@@ -4749,15 +4856,26 @@ async function loadHybridSequence(automatic = false) {
     );
   }
 
+  // This exact measured-frame window can be shifted in place when its retained
+  // observations are unchanged. Historical backfill, temporal-inference edits
+  // and selection changes retain the original chronological rebuild path.
+  const incrementalCommit = automatic && !isCombined && !needsHistoricalRebuild &&
+    loadedLoopSelection === loopSelection &&
+    planIncrementalRadarWindow(hybridFrames,displayFrames);
   const oldTime = hybridFrames[hybridFrameIndex]?.observedUtc;
   // Operators parked on Latest must follow genuine newly accepted scans.
   // Preserve a deliberately scrubbed historical position instead.
   const wasFollowingLatest = automatic && !isCombined &&
-    hybridFrames.length > 0 && hybridFrameIndex === hybridFrames.length - 1;
+    !playback.isPlaying() && hybridFrames.length > 0 &&
+    hybridFrameIndex === hybridFrames.length - 1;
   const resume = automatic ? playback.isPlaying() : true;
-  $("hybridFrameSlider").disabled = true;
-  $("hybridPlayButton").disabled = true;
-  await playback.pause();
+  // On an ordinary new scan the live player owns its existing timer.
+  // Do not pause it, reset its worker, or recreate old track volumes.
+  if(!incrementalCommit){
+    $("hybridFrameSlider").disabled = true;
+    $("hybridPlayButton").disabled = true;
+    await playback.pause();
+  }
   hybridFrames = displayFrames;
   hybridResults = displayResults;
   preparedDopplerStates = displayStates;
@@ -4779,8 +4897,26 @@ async function loadHybridSequence(automatic = false) {
       ) / 60000,
     failures
   };
-  hybridHistory = new Map();
-  hybridTrackVolumes = [];
+  if(incrementalCommit){
+    radarIncrementalAudit.appendUpdates++;
+    radarIncrementalAudit.lastAppendUtc=displayFrames.at(-1).observedUtc;
+    radarIncrementalAudit.lastRetiredCount=incrementalCommit.dropped;
+    radarIncrementalAudit.lastAppendedCount=incrementalCommit.appended;
+    // Frame-indexed track trails must follow the surviving UTCs.
+    if(incrementalCommit.dropped){
+      for(const [id,history] of hybridHistory){
+        const retained=history.filter(entry=>entry.frameIndex>=incrementalCommit.dropped)
+          .map(entry=>({...entry,frameIndex:entry.frameIndex-incrementalCommit.dropped}));
+        if(retained.length)hybridHistory.set(id,retained);
+        else hybridHistory.delete(id);
+      }
+    }
+    hybridTrackVolumes=hybridTrackVolumes.slice(incrementalCommit.dropped);
+  }else{
+    if(automatic)radarIncrementalAudit.fullRebuildUpdates++;
+    hybridHistory = new Map();
+    hybridTrackVolumes = [];
+  }
   hybridDopplerFrameStates = [];
   hybridFrameIndex = automatic
     ? (wasFollowingLatest
@@ -4848,124 +4984,18 @@ async function loadHybridSequence(automatic = false) {
   }
   $("autoRefreshNote").title = "";
 
-  const previousByTrack =
-    new Map();
-
-  for (
-    let frameIndex = 0;
-    frameIndex < hybridFrames.length;
-    frameIndex++
-  ) {
-    const frame =
-      hybridFrames[
-        frameIndex
-      ];
-
-    const result =
-      hybridResults[
-        frameIndex
-      ];
-
-    const segmentation =
-      result
-        ?.segmentations
-        ?.[0];
-
-    const volumeMap =
-      new Map();
-
-    for (
-      const track
-      of result?.tracks ?? []
-    ) {
-      const observation =
-        track.history?.find(
-          item =>
-            sameObservedInstant(
-              item.observed_utc,
-              frame.observedUtc
-            )
-        );
-
-      if (!observation) {
-        continue;
-      }
-
-      const volume =
-        buildMeasuredTrackVolume(
-          frame,
-          segmentation,
-          observation,
-          model,
-          {
-            occupancyThreshold:
-              Number(
-                $("occupancyThreshold").value
-              ),
-
-            minimumOutputDbz:
-              20,
-
-            // Display threshold no longer changes measured-cell inference styles.
-            displayThresholdDbz: 30,
-
-            basePointSize:
-              Number(
-                $("pointSize").value
-              )
-          }
-        );
-
-      if (!volume) {
-        continue;
-      }
-
-      // The stable QA renders the persistent, frame-wide 3-D volume.
-      // Preserve track top, trend and support metrics without keeping another
-      // complete set of redundant per-track 3-D point/footprint arrays for
-      // every observation in the 60/120/180-minute history.
-      const retainedVolume=INCREMENTAL_VOLUME_PREVIEW ? {
-        high_support_top_40_m_amsl:volume.high_support_top_40_m_amsl,
-        high_support_points:volume.high_support_points,
-        inferred_point_count:volume.inferred_point_count
-      } : volume;
-
-      const previous =
-        previousByTrack.get(
-          track.track_id
-        );
-
-      const trend =
-        previous
-          ? highSupportTop40Trend(
-              previous.volume,
-              previous.observedUtc,
-              retainedVolume,
-              frame.observedUtc
-            )
-          : null;
-
-      const record = {
-        volume:retainedVolume,
-        trend,
-        observedUtc:
-          frame.observedUtc
-      };
-
-      volumeMap.set(
-        track.track_id,
-        record
-      );
-
-      previousByTrack.set(
-        track.track_id,
-        record
-      );
-    }
-
-    hybridTrackVolumes.push(
-      volumeMap
-    );
+  const previousByTrack = new Map();
+  if(incrementalCommit){
+    // Reuse every retained frame's prior verified track-volume calculation.
+    for(const volumeMap of hybridTrackVolumes)
+      for(const [id,record] of volumeMap)previousByTrack.set(id,record);
+    for(let index=incrementalCommit.appendStart;index<hybridFrames.length;index++)
+      hybridTrackVolumes.push(buildTrackVolumeMap(
+        hybridFrames[index],hybridResults[index],previousByTrack));
+  }else{
+    for(let index=0;index<hybridFrames.length;index++)
+      hybridTrackVolumes.push(buildTrackVolumeMap(
+        hybridFrames[index],hybridResults[index],previousByTrack));
   }
 
   hybridDopplerFrameStates = []; // Independent Doppler never borrows a radar frame timestamp.
@@ -4975,15 +5005,21 @@ async function loadHybridSequence(automatic = false) {
     hybridFrameIndex
   );
   $("hybridPlayButton").disabled = hybridFrames.length < 2;
-  await showHybridFrame(hybridFrameIndex);
+  // Never cause a second render over the active player's own in-flight render.
+  // A paused Latest operator still sees the just-accepted newest observation.
+  if(!incrementalCommit || !playback.isPlaying())
+    await showHybridFrame(hybridFrameIndex);
   recordRadarAutoRefreshAudit({
     acceptedUtc: frames.at(-1).observedUtc,
     failure: frameFailures.detail || null,
     outcome: frameFailures.summary
       ? "updated; some genuine source frames unavailable"
-      : automatic ? "updated" : "manual load complete"
+      : incrementalCommit
+        ? "incremental: " + incrementalCommit.appended + " added, " +
+          incrementalCommit.dropped + " retired"
+        : automatic ? "updated by chronological rebuild" : "manual load complete"
   });
-  if (resume) playback.play();
+  if(resume && !incrementalCommit)playback.play();
   // Bound decoded imagery and per-frame results while retaining worker tracks.
   // Playback references remain in hybridFrames and hybridResults. The extra
   // archive cache can release old decoded source data beyond that window.
