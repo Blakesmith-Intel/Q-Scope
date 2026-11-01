@@ -22,11 +22,11 @@ def replace_once(old, new):
 
 replace_once(
     "bom-wmts-loop-v2.js?v=9.18.6-bounded-published-history",
-    "bom-wmts-loop-v2.js?v=20261101-source-history-replay"
+    "bom-wmts-loop-v2.js?v=20261101-region-independent-v10-2-39"
 )
 replace_once(
     "live-loop-refresh-v1.js?v=9.9.0-4",
-    "live-loop-refresh-v1.js?v=20261031-radar-refresh-v1"
+    "live-loop-refresh-v1.js?v=20261101-radar-live-follow-v10-2-39"
 )
 old_refresh = '''const autoRefresh = createLiveLoopRefresh({
   refresh: () => document.hidden ? undefined : runSourceLoad(() => loadHybridSequence(true), true),
@@ -51,6 +51,68 @@ replace_once(
     });
     $("autoRefreshNote").textContent ='''
 )
+# Source discovery failures must be handed back to the refresh scheduler.
+replace_once(
+    '''    $("autoRefreshNote").textContent =
+      "BoM new imagery currently unavailable · retaining last genuine displayed radar scan";
+    return;''',
+    '''    $("autoRefreshNote").textContent =
+      "BoM new imagery currently unavailable · retaining last genuine displayed radar scan";
+    // Keep rendered real imagery, but tell the scheduler this check failed:
+    // it must retry without a manual reload, not report a successful poll.
+    if (automatic) throw new Error(
+      "BoM radar discovery unavailable: " +
+      String(sourceResult.error?.message ?? sourceResult.error)
+    );
+    return;'''
+)
+replace_once(
+    '''  const oldTime = hybridFrames[hybridFrameIndex]?.observedUtc;
+  const resume = automatic ? playback.isPlaying() : true;''',
+    '''  const oldTime = hybridFrames[hybridFrameIndex]?.observedUtc;
+  // Operators parked on Latest must follow genuine newly accepted scans.
+  // Preserve a deliberately scrubbed historical position instead.
+  const wasFollowingLatest = automatic && !isCombined &&
+    hybridFrames.length > 0 && hybridFrameIndex === hybridFrames.length - 1;
+  const resume = automatic ? playback.isPlaying() : true;'''
+)
+replace_once(
+    '''  hybridFrameIndex = automatic
+    ? Math.max(0,hybridFrames.findIndex(frame=>frame.observedUtc===oldTime))
+    : 0;''',
+    '''  hybridFrameIndex = automatic
+    ? (wasFollowingLatest
+      ? hybridFrames.length - 1
+      : Math.max(0,hybridFrames.findIndex(frame=>frame.observedUtc===oldTime)))
+    : 0;'''
+)
+replace_once(
+    '''      $("autoRefreshNote").title = error.message;
+    }
+    else setStatus(error.message, "error");
+  } finally {''',
+    '''      $("autoRefreshNote").title = error.message;
+      // An automatic source failure is not a successful refresh. Scheduler
+      // applies bounded retry without resetting the normal 5-minute cadence.
+      throw error;
+    }
+    else setStatus(error.message, "error");
+  } finally {'''
+)
+replace_once(
+    '''document.addEventListener("visibilitychange", () => { if (!document.hidden) { autoRefresh.check(); independentDopplerRefresh.check(); } });''',
+    '''function checkRadarOnForegroundReturn() {
+  if (document.hidden) return;
+  void autoRefresh.check();
+  void independentDopplerRefresh.check();
+}
+// iOS Safari can restore a frozen tab with pageshow/focus but no reliable
+// visibilitychange. The scheduler coalesces duplicate events.
+document.addEventListener("visibilitychange", checkRadarOnForegroundReturn);
+window.addEventListener("pageshow", checkRadarOnForegroundReturn);
+window.addEventListener("focus", checkRadarOnForegroundReturn);'''
+)
+
 replace_once(
     "loadBomReflectivityMosaicAtTime(entry.observedUtc, selectedRadarRegion())",
     "loadBomReflectivityMosaicAtTime(entry.observedUtc, selectedRadarRegion(), discoveredTimes)"
@@ -129,16 +191,22 @@ for relative, marker in (
     page = site / relative
     html = page.read_text(encoding="utf-8")
     assert html.count(marker) == 1, f"Cannot refresh production browser cache: {marker}"
-    html = html.replace(marker, marker + "v10.2.38-radar-verified-history-", 1)
+    html = html.replace(marker, marker + "v10.2.39-radar-live-follow-", 1)
     page.write_text(html, encoding="utf-8")
 
+# Preserve the existing V10.2.38 marker, and append a new independent
+# frozen release identity after the V10.2.39 operational correction.
 with (site / "BUILD.txt").open("a", encoding="utf-8") as build:
     build.write(
         "V10.2.38 VERIFIED RADAR HISTORY: source-published older replay scans, "
         "one capability snapshot during loading and preserved 5-minute polling 2026-11-01\n"
     )
+    build.write(
+        "V10.2.39 RADAR CROSS-SITE LIVE RECOVERY: regional tile rejection isolation, "
+        "latest-frame following, bounded error retry, Safari foreground reconciliation 2026-11-01\n"
+    )
 assert "discoverBoundedBomReflectivityHistory(now,5,region)" not in data
 assert "discoverBoundedBomReflectivityHistory(now,180,region)" in data
 assert "recordRadarAutoRefreshAudit" in data
 assert "LIVE_LOOP_BUSY_RETRY_MS" in (site / "src/live-loop-refresh-v1.js").read_text()
-print("RADAR_VERIFIED_HISTORY_V10_2_38_PACKAGED")
+print("RADAR_CROSS_SITE_LIVE_V10_2_39_PACKAGED")
