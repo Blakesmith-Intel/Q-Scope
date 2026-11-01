@@ -22,7 +22,7 @@ def replace_once(old, new):
 
 replace_once(
     "bom-wmts-loop-v2.js?v=9.18.6-bounded-published-history",
-    "bom-wmts-loop-v2.js?v=20261101-source-verified-recovery-v10-2-40"
+    "bom-wmts-loop-v2.js?v=20261101-source-verified-incremental-v10-2-43"
 )
 replace_once(
     "live-loop-refresh-v1.js?v=9.9.0-4",
@@ -69,12 +69,7 @@ replace_once(
 replace_once(
     '''  const oldTime = hybridFrames[hybridFrameIndex]?.observedUtc;
   const resume = automatic ? playback.isPlaying() : true;''',
-    '''  const oldTime = hybridFrames[hybridFrameIndex]?.observedUtc;
-  // Operators parked on Latest must follow genuine newly accepted scans.
-  // Preserve a deliberately scrubbed historical position instead.
-  const wasFollowingLatest = automatic && !isCombined &&
-    hybridFrames.length > 0 && hybridFrameIndex === hybridFrames.length - 1;
-  const resume = automatic ? playback.isPlaying() : true;'''
+    "  // This exact measured-frame window can be shifted in place when its retained\n  // observations are unchanged. Historical backfill, temporal-inference edits\n  // and selection changes retain the original chronological rebuild path.\n  const incrementalCommit = automatic && !isCombined && !needsHistoricalRebuild &&\n    loadedLoopSelection === loopSelection &&\n    planIncrementalRadarWindow(hybridFrames,displayFrames);\n  const oldTime = hybridFrames[hybridFrameIndex]?.observedUtc;\n  // Operators parked on Latest must follow genuine newly accepted scans.\n  // Preserve a deliberately scrubbed historical position instead.\n  const wasFollowingLatest = automatic && !isCombined &&\n    !playback.isPlaying() && hybridFrames.length > 0 &&\n    hybridFrameIndex === hybridFrames.length - 1;\n  const resume = automatic ? playback.isPlaying() : true;"
 )
 replace_once(
     '''  hybridFrameIndex = automatic
@@ -205,16 +200,7 @@ replace_once(
     '''  $("hybridPlayButton").disabled = hybridFrames.length < 2;
   await showHybridFrame(hybridFrameIndex);
   if (resume) playback.play();''',
-    '''  $("hybridPlayButton").disabled = hybridFrames.length < 2;
-  await showHybridFrame(hybridFrameIndex);
-  recordRadarAutoRefreshAudit({
-    acceptedUtc: frames.at(-1).observedUtc,
-    failure: frameFailures.detail || null,
-    outcome: frameFailures.summary
-      ? "updated; some genuine source frames unavailable"
-      : automatic ? "updated" : "manual load complete"
-  });
-  if (resume) playback.play();'''
+    "  $(\"hybridPlayButton\").disabled = hybridFrames.length < 2;\n  // Never cause a second render over the active player's own in-flight render.\n  // A paused Latest operator still sees the just-accepted newest observation.\n  if(!incrementalCommit || !playback.isPlaying())\n    await showHybridFrame(hybridFrameIndex);\n  radarLifecycle.sampleMemory({\n    region,latestUtc:frames.at(-1).observedUtc,\n    frameCount:hybridFrames.length,incremental:!!incrementalCommit\n  });\n  recordRadarAutoRefreshAudit({\n    acceptedUtc: frames.at(-1).observedUtc,\n    failure: frameFailures.detail || null,\n    outcome: frameFailures.summary\n      ? \"updated; some genuine source frames unavailable\"\n      : incrementalCommit\n        ? \"incremental: \" + incrementalCommit.appended + \" added, \" +\n          incrementalCommit.dropped + \" retired\"\n        : automatic ? \"updated by chronological rebuild\" : \"manual load complete\"\n  });\n  if(resume && !incrementalCommit)playback.play();"
 )
 
 replace_once(
@@ -244,6 +230,57 @@ replace_once("  previousPrimaryRadarId=nextPrimary;\n  configureRadarSite(); res
 replace_once("    if(selector.value===id){\n      resetView();\n      scene.requestRender();\n      return;\n    }","    if(selector.value===id){\n      operatorCameraChosen=true;\n      resetView(); saveOperatorRadarView();\n      scene.requestRender();\n      return;\n    }")
 replace_once("$(\"resetButton\").addEventListener(\n  \"click\",\n  () => {\n    resetView();\n  }\n);","$(\"resetButton\").addEventListener(\n  \"click\",\n  () => {\n    operatorCameraChosen=true;\n    resetView(); saveOperatorRadarView();\n  }\n);")
 
+
+# V10.2.43 review-only radar append overlay: strictly bounded patch of the
+# sealed production engine. Preserve every existing science and map function.
+def inject_once(old,new):
+    global data
+    assert data.count(old)==1, f"Radar incremental package anchor changed: {old[:96]!r}"
+    assert new in source, f"Radar incremental tested source missing: {new[:96]!r}"
+    data=data.replace(old,new,1)
+
+inject_once(
+    'import { createContinuousPlayback } from "./continuous-playback-v1.js?v=9.16.10";',
+    'import { createContinuousPlayback } from "./continuous-playback-v1.js?v=20261101-incremental-cursor-v1";\n'
+    'import {planIncrementalRadarWindow} from "./radar-incremental-window-v1.js?v=20261101-verified-append-v1";\n'
+    'import {installRadarLifecycleDiagnostics} from "./radar-lifecycle-diagnostics-v1.js?v=20261101-iframe-webgl-evidence-v1";'
+)
+inject_once(
+    '  reflectivityWindowForRegion\n} from "./bom-wmts-loop-v2.js?v=20261101-source-verified-incremental-v10-2-43";',
+    '  reflectivityWindowForRegion,\n  radarTileFailureSnapshot\n} from "./bom-wmts-loop-v2.js?v=20261101-source-verified-incremental-v10-2-43";'
+)
+start=source.index("const radarIncrementalAudit = {")
+end=source.index("const radarAutoRefreshAudit = {",start)
+inject_once("const radarAutoRefreshAudit = {",source[start:end]+"const radarAutoRefreshAudit = {")
+start=source.index("const scene = viewer.scene;")
+end=source.index("// V9.20.0: limit surplus Cesium",start)
+inject_once("const scene = viewer.scene;\n",source[start:end])
+start=source.index("window.__stormtrackerRadarDiagnostics=()=>")
+end=source.index("const autoRefresh = createLiveLoopRefresh({",start)
+inject_once("const autoRefresh = createLiveLoopRefresh({",
+    source[start:end]+"const autoRefresh = createLiveLoopRefresh({")
+start=source.index("function buildTrackVolumeMap(")
+end=source.index("async function loadHybridSequence(automatic = false)",start)
+inject_once("async function loadHybridSequence(automatic = false)",
+    source[start:end]+"async function loadHybridSequence(automatic = false)")
+start=source.index("  // On an ordinary new scan the live player")
+end=source.index("  hybridFrames = displayFrames;",start)
+inject_once(
+    '  $("hybridFrameSlider").disabled = true;\n  $("hybridPlayButton").disabled = true;\n  await playback.pause();\n  hybridFrames = displayFrames;',
+    source[start:end]+"  hybridFrames = displayFrames;")
+start=source.index("  if(incrementalCommit){\n    radarIncrementalAudit.appendUpdates++")
+end=source.index("  hybridDopplerFrameStates = [];",start)
+inject_once(
+    "  hybridHistory = new Map();\n  hybridTrackVolumes = [];\n  hybridDopplerFrameStates = [];",
+    source[start:end]+"  hybridDopplerFrameStates = [];")
+start=source.index("  const previousByTrack = new Map();",source.index("async function loadHybridSequence("))
+end=source.index("  hybridDopplerFrameStates = []; // Independent Doppler never borrows a radar frame timestamp.",start)
+new_volume=source[start:end]
+start=data.index("  const previousByTrack =\n    new Map();")
+end=data.index("  hybridDopplerFrameStates = []; // Independent Doppler never borrows a radar frame timestamp.",start)
+assert data.count("  const previousByTrack =\n    new Map();")==1
+data=data[:start]+new_volume+data[end:]
+
 app.write_text(data, encoding="utf-8")
 copyfile("frontend/src/live-loop-refresh-v1.js", site / "src/live-loop-refresh-v1.js")
 # The sealed production bundle historically used an older radar-source and
@@ -252,6 +289,10 @@ copyfile("frontend/src/live-loop-refresh-v1.js", site / "src/live-loop-refresh-v
 copyfile("frontend/src/radar-source.js", site / "src/radar-source.js")
 copyfile("frontend/src/radar-request-pressure-v1.js", site / "src/radar-request-pressure-v1.js")
 copyfile("frontend/src/radar-viewport-continuity-v1.js", site / "src/radar-viewport-continuity-v1.js")
+copyfile("frontend/src/bom-wmts-loop-v2.js", site / "src/bom-wmts-loop-v2.js")
+copyfile("frontend/src/continuous-playback-v1.js", site / "src/continuous-playback-v1.js")
+copyfile("frontend/src/radar-incremental-window-v1.js", site / "src/radar-incremental-window-v1.js")
+copyfile("frontend/src/radar-lifecycle-diagnostics-v1.js", site / "src/radar-lifecycle-diagnostics-v1.js")
 
 # Both the outer iframe and the inner ES-module need a new immutable URL key:
 # returning iOS Safari tabs otherwise continue using the old running loader.
@@ -262,7 +303,7 @@ for relative, marker in (
     page = site / relative
     html = page.read_text(encoding="utf-8")
     assert html.count(marker) == 1, f"Cannot refresh production browser cache: {marker}"
-    html = html.replace(marker, marker + "v10.2.41-radar-camera-continuity-", 1)
+    html = html.replace(marker, marker + "v10.2.43-incremental-radar-v10.2.41-radar-camera-continuity-", 1)
     page.write_text(html, encoding="utf-8")
 
 # Preserve the existing V10.2.38 marker, and append a new independent
@@ -284,6 +325,13 @@ with (site / "BUILD.txt").open("a", encoding="utf-8") as build:
         "V10.2.41 OPERATOR CAMERA CONTINUITY: preserve selected radar and camera "
         "during new frames, delayed app initialization and Safari tab reload 2026-11-01\n"
     )
+assert "planIncrementalRadarWindow(hybridFrames,displayFrames)" in data
+assert "if(resume && !incrementalCommit)playback.play();" in data
+assert "radarTileFailureSnapshot" in data
+assert (site / "src/radar-incremental-window-v1.js").exists()
+assert (site / "src/radar-lifecycle-diagnostics-v1.js").exists()
+with (site / "BUILD.txt").open("a", encoding="utf-8") as build:
+    build.write("V10.2.43 CANDIDATE — INCREMENTAL RADAR APPEND / GYMPIE GLADSTONE DIAGNOSTICS (review only)\\n")
 assert "discoverBoundedBomReflectivityHistory(now,5,region)" not in data
 assert "discoverBoundedBomReflectivityHistory(now,180,region)" in data
 assert "recordRadarAutoRefreshAudit" in data
