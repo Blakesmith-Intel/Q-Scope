@@ -46,7 +46,8 @@ export function parsePublishedReflectivityTimes(xml){
 // when metadata fails; the caller falls back to genuine cached observations.
 export function createPublishedReflectivityTimeSource({
   fetchImpl=(...args)=>globalThis.fetch(...args),
-  now=()=>Date.now(),cacheMs=120000,timeoutMs=12000
+  now=()=>Date.now(),cacheMs=120000,timeoutMs=12000,
+  retryDelayMs=750
 }={}){
   let expiresAt=0,cached=null,pending=null;
   return async function publishedReflectivityTimes(){
@@ -54,22 +55,34 @@ export function createPublishedReflectivityTimeSource({
     if(cached&&current<expiresAt)return [...cached];
     if(pending)return [...await pending];
     const load=async()=>{
-      const controller=new AbortController();
-      const timer=setTimeout(()=>controller.abort(),timeoutMs);
-      try{
-        const response=await fetchImpl(REFLECTIVITY_CAPABILITIES_URL,{
-          headers:{Accept:"application/xml,text/xml"},
-          cache:"no-store",signal:controller.signal
-        });
-        if(!response.ok)throw Error("BoM WMTS capabilities HTTP "+response.status);
-        const size=Number(response.headers?.get?.("content-length"))||0;
-        if(size>1_000_000)throw Error("BoM WMTS capabilities unexpectedly large");
-        const text=await response.text();
-        const times=parsePublishedReflectivityTimes(text);
-        cached=times;
-        expiresAt=now()+cacheMs;
-        return times;
-      }finally{clearTimeout(timer);}
+      // Metadata is a single shared ~88 KB GET, NOT a radar frame. On a
+      // temporary 502/503, transport abort or timeout retry it once before
+      // declaring the source unavailable. Do not treat unavailable metadata
+      // as a verified zero-frame result or invent new observation UTCs.
+      for(let attempt=0;attempt<2;attempt++){
+        const controller=new AbortController();
+        const timer=setTimeout(()=>controller.abort(),timeoutMs);
+        try{
+          const response=await fetchImpl(REFLECTIVITY_CAPABILITIES_URL,{
+            headers:{Accept:"application/xml,text/xml"},
+            cache:"no-store",signal:controller.signal
+          });
+          if(!response.ok)throw Error("BoM WMTS capabilities HTTP "+response.status);
+          const size=Number(response.headers?.get?.("content-length"))||0;
+          if(size>1_000_000)throw Error("BoM WMTS capabilities unexpectedly large");
+          const text=await response.text();
+          const times=parsePublishedReflectivityTimes(text);
+          cached=times;
+          expiresAt=now()+cacheMs;
+          return times;
+        }catch(error){
+          const message=String(error?.message??error);
+          const transient=error?.name==="AbortError" ||
+            /abort|timeout|network|failed to fetch|HTTP\s+(?:502|503|504)\b/i.test(message);
+          if(attempt===1||!transient)throw error;
+        }finally{clearTimeout(timer);}
+        await new Promise(resolve=>setTimeout(resolve,retryDelayMs));
+      }
     };
     pending=load();
     try{return [...await pending];}
