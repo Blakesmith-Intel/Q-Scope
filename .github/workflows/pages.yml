@@ -125,6 +125,16 @@ jobs:
           grep -Fq 'createInternalCycloneLiveQA' checked/production-v10.2.0/frontend/src/live3d-operational-v9.js
           grep -Fq 'Currently no tropical cyclone warnings' checked/production-v10.2.0/frontend/src/internal-cyclone-live-qa-v1.js
 
+      # Operator acceptance: pin the already-tested shared radar-refresh
+      # candidate into a separate Pages review subpath. The operational root
+      # remains built from the frozen production workflow and its own overlay.
+      - name: Checkout tested radar refresh candidate for isolated operator QA
+        uses: actions/checkout@v4
+        with:
+          ref: 152a367bca60f2c01e6c1e62ad65e9ced7f84247
+          path: checked/radar-refresh-review
+          persist-credentials: false
+
       # QA is an independently pinned third preview. Never change the V10.2.0
       # production source, nor the two existing diagnostic QA subpaths.
       - name: Checkout isolated V10.3 wind-hook scientific QA source
@@ -178,6 +188,10 @@ jobs:
         run: |
           bash scripts/build-current-site.sh
           python scripts/apply-ftp-aep-release-v10.py
+          # Preserve the pre-radar-overlay package as a source for a separate
+          # independently patched candidate. Never change the operational root.
+          mkdir -p checked/radar-refresh-review/_site
+          rsync -a --exclude='/preview/' _site/ checked/radar-refresh-review/_site/
           python scripts/apply-radar-auto-refresh-v1.py
           node --check _site/src/live-loop-refresh-v1.js
           node --check _site/src/live3d-operational-v9.js
@@ -239,6 +253,48 @@ jobs:
           grep -Fq 'queueIfdLookups' _site/preview/rainfall-aep/src/context-layers/significant-rainfall-operational-v1.js
           test -s _site/preview/rainfall-aep/BUILD.txt
           grep -Fq 'SEALED StormTracker V10.2.0' _site/BUILD.txt
+
+      - name: Package separate browser-accessible radar refresh review
+        run: |
+          set -euo pipefail
+          # Pin to the tested source, never a floating feature branch.
+          test "$(git -C checked/radar-refresh-review rev-parse HEAD)" = "152a367bca60f2c01e6c1e62ad65e9ced7f84247"
+          # The normal operational build has already completed. Compare its
+          # accepted root assets before and after producing ONLY preview files.
+          sha256sum _site/index.html _site/live3d-operational-v9.html \
+            _site/src/live3d-operational-v9.js _site/src/bom-wmts-loop-v2.js \
+            _site/BUILD.txt > /tmp/st-frozen-root-before.sha256
+          cp _site/data/qld-rainfall-basins-v1.json \
+            checked/radar-refresh-review/_site/data/qld-rainfall-basins-v1.json
+          (
+            cd checked/radar-refresh-review
+            python scripts/apply-radar-auto-refresh-v1.py
+            node --check _site/src/live3d-operational-v9.js
+            node --check _site/src/bom-wmts-loop-v2.js
+            test -s _site/src/radar-incremental-window-v1.js
+            grep -Fq 'planIncrementalRadarWindow(hybridFrames,displayFrames)' _site/src/live3d-operational-v9.js
+            grep -Fq 'v10.2.43-incremental-radar-' _site/index.html
+          )
+          mkdir -p _site/preview/radar-refresh-review
+          rsync -a --exclude='/preview/' \
+            checked/radar-refresh-review/_site/ \
+            _site/preview/radar-refresh-review/
+          printf 'REVIEW BUILD from tested source 152a367bca60f2c01e6c1e62ad65e9ced7f84247; NOT OPERATIONAL PRODUCTION\n' \
+            > _site/preview/radar-refresh-review/REVIEW.txt
+          python - <<'PY'
+          from pathlib import Path
+          p=Path("_site/preview/radar-refresh-review/index.html")
+          s=p.read_text(encoding="utf-8")
+          assert s.count("</body>")==1
+          banner=('<div aria-label="Radar refresh review build" style="position:fixed;'
+            'bottom:7px;right:7px;z-index:2000;pointer-events:none;'
+            'background:#29251a;color:#ffe6ab;padding:3px 7px;'
+            'font:11px system-ui;border:1px solid #9d792d;border-radius:4px">'
+            'RADAR QA PREVIEW — production unaffected</div>')
+          p.write_text(s.replace("</body>",banner+"\n</body>"),encoding="utf-8")
+          PY
+          sha256sum -c /tmp/st-frozen-root-before.sha256
+          test -s _site/preview/radar-refresh-review/BUILD.txt
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
