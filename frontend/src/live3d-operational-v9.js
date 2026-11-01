@@ -4503,7 +4503,7 @@ async function loadHybridSequence(automatic = false) {
         hybridFrames.length
         && Date.parse(availableEndUtc)
           <= Date.parse(
-            hybridFrames.at(-1).observedUtc
+            radarAutoRefreshAudit.newestAcceptedUtc ?? ""
           )
       )
     )
@@ -4940,7 +4940,12 @@ async function loadHybridSequence(automatic = false) {
     hybridFrameIndex
   );
   $("hybridPlayButton").disabled = hybridFrames.length < 2;
-  await showHybridFrame(hybridFrameIndex);
+  const displayed = await showHybridFrame(hybridFrameIndex);
+  // Decoding tiles is not a successful radar refresh unless the Cesium map
+  // actually committed the matching source observation.
+  if (displayed !== true) throw Error(
+    "Verified BoM radar scan loaded but was not displayed; automatic retry required"
+  );
   recordRadarAutoRefreshAudit({
     acceptedUtc: frames.at(-1).observedUtc,
     failure: frameFailures.detail || null,
