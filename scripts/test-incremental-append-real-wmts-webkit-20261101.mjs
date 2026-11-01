@@ -21,6 +21,7 @@ const page=await browser.newPage(isDesktop
  : {viewport:{width:390,height:780},deviceScaleFactor:2,isMobile:true,hasTouch:true});
 page.setDefaultTimeout(180000);
 let phase="initial",heldBackUtc=null,metadataRequests=0;
+let authenticCapabilitySnapshot=null;
 const navigations=[],errors=[];
 page.on("framenavigated",frame=>navigations.push(frame.url()));
 page.on("pageerror",error=>errors.push(String(error)));
@@ -34,10 +35,18 @@ await page.route("https://blakesmith-intel.github.io/StormTracker/**",async rout
  }catch{await route.abort("failed");}
 });
 await page.route(/\/wmts-native-capabilities(?:\?|$)/,async route=>{
- const response=await route.fetch();
- assert(response.ok(),"Authoritative BoM capabilities XML unavailable");
- let xml=await response.text();
  metadataRequests++;
+ // This is the SAME BoM-issued XML captured live exactly once. First hide
+ // one already-published real UTC from the QA browser; then expose the
+ // unmodified authentic snapshot on the next poll. Do not depend on a
+ // second live HTTP round-trip, which can time out in Chromium CI and does
+ // not test the incremental renderer. Every PNG tile is still fetched live.
+ if(authenticCapabilitySnapshot===null){
+  const response=await route.fetch();
+  assert(response.ok(),"Authoritative BoM capabilities XML unavailable");
+  authenticCapabilitySnapshot=await response.text();
+ }
+ let xml=authenticCapabilitySnapshot;
  if(phase==="initial"){
   const times=parsePublishedReflectivityTimes(xml);
   assert(times.length>=7,"Seven genuine published scans required for append QA");
@@ -55,7 +64,8 @@ await page.route(/\/wmts-native-capabilities(?:\?|$)/,async route=>{
   xml=xml.replace(found[0],replacement);
   assert(!parsePublishedReflectivityTimes(xml).includes(heldBackUtc));
  }
- await route.fulfill({response,body:xml,contentType:"application/xml"});
+ await route.fulfill({status:200,body:xml,contentType:"application/xml",
+   headers:{"Access-Control-Allow-Origin":"*"}});
 });
 async function snapshot(){
  return page.evaluate(()=>({
