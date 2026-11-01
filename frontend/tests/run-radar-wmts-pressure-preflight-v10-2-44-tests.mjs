@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import {fetchWmtsPreflightTile} from "../src/bom-wmts-loop-v2.js";
+import {fetchWmtsPreflightTile,loadBomReflectivityMosaicAtTime,
+  retryableWmtsMosaicFailure} from "../src/bom-wmts-loop-v2.js";
 
 // One transient transport failure is NOT evidence that an authentic BoM
 // observation is missing. Retest the SAME URL; never substitute a scan.
@@ -26,6 +27,38 @@ for(const status of [400,403,429]){
  await assert.rejects(()=>fetchWmtsPreflightTile("url",
   async()=>{count++;throw Error("HTTP 503");},{wait:async()=>{}}),/503/);
  assert.equal(count,2);
+}
+
+// A genuine source observation must not be lost to a one-off full-mosaic
+// network failure, even if its preflight succeeds. Never retry BoM 400/403/429.
+{
+ const utc=new Date(Math.floor(Date.now()/300000)*300000-15*60000)
+   .toISOString().replace(".000Z","Z");
+ let calls=0,delays=[];
+ const frame={observedUtc:utc,sourceMetadata:{region:"23"}};
+ const actual=await loadBomReflectivityMosaicAtTime(utc,"23",[utc],{
+  loadVerified:async(observed,region)=>{
+   assert.equal(observed,utc);assert.equal(region,"23");
+   calls++;
+   if(calls===1)throw Object.assign(new Error("Image request failed: HTTP 503"),{status:503});
+   return frame;
+  },
+  wait:async ms=>delays.push(ms),retryDelayMs:900
+ });
+ assert.equal(actual,frame);assert.equal(calls,2);assert.deepEqual(delays,[900]);
+ for(const status of [400,403,429]){
+  let attempt=0;
+  await assert.rejects(()=>loadBomReflectivityMosaicAtTime(utc,"23",[utc],{
+   loadVerified:async()=>{
+    attempt++;throw Object.assign(new Error("Image request failed: HTTP "+status),{status});
+   },
+   wait:async()=>{throw Error("Retry prohibited for source rejection")}
+  }),new RegExp("HTTP "+status));
+  assert.equal(attempt,1);
+ }
+ assert.equal(retryableWmtsMosaicFailure(new Error("HTTP 503")),true);
+ assert.equal(retryableWmtsMosaicFailure(new Error("HTTP 400")),false);
+ assert.equal(retryableWmtsMosaicFailure(new Error("HTTP 429 relay cooldown")),false);
 }
 
 // Simulate a genuine browser URL for the OPERATOR QA preview. This path was
