@@ -35,7 +35,8 @@ const build=readFileSync(new URL("scripts/build-current-site.sh",root),"utf8");
 assert(!js.includes("viewer.camera.flyTo("),"Never bypass StormTracker guardian");
 assert.match(js,/cameraController\.setView\(target\)/);
 assert.match(build,/cameraController:mapCamera/);
-assert.match(build,/20261030-four-idq-menu-v1/);
+assert.match(build,/20261101-v10-2-46-live-polygon-catchup/,
+ "Warning source must get a new verified browser cache identity");
 assert.match(js,/window\.addEventListener\("pointerdown",down,\{capture:true,passive:true\}\)/);
 assert.match(js,/window\.addEventListener\("pointerup",up,\{capture:true,passive:true\}\)/);
 assert.match(js,/window\.removeEventListener\("pointerup",up,true\)/);

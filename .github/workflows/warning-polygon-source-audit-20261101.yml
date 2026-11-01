@@ -1,0 +1,25 @@
+name: Audit live BoM warning polygon source without production changes
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/audit-live-bom-warning-polygon-gap-20261101.mjs"
+      - "relay/bom-warning-gis2web-replica-v1.js"
+      - "relay/bom-warning-polygons-v1.js"
+      - "relay/bom-warning-product-reconcile-v1.js"
+      - "frontend/src/context-layers/bom-warning-cap-source-v1.js"
+      - ".github/workflows/warning-polygon-source-audit-20261101.yml"
+permissions:
+  contents: read
+jobs:
+  identify-source-failure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "24"}
+      - name: Inspect live BoM CAP, Queensland current listing, ArcGIS GIS2Web and production Cloudflare relay
+        run: |
+          node --check scripts/audit-live-bom-warning-polygon-gap-20261101.mjs
+          node scripts/audit-live-bom-warning-polygon-gap-20261101.mjs
