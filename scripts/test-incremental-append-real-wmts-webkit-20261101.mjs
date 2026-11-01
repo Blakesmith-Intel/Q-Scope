@@ -78,7 +78,7 @@ async function snapshot(){
 }
 try{
  await page.goto(
-  "https://blakesmith-intel.github.io/StormTracker/live3d-operational-v9.html?qaIncrementalRadar=1",
+  "https://blakesmith-intel.github.io/StormTracker/preview/radar-refresh-review/live3d-operational-v9.html?qaIncrementalRadar=1",
   {waitUntil:"domcontentloaded",timeout:60000}
  );
  await page.locator("#cesiumContainer .cesium-widget canvas").waitFor({state:"attached",timeout:90000});
@@ -89,6 +89,8 @@ try{
   null,{timeout:180000});
  const before=await snapshot();
  assert.equal(before.site,"66");
+ assert(await page.evaluate(()=>typeof window.__stormtrackerMemoryDiagnostics==="function"),
+  "Operator QA route did not enable the production radar recovery/memory path");
  assert.equal(before.diagnostics.incremental.appendUpdates,0);
  assert(heldBackUtc,"No genuine source observation withheld");
  assert.notEqual(before.diagnostics.automatic.newestAcceptedUtc,heldBackUtc);
