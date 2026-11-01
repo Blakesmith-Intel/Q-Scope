@@ -71,30 +71,74 @@ jobs:
           mkdir -p _site/preview/radar-refresh-review
           rsync -a --exclude='/preview/' _site/ _site/preview/radar-refresh-review/
           grep -Fq 'OPERATOR_RADAR_REVIEW' _site/preview/radar-refresh-review/src/live3d-operational-v9.js
-      - name: Install mobile WebKit and desktop Chromium
+      - name: Install mobile WebKit
         run: |
           npm install --no-save --ignore-scripts playwright@1.58.2
-          npx playwright install --with-deps webkit chromium
+          npx playwright install --with-deps webkit
       - name: Repeated real radar checks across seven regions and GPU/browser continuity
         run: |
           python -m http.server 8137 --bind 127.0.0.1 --directory _site >/tmp/st-radar-review.log 2>&1 &
           node scripts/test-gympie-gladstone-incremental-webkit-20261101.mjs
       - name: Require genuine WMTS frame insertion without mobile Safari player/page restart
         run: node scripts/test-incremental-append-real-wmts-webkit-20261101.mjs
-      - name: Require same genuine WMTS frame insertion without desktop Chromium player/page restart
-        run: STORMTRACKER_BROWSER=desktop node scripts/test-incremental-append-real-wmts-webkit-20261101.mjs
       - name: Reproduce and repair genuine 5-of-5 missing middle frame on mobile WebKit
         run: node scripts/test-real-wmts-missing-frame-recovery-20261101.mjs
-      - name: Reproduce and repair genuine 5-of-5 missing middle frame on desktop Chromium
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: incremental-radar-mobile-failure
+          path: |
+            /tmp/incremental-radar-webkit-failure.png
+            /tmp/radar-incremental-real-append-failure.png
+            /tmp/radar-mobile-missing-frame-failure.png
+          if-no-files-found: ignore
+
+  genuine-desktop:
+    if: github.head_ref == 'feature/incremental-radar-frames-20261101'
+    needs: exact-tiles
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "24"}
+      - uses: actions/checkout@v4
+        with:
+          ref: 047b3bd1c66b0ed5f070d2298202f46d0cd8dae2
+          path: checked/production-v10.2.0
+      - uses: actions/checkout@v4
+        with:
+          ref: acfa0ebd3717a793369e3e887e2d1a54785620b7
+          path: checked/accepted-v9.18
+      - uses: actions/checkout@v4
+        with:
+          ref: f3a07688ca02f5f0234ae6425fc1177722518c53
+          path: checked/wind-hook-v10.3-qa
+      - name: Package exactly the production-equivalent radar QA preview for desktop
+        run: |
+          bash scripts/build-current-site.sh
+          python scripts/apply-ftp-aep-release-v10.py
+          python scripts/apply-radar-auto-refresh-v1.py
+          mkdir -p _site/preview/radar-refresh-review
+          rsync -a --exclude='/preview/' _site/ _site/preview/radar-refresh-review/
+          grep -Fq 'OPERATOR_RADAR_REVIEW' _site/preview/radar-refresh-review/src/live3d-operational-v9.js
+          node --check _site/preview/radar-refresh-review/src/live3d-operational-v9.js
+          node --check _site/preview/radar-refresh-review/src/bom-wmts-loop-v2.js
+      - name: Install desktop Chromium independently of mobile
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.58.2
+          npx playwright install --with-deps chromium
+      - name: Prove desktop Chromium genuine BoM scan enters six-frame active loop
+        run: |
+          python -m http.server 8137 --bind 127.0.0.1 --directory _site >/tmp/st-radar-desktop-review.log 2>&1 &
+          STORMTRACKER_BROWSER=desktop node scripts/test-incremental-append-real-wmts-webkit-20261101.mjs
+      - name: Prove same-tab desktop recovery of missing genuine scan from five frames to six
         run: STORMTRACKER_BROWSER=desktop node scripts/test-real-wmts-missing-frame-recovery-20261101.mjs
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: incremental-radar-webkit-failure
+          name: incremental-radar-desktop-failure
           path: |
-            /tmp/incremental-radar-webkit-failure.png
-            /tmp/radar-incremental-real-append-failure.png
             /tmp/radar-incremental-desktop-append-failure.png
-            /tmp/radar-mobile-missing-frame-failure.png
             /tmp/radar-desktop-missing-frame-failure.png
           if-no-files-found: ignore
