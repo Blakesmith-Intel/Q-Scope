@@ -635,9 +635,12 @@ jobs:
           echo 'Verified sealed V10.2.0 source 047b3bd1c66b0ed5f070d2298202f46d0cd8dae2, single UI, native multi-site BoM Doppler, previous full-quality 3-D, and V9.18 QA.'
 
   seal:
-    name: Seal verified cyclone release references
+    name: Preserve legacy cyclone release refs (original release only)
     needs: deploy
-    if: github.ref == 'refs/heads/main'
+    # All v10.2.0–v10.2.28 references are already frozen. Do not rerun
+    # historical creation tests against modern docs/current deployment SHA.
+    # Leave all historical tags and restore branches untouched.
+    if: github.ref == 'refs/heads/main' && github.sha == '2df8f20141d4d450ba158157e6d125f7288de740'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -1644,7 +1647,9 @@ jobs:
   seal_radar_cross_site_live:
     name: Seal V10.2.39 cross-site radar auto-follow only after published-site acceptance
     needs: deploy
-    if: github.ref == 'refs/heads/main'
+    # The tag is immutable once created; new maintenance releases must
+    # never test it against the latest GITHUB_SHA or recreate it.
+    if: github.ref == 'refs/heads/main' && github.sha == '12024a83749d8a4e435874b64d5e36ecb911d858'
     runs-on: ubuntu-latest
     permissions:
       contents: write
