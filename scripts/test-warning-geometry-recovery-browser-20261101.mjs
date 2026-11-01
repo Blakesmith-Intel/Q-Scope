@@ -59,6 +59,16 @@ await page.route("**/bom-official-warning-polygons",async route=>{
   headers:{"access-control-allow-origin":"*","cache-control":"no-store"},
   body:JSON.stringify(payload)});
 });
+// Browser virtual time freezes its normal polling timers. Poll DOM state
+// from the Node test runner so WebKit/Chromium checks do not deadlock.
+async function nodeWait(predicate,{timeoutMs=120000,intervalMs=400}={}){
+ const started=Date.now();
+ while(Date.now()-started<timeoutMs){
+  if(await page.evaluate(predicate))return;
+  await new Promise(resolve=>setTimeout(resolve,intervalMs));
+ }
+ throw Error("Browser warning-state check timed out after "+timeoutMs+"ms");
+}
 const stat=()=>page.evaluate(()=>({
  sourceStatus:document.getElementById("officialBomWarningsStatus")?.textContent?.trim(),
  selected:document.getElementById("officialBomWarningProduct")?.value,
@@ -71,16 +81,15 @@ try{
  await page.clock.install();
  await page.goto("https://blakesmith-intel.github.io/StormTracker/live3d-operational-v9.html",
   {waitUntil:"domcontentloaded",timeout:60000});
- await page.locator("#cesiumContainer .cesium-widget canvas").waitFor({state:"attached",timeout:120000});
+ await nodeWait(()=>Boolean(document.querySelector("#cesiumContainer .cesium-widget canvas")),{timeoutMs:120000});
  await page.evaluate(()=>{
   const checkbox=document.getElementById("showOfficialBomWarnings");
   if(!checkbox)throw Error("Approved warning toggle absent");
   checkbox.checked=true;
   checkbox.dispatchEvent(new Event("change",{bubbles:true}));
  });
- await page.waitForFunction(()=>
-  document.querySelector("#officialBomWarningsStatus")?.textContent?.includes("awaiting updated BoM polygon"),
-  null,{timeout:110000,polling:200});
+ await nodeWait(()=>
+  document.querySelector("#officialBomWarningsStatus")?.textContent?.includes("awaiting updated BoM polygon"),{timeoutMs:110000});
  const prior=await stat();
  assert.equal(requests,1);
  assert.equal(prior.canLocate,false,
@@ -93,11 +102,11 @@ try{
  // waiting two minutes wall time. No manual refresh and no source swap on
  // the public application. Its minute timer must notice the 2-minute expiry.
  await page.clock.fastForward(140000);
- await page.waitForFunction(()=>{
+ await nodeWait(()=>{
   const s=document.querySelector("#officialBomWarningsStatus")?.textContent??"";
   return s.includes("IDQ21033")&&s.includes("active (")&&
    document.querySelector("#locateOfficialBomWarnings")?.hidden===false;
- },null,{timeout:130000,polling:250});
+ },{timeoutMs:130000});
  const after=await stat();
  assert.equal(requests,2,"One automatic recovery request required, not busy polling");
  assert.equal(after.shown,true);
