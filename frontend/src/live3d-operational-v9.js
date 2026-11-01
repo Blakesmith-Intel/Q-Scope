@@ -10,7 +10,7 @@ import {
   discoverBoundedBomReflectivityHistory,
   loadBomReflectivityMosaicAtTime,
   reflectivityWindowForRegion
-} from "./bom-wmts-loop-v2.js?v=20261101-source-history-replay";
+} from "./bom-wmts-loop-v2.js?v=20261101-region-independent-v10-2-39";
 
 import {
   RadarWorkerClient
@@ -140,7 +140,7 @@ import {
   automaticRefreshEndUtc,
   hasNewMatchedProducts,
   createLiveLoopRefresh
-} from "./live-loop-refresh-v1.js?v=20261031-radar-refresh-v1";
+} from "./live-loop-refresh-v1.js?v=20261101-radar-live-follow-v10-2-39";
 import { createContinuousPlayback } from "./continuous-playback-v1.js?v=9.16.10";
 import { buildTrackThreatCone } from "./track-threat-cone-v1.js?v=v9-cone-observed-tip-v3";
 import {
