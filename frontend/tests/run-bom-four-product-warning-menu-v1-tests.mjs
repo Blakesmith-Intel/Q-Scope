@@ -62,7 +62,11 @@ const op=readFileSync(new URL("../src/context-layers/bom-warning-operational-v1.
 assert.match(op,/const codes=filter\.value==="all"\?WARNING_CODES:\[filter\.value\]/);
 assert(!op.includes('"other"]:[filter.value]'),"Never hide a clear 21037/38 under Other");
 assert.match(op,/INTERVAL_MS=15\*60\*1000/);
-assert.match(op,/now\(\)-lastAttemptAt>=INTERVAL_MS\)void refresh\(\)/);
+assert.match(op,/now\(\)-lastAttemptAt>=currentRefreshMs\(\)\)void refresh\(\)/);
+assert.match(op,/INTERVAL_MS=15\*60\*1000/);
+assert.match(op,/WARNING_GEOMETRY_RECOVERY_MS=2\*60\*1000/);
+assert.match(op,/missingActiveBoMWarningGeometry\(productStatuses,warnings\)/,
+ "Short retries only during active warning with missing source-verified geometry");
 assert.match(op,/const onRefresh=\(\)=>\{void refresh\(\{force:true\}\);\}/);
 assert.match(op,/No current warnings for this product/);
 console.log("PASS separate IDQ21033/35/37/38 selection, polygon isolation, independent verified no-current/report state and existing 15-minute/manual cadence");
