@@ -33,7 +33,9 @@ function isNetworkGuardPreview(){
       String(globalThis.location?.pathname??"")) &&
       !String(globalThis.location?.pathname??"").includes("/preview/"));
 }
-if(isNetworkGuardPreview())
+// Diagnostics are read-only and available in every production/QA viewer,
+// so operator-side tests can verify the same bounded live network behaviour.
+if(typeof globalThis.window!=="undefined")
   globalThis.__stormtrackerRelayPressureDiagnostics=networkPressureDiagnostics;
 
 function createCanvas(width, height) {
@@ -119,10 +121,12 @@ export async function fetchReadableImage(url) {
   if(isWmts)rememberVerifiedWmtsBlob(url,blob);
   return pixels;
   };
-  // Radar scan source is unchanged. Only bound request pressure in this
-  // isolated review path; all previously approved previews stay identical.
-  if(isNetworkGuardPreview() && /\/wmts\?/i.test(String(url)))
-    return guardedRadarRequests.run(String(url),read);
+  // Every StormTracker route uses the same source pipeline. Keep the
+  // established two-request BoM WMTS bound on production AND all preview
+  // subpaths; otherwise a review can burst 9–16 tiles per scan and lose a
+  // genuine frame to intermittent relay limits (403/429/502/503).
+  // The exact-UTC verified-PNG blob cache above remains unchanged.
+  if(isWmts) return guardedRadarRequests.run(String(url),read);
   return read();
 }
 
