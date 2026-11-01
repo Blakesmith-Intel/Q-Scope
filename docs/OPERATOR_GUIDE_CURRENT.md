@@ -1,8 +1,8 @@
 # StormTracker — current operator guide
-**Edition:** 1 November 2026 | **Applies to:** **V10.2.42 immutable operator-accepted baseline** (working V10.2.41 application, V10.2.40 verified WMTS resilience and all previously approved navigation, flood, rainfall, warning and community-impact layers).
+**Edition:** 1 November 2026 | **Applies to:** **V10.2.45 operator-approved production radar reliability baseline**, preserving all previously approved navigation, flood, rainfall, warning and community-impact layers.
 **Open:** https://blakesmith-intel.github.io/StormTracker/  
 **Technical handover:** [DEVELOPMENT_HANDOVER_CURRENT.md](DEVELOPMENT_HANDOVER_CURRENT.md)
-**Frozen release:** [V10.2.42 accepted baseline](PRODUCTION_BASELINE_V10.2.42.md) · [Release notes](RELEASE_NOTES_V10.2.42.md) · [One-page operator reference](OPERATOR_QUICK_REFERENCE_V10.2.42.md) · [Shareable PDF](STORMTRACKER_LAYERS_INFORMATION.pdf). **Operator confirmed all functionality working on an iPhone on 1 November 2026.** All future feature proposals start from this frozen version; no new functions or visual changes are included here.
+**Frozen release:** [V10.2.45 accepted baseline](PRODUCTION_BASELINE_V10.2.45.md) · [Release notes](RELEASE_NOTES_V10.2.45.md) · [One-page operator reference](OPERATOR_QUICK_REFERENCE_V10.2.45.md) · [Shareable existing PDF](STORMTRACKER_LAYERS_INFORMATION.pdf). **Operator approved the cross-platform radar recovery QA for promotion on 1 November 2026.** All further enhancements start from this new immutable release; previously accepted non-radar controls and safety behaviours remain unchanged.
 
 
 > **Purpose and safety:** StormTracker brings together official source observations and selected public incident information for situational awareness. It is **not** a Bureau of Meteorology (BoM) warning service, an incident dispatch system, or a replacement for agency procedures. For warnings, evacuation advice and operational decisions, consult the original issuing authority. Some displays (3-D clouds, storm tracks, projected cones and rapid-rise arrows) are estimates and **not official warnings**.
@@ -10,6 +10,14 @@
 **Finding this guide from the map:** select the small **Operator guide ↗** text link in the existing StormTracker sidebar heading. It opens this up-to-date guide in a separate browser tab and leaves the active weather map, controls and information panels unchanged.
 
 **Public information sheet:** [StormTracker — layers and features (PDF)](STORMTRACKER_LAYERS_INFORMATION.pdf) — a concise shareable overview for new users. This is a guide to features, not a live weather bulletin.
+
+## V10.2.45 — Verified radar six-frame recovery and continuous playback
+
+The standard **30-minute rain playback** displays six source-verified five-minute BoM observations when all six are genuinely published and their required high-resolution WMTS tiles are readable. A count such as **5/5 is not a guarantee of completeness**: the system retains authentic available frames and automatically checks for temporarily missing published observations. When a previously missing historical scan becomes readable, the six-frame window recovers without needing a newer BoM scan or manually refreshing the page. No false sixth frame or replaced geographic tile is ever generated.
+
+While playback is running, an actually new frame enters the existing rolling sequence, the oldest retires and the normal timer and camera remain in place. The selected radar and operator-controlled map view never change solely because new source images arrive. The application uses a bounded two-tile request guard and short, non-hammering retries for transient metadata, tile and complete-mosaic transport errors. Explicit BoM refusals and genuinely unavailable frames remain source-unavailable; do **not** interpret this as absence of rainfall. Automatic polling remains every five minutes, with source-error and foreground recovery as previously accepted.
+
+The source check and accepted history can be inspected using the existing refresh information or read-only browser diagnostics `window.__stormtrackerRadarDiagnostics()`. A transient source error may be reported while already verified older imagery remains usable; check the frame's **actual AEST/UTC** observation time. Mobile WebKit and desktop Chromium were both tested against the real public preview path before promotion. No other operator controls, layer defaults or warnings were changed.
 
 ## Radar automatic update and observed-history reliability (V10.2.39)
 

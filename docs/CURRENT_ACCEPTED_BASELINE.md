@@ -1,4 +1,14 @@
-# CURRENT ACCEPTED PRODUCTION — V10.2.42 (1 November 2026)
+# CURRENT ACCEPTED PRODUCTION — V10.2.45 (1 November 2026)
+
+**Operator-approved:** exact QA-tested cross-platform incremental BoM WMTS playback and genuine missing-frame recovery. The operational root is the release target; historical `v10.2.42` and all prior seals are preserved untouched. Publication and tag/restore verification are part of the final release gate, not inferred from source checks alone.
+
+**Authoritative immutable reference:** new annotated tag `v10.2.45` and same-commit `restore/v10.2.45`. New work branches only from this release. Keep source-real six-frame recovery, five-minute polling, source failure honesty, operator camera state, all scientific constraints and all non-radar situational awareness features. The app's live remote agency feeds and Cloudflare relay are not frozen.
+
+[New production baseline](PRODUCTION_BASELINE_V10.2.45.md) · [V10.2.45 release notes](RELEASE_NOTES_V10.2.45.md) · [Operator guide](OPERATOR_GUIDE_CURRENT.md) · [Development handover](DEVELOPMENT_HANDOVER_CURRENT.md) · [Restore instructions](BASELINE_RESTORE.md).
+
+---
+
+# HISTORICAL ACCEPTED PRODUCTION — V10.2.42 (1 November 2026)
 
 **Confirmed functional by the operator at approximately 13:37 AEST on 1 November 2026.** This is the frozen documentation/recovery baseline for the **unchanged live V10.2.41 application**, including all V10.2.40 verified national BoM radar WMTS recovery, V10.2.41 selected-site/camera preservation, and the earlier approved flood, AEP, warnings, cyclone, road, outage and QFD capabilities.
 

@@ -1,4 +1,14 @@
-# StormTracker — V10.2.42 immutable recovery baseline (1 November 2026)
+# StormTracker — V10.2.45 immutable recovery baseline (1 November 2026)
+
+**Current operator-approved production seal:** `v10.2.45` (annotated) and `restore/v10.2.45`, created and checked only after successful public Pages deployment and production-radar source verification. Both must peel to exactly the same SHA. Older `v10.2.42` and `restore/v10.2.42` must remain at `7b9df1e4b235ed91a12eb3edd17655984643f0b2`.
+
+**For new enhancements:** `git fetch origin --tags` and `git switch -c feature/<scope> v10.2.45`. Never start from the earlier QA path, V10.2.42 or the pinned V10.2.0 underlying science source alone. Require independent source/science, genuine frame, mobile/desktop and published-site checks and operator approval before making a new release. An operational rollback is a new reviewed commit; never rewrite an older tag/restore branch.
+
+**Current release references:** [V10.2.45 production contract](PRODUCTION_BASELINE_V10.2.45.md) · [release notes](RELEASE_NOTES_V10.2.45.md) · [operator guide](OPERATOR_GUIDE_CURRENT.md). The independently run relay and all agency feeds are external to this Git freeze.
+
+---
+
+# Historical StormTracker V10.2.42 recovery baseline (1 November 2026)
 
 **Latest operator-approved stable production:** V10.2.42, documenting and freezing the field-confirmed V10.2.41 app without any weather functionality change. [Production baseline contract](PRODUCTION_BASELINE_V10.2.42.md) · [Release notes](RELEASE_NOTES_V10.2.42.md) · [Operator guide](OPERATOR_GUIDE_CURRENT.md).
 

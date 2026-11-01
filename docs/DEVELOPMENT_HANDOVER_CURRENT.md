@@ -1,4 +1,16 @@
-# V10.2.42 — IMMUTABLE OPERATOR-ACCEPTED PRODUCTION BASELINE (1 November 2026)
+# V10.2.45 — CURRENT IMMUTABLE OPERATOR-ACCEPTED PRODUCTION BASELINE (1 November 2026)
+
+**Approved upgrade:** operator-tested six-frame native BoM radar recovery, source-real rolling frame append without playback timer restart, source pressure and transient tile/metadata retries, no page/camera reset and real QLD/NSW regional coverage. Both mobile WebKit and desktop Chromium independently passed 5/5 → 6/6 recovery on the actual QA route and actual newly available frame insertion. The compiled operational site is independently verified at the public root before creation of `v10.2.45` and `restore/v10.2.45`. The previous V10.2.42 freeze remains untouched.
+
+**Mandatory development base for all subsequent work:** the newly annotated `v10.2.45` tag or exact same-commit restore ref—**never V10.2.42** or the development QA branch. New features require operator approval, all source/science/unit checks, genuine source tests, representative WebKit and desktop Chromium operational browser tests, package dry-run, public-site smoke test and a *new* immutable release tag.
+
+**Critical regression:** a 30-minute rain loop must recover an authentic missing historical observation from 5/5 to 6/6 on the next valid source check even when no newer time exists, while new scans append in place; retain two-request source pressure, bounded 400/403/429 rules, original UTC, region isolation and map/camera continuity. No synthetic frames. Preserve science, warning polygons/zero reporting, river gauge and crossing thresholds, flood icon sizes, rainfall/AEP maps, cyclone panel, roads, outages, QFD and the four-section interface exactly.
+
+**Current documents:** [production contract](PRODUCTION_BASELINE_V10.2.45.md) · [release notes](RELEASE_NOTES_V10.2.45.md) · [operator guide](OPERATOR_GUIDE_CURRENT.md) · [quick reference](OPERATOR_QUICK_REFERENCE_V10.2.45.md) · [restore procedure](BASELINE_RESTORE.md).
+
+---
+
+# Historical V10.2.42 operator-accepted baseline (1 November 2026)
 
 **The operator confirmed the entire working production application functional on a physical iPhone at approximately 13:37 AEST, 1 November 2026.** V10.2.42 is the **documentation and release-process freeze** of the accepted V10.2.41 operational code, including V10.2.40 genuine BoM WMTS resilience and V10.2.41 Longreach camera protection. The only release-process change stops the obsolete V10.2.29 tag creator from rerunning on later deployments. There is no new data or feature behaviour.
 
