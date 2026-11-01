@@ -5,7 +5,7 @@ export const NATIONAL_MOSAIC_PRIMARY=true;
 export const HIGH_RESOLUTION_FRAMES_ONLY=true;
 import { BORDER_RADAR_SITES } from "./border-radar-sites-v1.js";
 import { decodeReflectivityImageData, SOURCE_PALETTES, REFLECTIVITY_CLASSES } from "./palette.js?v=diagnostics-v1";
-import { fetchReadableImage } from "./radar-source.js?v=diagnostics-v1";
+import { fetchReadableImage } from "./radar-source.js?v=20261101-source-png-blob-reuse";
 import { loadCompleteRadarTiles } from "./radar-tile-retry-v1.js?v=9.16-radar-recovery";
 import {publishedReflectivityTimes} from "./bom-wmts-published-times-v1.js?v=20261019-native-bom-hires-current";
 
@@ -22,7 +22,7 @@ const WORLD_EXTENT_M = 40075016.68557849;
 export const WMTS_SOURCE_FRESHNESS_MS = 45*60000;
 
 export function createWmtsTimeFailureGuard({
-  now=()=>Date.now(),ttlMs=300000,maxEntries=36
+  now=()=>Date.now(),ttlMs=45000,maxEntries=36
 }={}){
   const rejected=new Map();
   const prune=()=>{for(const [time,until] of rejected)
@@ -150,9 +150,11 @@ async function validatedNationalTimes(now,region,publishedTimes,verifyTile=probe
  const published=currentPublishedTimes(history,now,region);
  if(!published.length)
   throw Error("National BoM mosaic has no verified current observation timestamp");
- // BoM GetCapabilities may list times with missing 400 tiles. Check one REAL
- // central source PNG before exposing a whole history or prewarming images.
- for(const observedUtc of published.slice(-3).reverse()){
+ // The three newest advertised scans may have not-yet-published tiles.
+ // Continue through ALL advertised source timestamps in the 45-minute
+ // freshness window before declaring the radar unavailable. This never
+ // requests a guessed timestamp or accepts an unverified source tile.
+ for(const observedUtc of published.slice(-9).reverse()){
   try{
    if(await verifyTile(observedUtc,region)) {
     // GetCapabilities may advertise stale observations that cannot be
@@ -167,7 +169,7 @@ async function validatedNationalTimes(now,region,publishedTimes,verifyTile=probe
    // A transient 502/503, timeout, or browser queue failure must not be
    // quarantined as a withdrawn BoM observation for five minutes.
    // Only an explicit 400 signals a source-rejected timestamp/tile.
-   if(Number(error?.status)===400 || /HTTP\\s+400\\b/.test(String(error?.message??error)))
+   if(Number(error?.status)===400 || /HTTP\s+400\b/.test(String(error?.message??error)))
      unavailableTime.reject(observedUtc,region);
    console.warn("National BoM reflectivity frame unavailable",observedUtc,
     String(error?.message??error));
