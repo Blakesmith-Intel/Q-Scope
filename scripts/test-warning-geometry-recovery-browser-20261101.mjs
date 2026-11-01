@@ -131,7 +131,15 @@ try{
  // Switching products must show the original source counts, not the same
  // guessed boundary shown for both product IDs.
  for(const [code,count] of Object.entries(sourceCounts)){
-  await page.locator("#officialBomWarningProduct").selectOption(code);
+  // Product filter is inside a collapsible menu in the genuine operator
+  // interface. Dispatch its ordinary change event without requiring that
+  // sidebar disclosure to be open in the test-only browser harness.
+  await page.evaluate(code=>{
+   const select=document.getElementById("officialBomWarningProduct");
+   if(!select)throw Error("Verified source-product selector not present");
+   select.value=code;
+   select.dispatchEvent(new Event("change",{bubbles:true}));
+  },code);
   const status=(await stat()).sourceStatus;
   assert(status.includes(code)&&status.includes("("+count+" polygon"),
    "Original BoM source polygon count not restored for "+code+": "+status);
