@@ -5,7 +5,7 @@ import {
   REFLECTIVITY_CAPABILITIES_URL
 } from "../src/bom-wmts-published-times-v1.js";
 import {
-  discoverBoundedBomReflectivityHistory,discoverBomReflectivityHistory,
+  publishedRadarHistoryTimes,discoverBoundedBomReflectivityHistory,discoverBomReflectivityHistory,
   findLatestBomReflectivityTime,findRecentBomReflectivityTimes,
   reflectivityWindowForRegion
 } from "../src/bom-wmts-loop-v2.js";
@@ -77,3 +77,23 @@ assert.deepEqual(await discoverBoundedBomReflectivityHistory(clock,180,"19",{
   verifyNationalTile:async()=>true}),
   [stamp(45),stamp(50),stamp(55)]);
 console.log("PASS real BoM GetCapabilities timestamps used at every radar, XML layer isolation, 9 genuine frames, one shared 120-sec cache, no speculative WMTS 400 site-load probes.");
+
+
+// Incident regression: BoM advertises genuine 10:05-10:45 AEST frames,
+// but at 11:10 AEST the legacy 45-minute filter removed older replay scans.
+const delayedNow=Date.parse("2026-11-01T01:10:00Z");
+const delayedHistory=Array.from({length:9},(_,i)=>
+  new Date(Date.parse("2026-11-01T00:05:00Z")+i*300000)
+    .toISOString().replace(".000Z","Z"));
+assert.deepEqual(publishedRadarHistoryTimes(delayedHistory,delayedNow),delayedHistory);
+for(const region of ["66","23","SEQ"]){
+  const actual=await discoverBoundedBomReflectivityHistory(delayedNow,180,region,{
+    publishedTimes:async()=>delayedHistory,verifyNationalTile:async()=>true
+  });
+  assert.deepEqual(actual,delayedHistory,
+    "All genuine replay scans must survive delayed publication at "+region);
+}
+assert.deepEqual(publishedRadarHistoryTimes([
+  "2026-10-31T20:00:00Z",...delayedHistory,"2026-11-01T01:20:00Z"
+],delayedNow),delayedHistory);
+console.log("PASS delayed WMTS source preserves a source-authentic 30-minute loop");
