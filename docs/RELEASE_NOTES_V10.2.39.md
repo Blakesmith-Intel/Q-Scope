@@ -10,8 +10,9 @@ The operational frontend contained several defects:
 1. A failed BoM WMTS region/timestamp was quarantined globally by timestamp, potentially poisoning independently valid site regions.
 2. Transient discovery/probe failures (including HTTP 502/503) were quarantined as though BoM withdrew the timestamp.
 3. On automatic refresh, a viewer already at the latest frame retained the previous observation index, so even successful new data could remain invisible until manual reload.
-4. Background runSourceLoad caught errors and returned without signalling failure to the polling scheduler. Genuine source discovery failures also returned with a keepCurrent status but no retry.
-5. iOS Safari foreground catch-up was dependent only on visibilitychange, although page restoration can produce pageshow/focus.
+4. A successful tile decode was treated as refreshed even when Cesium rejected the actual map-frame handover. A later poll could then see the updated in-memory timeline and skip retries despite still showing old pixels.
+5. Background runSourceLoad caught errors and returned without signalling failure to the polling scheduler. Genuine source discovery failures also returned with a keepCurrent status but no retry.
+6. iOS Safari foreground catch-up was dependent only on visibilitychange, although page restoration can produce pageshow/focus.
 
 ## Corrections
 
