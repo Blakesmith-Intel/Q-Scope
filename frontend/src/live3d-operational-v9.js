@@ -4994,6 +4994,7 @@ async function loadHybridSequence(automatic = false) {
   }
 }
 
+let manualRadarRecoveryTimer=null;
 async function runSourceLoad(loader, background = false) {
   if (sequenceLoading || !model) return false;
   if (!background) motionTransition.cancel();
@@ -5008,6 +5009,10 @@ async function runSourceLoad(loader, background = false) {
   }
   try {
     await loader();
+    if(manualRadarRecoveryTimer!==null){
+      clearTimeout(manualRadarRecoveryTimer);
+      manualRadarRecoveryTimer=null;
+    }
     return true;
   } catch (error) {
     if (background) {
@@ -5023,7 +5028,21 @@ async function runSourceLoad(loader, background = false) {
       // applies bounded retry without resetting the normal 5-minute cadence.
       throw error;
     }
-    else setStatus(error.message, "error");
+    else {
+      setStatus(error.message, "error");
+      recordRadarAutoRefreshAudit({
+        failure:String(error?.message??error),
+        outcome:"manual site load failed; automatic retry queued"
+      });
+      // A failure when switching sites must recover in the existing tab.
+      // Allow BoM tile publication and 45-second negative caches to settle,
+      // then request a scheduler-managed background recovery.
+      if(manualRadarRecoveryTimer!==null)clearTimeout(manualRadarRecoveryTimer);
+      manualRadarRecoveryTimer=setTimeout(()=>{
+        manualRadarRecoveryTimer=null;
+        if(!document.hidden)void autoRefresh.check();
+      },50000);
+    }
   } finally {
     sequenceLoading = false;
     prewarmUpcomingFrames(hybridFrameIndex);
