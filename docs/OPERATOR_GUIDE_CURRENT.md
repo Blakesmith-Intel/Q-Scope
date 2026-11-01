@@ -1,5 +1,5 @@
 # StormTracker — current operator guide
-**Edition:** 1 November 2026 | **Applies to:** V10.2.38 radar published-history replay recovery, including V10.2.37 automatic refresh, V10.2.36 cyclone subsection and unchanged four-section navigation.
+**Edition:** 1 November 2026 | **Applies to:** V10.2.39 cross-site radar loop and live automatic-refresh reliability, including V10.2.38 source-published replay, V10.2.37 scheduler, cyclone subsection and unchanged four-section navigation.
 **Open:** https://blakesmith-intel.github.io/StormTracker/  
 **Technical handover:** [DEVELOPMENT_HANDOVER_CURRENT.md](DEVELOPMENT_HANDOVER_CURRENT.md)
 
@@ -9,13 +9,13 @@
 
 **Public information sheet:** [StormTracker — layers and features (PDF)](STORMTRACKER_LAYERS_INFORMATION.pdf) — a concise shareable overview for new users. This is a guide to features, not a live weather bulletin.
 
-## Radar automatic update and observed-history reliability (V10.2.38)
+## Radar automatic update and observed-history reliability (V10.2.39)
 
 Radar playback checks for new BoM imagery every **five minutes** while the browser page is active and checks promptly when a previously hidden page returns to the foreground. New source scans can arrive with normal BoM publication delays. A temporary busy map load is retried promptly rather than waiting a whole extra polling interval. Recent genuinely published but missed scans are recovered in chronological order when still available from BoM; missing images are never invented. The last automatic check, newest successfully accepted radar observation and latest failure reason are recorded in the existing automatic refresh status tooltip (desktop) and in the read-only browser diagnostic `window.__stormtrackerRadarAutoRefreshAudit()`. These times are distinct: a successful check may find no newer observation.
 
 For a **30-minute rain loop**, the application retrieves genuinely published replay scans relative to the latest readable BoM observation, rather than filtering out older frames because the source itself is delayed by 20–40 minutes. The available source window has up to nine recent scans; longer 60/120/180-minute windows use observations previously verified and stored in the local browser. Each displayed source frame must pass its original tile checks; a missing or rejected scan is never replaced with a fabricated observation.
 
-If the latest observation is delayed, inspect its **actual AEST/UTC timestamp**. This is a measure of observation age, not a promise that the newest imagery on a separate BoM website has already been published to StormTracker's WMTS source. The usual radar site, window, Doppler and volume controls are unchanged.
+If already viewing the latest radar frame, automatic refresh advances to the newest genuine observation. Manually scrubbing back through a loop keeps that historical position. The page retries temporary automatic feed errors after one minute while retaining the five-minute normal polling schedule. On iPhone Safari, returning to an active tab triggers a new check; iOS can suspend background tabs, so an actual hidden tab cannot be guaranteed to poll while suspended. If the latest observation is delayed, inspect its **actual AEST/UTC timestamp**. This is a measure of observation age, not a promise that the newest imagery on a separate BoM website has already been published to StormTracker's WMTS source. The usual radar site, window, Doppler and volume controls are unchanged.
 
 ## At a glance
 
