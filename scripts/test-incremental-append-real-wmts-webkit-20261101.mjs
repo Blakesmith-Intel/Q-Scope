@@ -3,14 +3,22 @@
 // Initially delay publication of the genuine latest WMTS Value; never generate
 // a synthetic scan, replace its PNG, or modify production polling.
 import assert from "node:assert/strict";
-import {webkit} from "playwright";
+import {webkit,chromium} from "playwright";
 import {parsePublishedReflectivityTimes,REFLECTIVITY_WMTS_LAYER}
   from "../frontend/src/bom-wmts-published-times-v1.js";
 
-const browser=await webkit.launch({headless:true});
-const page=await browser.newPage({
- viewport:{width:390,height:780},deviceScaleFactor:2,isMobile:true,hasTouch:true
-});
+// Same exact genuine-frame append contract on iPhone Safari and desktop
+// Chromium; only browser viewport/engine differ. No platform-specific patch.
+const isDesktop=process.env.STORMTRACKER_BROWSER==="desktop";
+const browser=isDesktop
+ ? await chromium.launch({headless:true,args:[
+   "--no-sandbox","--disable-dev-shm-usage",
+   "--use-gl=angle","--use-angle=swiftshader","--enable-unsafe-swiftshader"
+  ]})
+ : await webkit.launch({headless:true});
+const page=await browser.newPage(isDesktop
+ ? {viewport:{width:1440,height:900},deviceScaleFactor:1,isMobile:false,hasTouch:false}
+ : {viewport:{width:390,height:780},deviceScaleFactor:2,isMobile:true,hasTouch:true});
 page.setDefaultTimeout(180000);
 let phase="initial",heldBackUtc=null,metadataRequests=0;
 const navigations=[],errors=[];
@@ -78,7 +86,7 @@ try{
  assert.equal(before.diagnostics.lifecycle.webglLossCount,0);
  assert.equal(before.button,"Pause","Active playback required");
  assert.equal(before.label.split("/")[1],"6");
- console.log("REAL_SOURCE_INCREMENTAL_START",JSON.stringify({
+ console.log("REAL_SOURCE_INCREMENTAL_START",JSON.stringify({platform:isDesktop?"desktop Chromium":"mobile WebKit",
   heldBackUtc,previousUtc:before.diagnostics.automatic.newestAcceptedUtc,
   state:before.diagnostics.incremental,frames:before.label
  }));
@@ -108,7 +116,7 @@ try{
  assert.equal(navigations.length,1,"Unexpected navigation");
  assert(metadataRequests>=2,"New genuine metadata was not fetched");
  assert.equal(after.label.split("/")[1],"6");
- console.log("REAL_SOURCE_INCREMENTAL_APPEND_PASS",JSON.stringify({
+ console.log("REAL_SOURCE_INCREMENTAL_APPEND_PASS",JSON.stringify({platform:isDesktop?"desktop Chromium":"mobile WebKit",
   beforeUtc:before.diagnostics.automatic.newestAcceptedUtc,
   afterUtc:after.diagnostics.automatic.newestAcceptedUtc,heldBackUtc,
   append:after.diagnostics.incremental,frames:after.label,
@@ -116,8 +124,8 @@ try{
  }));
 }catch(error){
  console.log("REAL_SOURCE_INCREMENTAL_APPEND_FAIL",
-  JSON.stringify({error:String(error),heldBackUtc,phase,metadataRequests,
+  JSON.stringify({platform:isDesktop?"desktop Chromium":"mobile WebKit",error:String(error),heldBackUtc,phase,metadataRequests,
    navigations,errors:errors.slice(-8),state:await snapshot().catch(()=>null)}));
- await page.screenshot({path:"/tmp/radar-incremental-real-append-failure.png"}).catch(()=>{});
+ await page.screenshot({path:isDesktop?"/tmp/radar-incremental-desktop-append-failure.png":"/tmp/radar-incremental-real-append-failure.png"}).catch(()=>{});
  throw error;
 }finally{await browser.close();}
