@@ -1,3 +1,30 @@
+# V10.2.42 — IMMUTABLE OPERATOR-ACCEPTED PRODUCTION BASELINE (1 November 2026)
+
+**The operator confirmed the entire working production application functional on a physical iPhone at approximately 13:37 AEST, 1 November 2026.** V10.2.42 is the **documentation and release-process freeze** of the accepted V10.2.41 operational code, including V10.2.40 genuine BoM WMTS resilience and V10.2.41 Longreach camera protection. The only release-process change stops the obsolete V10.2.29 tag creator from rerunning on later deployments. There is no new data or feature behaviour.
+
+**Start from the immutable annotated `v10.2.42` tag** (paired, at the same commit, with `restore/v10.2.42`). Do not start from an unreviewed branch, an older snippet in this historical handover, or the underlying pinned V10.2.0 code alone. All subsequent enhancement work must branch from this baseline; merge to production only after scoped tests, exact source/geometry verification, real operational mobile/desktop UI validation, operator acceptance, verified deployment and a **new** annotated tag and restore branch. Historical releases remain untouched.
+
+**Read first:** [Current production contract](PRODUCTION_BASELINE_V10.2.42.md) · [Release notes](RELEASE_NOTES_V10.2.42.md) · [Operator guide](OPERATOR_GUIDE_CURRENT.md) · [Quick reference PDF](STORMTRACKER_LAYERS_INFORMATION.pdf) · [Baseline restore](BASELINE_RESTORE.md) · [Approved scientific contract](SCIENTIFIC_CONTRACT.md) · [No unrequested visual changes](NON_NEGOTIABLE_VISUAL_FIDELITY.md).
+
+## Locked V10.2.42 regression and release acceptance
+
+1. **BoM source and replay:** preserve exact authentic published radar timestamps and complete verified PNG mosaics; no invented observations. Regular five-minute polling, two-second busy retries, 60-second background error retry, in-tab manual-site retry, foreground recovery, genuine backfill and correct latest-frame follow must all remain.
+2. **Regional reliability:** two in-flight image requests, bounded compressed verified WMTS PNG cache, 45-second bad-tile expiry, site+time rejection isolation and conservative HTTP 403/429 gating. A single transient 502/503/504 must not stall all Queensland sites. Test **actual six-frame multi-site loops in both WebKit and full operational browser**; isolated centre-pixel/source tests alone are insufficient.
+3. **Operator camera:** automatic frame ingestion must never recenter to Brisbane or switch the selected radar. The full selected primary and camera pose survive same-tab Safari reloads for the tab lifetime. Deliberate selection/Focus/Reset/Fit still work. The accepted Longreach test checked true Latest and full reload with exact same location, range, bearing and tilt; [test run 41268669694](https://github.com/Blakesmith-Intel/StormTracker/actions/runs/41268669694).
+4. **Unchanged science/situational awareness:** Doppler, inferred 3-D, storm motion/cones, severe thunderstorm/weather warnings, honest cyclone bulletin distinction, verified 'No current warnings' negative reporting, all four menu sections, rainfall/AEP/IFD, tidal-safe flood rapid rise and crossing heights, QLDTraffic road reports, power-outage LGA counts, QFD and icon severity/geographic layering are not available for opportunistic adjustments.
+5. **Release mechanics:** the Pages job uses a pinned base and approved overlays. Inspect **the generated public site**, not only GitHub `main` source, and verify both the deploy and new baseline tag+restore. `main` may advance later; the frozen tag will not. Never re-run V10.2.29/V10.2.28/V10.2.40 historical tag-creation checks on new commits. The independent Cloudflare Worker and authoritative external feeds are separate operational dependencies.
+6. **Operator acceptance and documentation:** keep this handover, current guide, baseline restore record and one-page reference up to date **only for a separately accepted new release**. Prior numbered release notes remain immutable historical provenance. Never claim 24/7 autonomous monitoring where only periodic in-tab refresh exists.
+
+### Accepted working scope
+
+Browser-only application; Queensland plus approved NSW border radar coverage, native reflectivity and Doppler, fast 3-D/storm analysis, playback and map tools, verified BoM warning polygons, flood gauges, significant rainfall/AEP and both read-only rainfall reports, cyclone forecast visibility, road closures, Energex/Ergon outages and QFD incidents. Public map: https://blakesmith-intel.github.io/StormTracker/.
+
+### Archive below
+
+The sections below are the earlier engineering and release history, including timestamps and then-current claims. They remain for traceability; the header above is the authoritative 1 November V10.2.42 baseline.
+
+---
+
 # V10.2.39 — cross-site radar replay plus automatic latest-frame follow (1 November 2026)
 
 V10.2.38 had two confirmed user-facing defects: one-frame loops in non-Brisbane Queensland radar sites despite a national WMTS source carrying valid six-frame histories, and failure to visibly advance the Latest frame without page reload.
