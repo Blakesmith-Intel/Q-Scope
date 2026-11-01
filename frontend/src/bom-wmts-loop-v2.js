@@ -369,8 +369,25 @@ export async function loadVerifiedNationalMosaicAtTime(observedUtc, region = 'SE
   };
 }
 
+// Retry only genuine transient transport/decode failures, never a rejected
+// publication time, HTTP 403/429 cooldown or a source 400. The second request
+// is for the SAME authentic BoM UTC and EXACT same geographic WMTS tiles.
+// Never fill a partial frame with invented, older or transparent pixels.
+export function retryableWmtsMosaicFailure(error){
+ const message=String(error?.message??error);
+ if([400,403,429].includes(Number(error?.status)) ||
+    /HTTP\s+(?:400|403|429)\b|relay cooldown|queue full/i.test(message))
+   return false;
+ return [502,503,504].includes(Number(error?.status)) ||
+   /HTTP\s+5(?:02|03|04)\b|network|CORS|failed to fetch|abort|timed?\s*out|incomplete BoM reflectivity mosaic/i.test(message);
+}
+
 export async function loadBomReflectivityMosaicAtTime(
- observedUtc,region='SEQ',knownPublishedTimes=null
+ observedUtc,region='SEQ',knownPublishedTimes=null,{
+ loadVerified=loadVerifiedNationalMosaicAtTime,
+ wait=ms=>new Promise(resolve=>setTimeout(resolve,ms)),
+ retryDelayMs=900
+ }={}
 ){
  if(!observedUtc)throw Error("observedUtc is required");
  // Keep one authentic capability snapshot during a multi-frame load.
@@ -383,7 +400,16 @@ export async function loadBomReflectivityMosaicAtTime(
   logWmtsFailure(region,observedUtc,"BoM published history excludes requested UTC");
   throw Error("BoM high-resolution frame not published in bounded history: "+observedUtc);
  }
- return loadVerifiedNationalMosaicAtTime(observedUtc,region);
+ try{
+   return await loadVerified(observedUtc,region);
+ }catch(error){
+   if(!retryableWmtsMosaicFailure(error))throw error;
+   await wait(retryDelayMs);
+   // Preserve genuine source pixels and independently verified timestamps.
+   // If a transient persists, bubble it up for the existing 60-second
+   // scheduler recovery; retain any already verified frames in the browser.
+   return loadVerified(observedUtc,region);
+ }
 }
 
 export async function loadLatestBomReflectivityMosaic(now = Date.now(), region = 'SEQ') {
