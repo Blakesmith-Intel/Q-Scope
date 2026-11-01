@@ -439,6 +439,10 @@ jobs:
           live_refresh="$(curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors "$base/src/live-loop-refresh-v1.js")"
           grep -Fq 'LIVE_LOOP_BUSY_RETRY_MS = 2000' <<< "$live_refresh"
           grep -Fq 'V10.2.38 VERIFIED RADAR HISTORY' <<< "$root"
+          grep -Fq 'V10.2.39 RADAR CROSS-SITE LIVE RECOVERY' <<< "$root"
+          grep -Fq 'const wasFollowingLatest = automatic' <<< "$live_engine"
+          grep -Fq 'LIVE_LOOP_SOURCE_RETRY_MS = 60000' <<< "$live_refresh"
+          grep -Fq 'isRejected(time,region)' <<< "$wmts_source"
           history_source="$(curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors "$base/src/context-layers/bom-recent-river-history-v1.js")"
           grep -Fq 'if(explicitlyTidal && !classified && !lastConfirmed && !crossingReached)return null' <<< "$history_source"
           grep -Fq 'if(!classified && !lastConfirmed && !inland && !crossingReached)return null' <<< "$history_source"
@@ -1570,9 +1574,10 @@ jobs:
           echo "SEALED V10.2.28 negative reporting; historical V10.2.27 unchanged"
 
   seal_radar_refresh:
-    name: Seal V10.2.38 verified radar replay only after published-site acceptance
+    name: Preserve historical V10.2.38 verified radar replay seal
     needs: deploy
-    if: github.ref == 'refs/heads/main'
+    # This legacy seal belongs only to its original immutable commit.
+    if: github.ref == 'refs/heads/main' && github.sha == '8aa35645429c597d004e5808f822464c61e0ea0e'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -1628,6 +1633,79 @@ jobs:
           if [ -z "$existing_tag" ]; then
             tag_object="$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/tags" \
               -f tag="$tag" -f message="StormTracker V10.2.38: verified published replay despite WMTS lag, preserved five-minute poll; previous releases immutable" \
+              -f object="$release_sha" -f type=commit --jq .sha)"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/tags/$tag" -f sha="$tag_object" >/dev/null
+          fi
+          test "$(git ls-remote origin "refs/tags/$tag^{}" | cut -f1)" = "$release_sha"
+          test "$(git ls-remote origin "refs/heads/$restore" | cut -f1)" = "$release_sha"
+          echo "SEALED $tag and $restore at $release_sha; older tags/restore refs untouched"
+
+  seal_radar_cross_site_live:
+    name: Seal V10.2.39 cross-site radar auto-follow only after published-site acceptance
+    needs: deploy
+    # This legacy seal belongs only to its original immutable commit.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify new radar release and create NEW immutable refs only
+        env:
+          GH_TOKEN: ${{ secrets.STORMTRACKER_RELEASE_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          release_sha="$GITHUB_SHA"
+          tag="v10.2.39"
+          restore="restore/v10.2.39"
+          test -f docs/RELEASE_NOTES_V10.2.39.md
+          grep -Fq 'V10.2.39 RADAR CROSS-SITE LIVE RECOVERY' scripts/apply-radar-auto-refresh-v1.py
+          wmts="$(curl -fsSL --max-time 20 "https://blakesmith-intel.github.io/StormTracker/src/bom-wmts-loop-v2.js?radarSeal=$GITHUB_SHA" || true)"
+          grep -Fq 'isRejected(time,region)' <<< "$wmts" || { echo 'Region-isolated radar rejection not published'; exit 1; }
+          prior_tag="$(git ls-remote origin 'refs/tags/v10.2.38^{}' | cut -f1)"
+          prior_restore="$(git ls-remote origin refs/heads/restore/v10.2.38 | cut -f1)"
+          if [ -n "$prior_tag" ] || [ -n "$prior_restore" ]; then
+            test "$prior_tag" = "$prior_restore" || { echo 'Previous radar release refs disagree; refuse new seal'; exit 1; }
+          fi
+          base="https://blakesmith-intel.github.io/StormTracker"
+          published=false
+          for attempt in $(seq 1 10); do
+            query="?radarRelease=$release_sha&verify=$attempt"
+            build="$(curl -fsSL --max-time 20 "$base/BUILD.txt$query" || true)"
+            runtime="$(curl -fsSL --max-time 20 "$base/src/live3d-operational-v9.js$query" || true)"
+            scheduler="$(curl -fsSL --max-time 20 "$base/src/live-loop-refresh-v1.js$query" || true)"
+            if grep -Fq 'V10.2.39 RADAR CROSS-SITE LIVE RECOVERY' <<< "$build" &&
+               grep -Fq 'discoverBoundedBomReflectivityHistory(now,180,region)' <<< "$runtime" &&
+               grep -Fq 'recordRadarAutoRefreshAudit' <<< "$runtime" &&
+               grep -Fq 'const wasFollowingLatest = automatic' <<< "$runtime" &&
+               grep -Fq 'checkRadarOnForegroundReturn' <<< "$runtime" &&
+               grep -Fq 'LIVE_LOOP_BUSY_RETRY_MS = 2000' <<< "$scheduler" &&
+               grep -Fq 'LIVE_LOOP_SOURCE_RETRY_MS = 60000' <<< "$scheduler"; then
+              published=true
+              break
+            fi
+            sleep 5
+          done
+          test "$published" = true || { echo 'Refuse radar seal: published Pages refresh overlay not verified'; exit 1; }
+          existing_tag="$(git ls-remote origin "refs/tags/$tag^{}" | cut -f1)"
+          existing_restore="$(git ls-remote origin "refs/heads/$restore" | cut -f1)"
+          if [ -n "$existing_tag" ] && [ -n "$existing_restore" ]; then
+            test "$existing_tag" = "$existing_restore" || { echo 'Existing refs disagree: refuse modification'; exit 1; }
+            echo "$tag already sealed at $existing_tag; immutable refs unchanged"
+            exit 0
+          fi
+          test -z "$existing_tag" || test "$existing_tag" = "$release_sha"
+          test -z "$existing_restore" || test "$existing_restore" = "$release_sha"
+          if [ -z "$existing_restore" ]; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/heads/$restore" -f sha="$release_sha" >/dev/null
+          fi
+          if [ -z "$existing_tag" ]; then
+            tag_object="$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/tags" \
+              -f tag="$tag" -f message="StormTracker V10.2.39: region-isolated genuine radar, latest auto-follow, bounded retry and Safari recovery; previous releases immutable" \
               -f object="$release_sha" -f type=commit --jq .sha)"
             gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
               -f ref="refs/tags/$tag" -f sha="$tag_object" >/dev/null
