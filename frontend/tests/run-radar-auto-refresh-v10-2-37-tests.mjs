@@ -19,7 +19,9 @@ assert.match(runtime, /window\.addEventListener\("focus", checkRadarOnForeground
 assert.match(runtime, /const wasFollowingLatest = automatic/);
 assert.match(runtime, /\? hybridFrames\.length - 1/);
 assert.match(runtime, /if \(automatic\) throw new Error/);
-assert.match(runtime, /throw error;\s*}\s*else setStatus\(error\.message/);
+assert.match(runtime, /throw error;\s*}\s*else\s*\{\s*setStatus\(error\.message/);
+assert.match(runtime, /manual site load failed; automatic retry queued/);
+assert.match(runtime, /manualRadarRecoveryTimer=setTimeout/);
 assert.match(scheduler, /LIVE_LOOP_SOURCE_RETRY_MS = 60000/);
 assert.match(runtime, /runSourceLoad\(\(\) => loadHybridSequence\(true\), true\)\.then/);
 assert.match(runtime, /if \(sequenceLoading \|\| !model\) return false;/);
