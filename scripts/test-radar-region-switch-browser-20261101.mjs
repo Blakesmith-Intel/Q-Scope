@@ -28,13 +28,14 @@ async function snapshot(region,timeout=150000){
       /\b[1-9]\d*\/[1-9]\d*\b/.test(label) &&
       !/Loading frame|Checking available|Checking history/i.test(status);
  },{region},{timeout});
- const state=await page.evaluate(()=>{
+ const state=await page.evaluate(async()=>{
+  const {networkPressureDiagnostics}=await import("./src/radar-source.js?v=20261101-source-png-blob-reuse");
   const id=x=>document.querySelector("#"+x);
   return {region:id("radarSite")?.value,frames:id("hybridFrameLabel")?.textContent,
     status:id("status")?.textContent,source:id("sourceTime")?.textContent,
     available:id("sharedHistoryNote")?.textContent,auto:id("autoRefreshNote")?.textContent,
     window:id("loopDurationMinutes")?.value,
-    pressure:globalThis.__stormtrackerRelayPressureDiagnostics?.()};
+    pressure:networkPressureDiagnostics()};
  });
  console.log("RADAR_OPERATIONAL_SITE_CHECK",JSON.stringify(state));
  assert(/\b[1-9]\d*\/6\b/.test(state.frames),"30-minute six measured scans missing at "+region+"; "+JSON.stringify(state));
