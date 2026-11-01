@@ -1,4 +1,4 @@
-name: Review Gympie Gladstone incremental radar (genuine BoM, mobile)
+name: Review system-wide incremental radar (genuine BoM, mobile)
 on:
   pull_request:
     branches: [main]
@@ -7,6 +7,7 @@ on:
       - "frontend/tests/**"
       - "scripts/apply-radar-auto-refresh-v1.py"
       - "scripts/audit-gympie-gladstone-wmts-20261101.mjs"
+      - "scripts/audit-all-radar-wmts-spotcheck-20261101.mjs"
       - "scripts/test-gympie-gladstone-incremental-webkit-20261101.mjs"
       - ".github/workflows/radar-incremental-gympie-gladstone-review.yml"
 permissions:
@@ -25,6 +26,8 @@ jobs:
         with: {node-version: "24"}
       - name: Verify actual six published timestamps and every Gympie/Gladstone tile
         run: node scripts/audit-gympie-gladstone-wmts-20261101.mjs
+      - name: Verify published imagery samples for every registered QLD/NSW radar region
+        run: node scripts/audit-all-radar-wmts-spotcheck-20261101.mjs
 
   genuine-mobile:
     if: github.head_ref == 'feature/incremental-radar-frames-20261101'
@@ -61,7 +64,7 @@ jobs:
         run: |
           npm install --no-save --ignore-scripts playwright@1.58.2
           npx playwright install --with-deps webkit
-      - name: Repeated real radar checks and GPU/browser continuity
+      - name: Repeated real radar checks across seven regions and GPU/browser continuity
         run: |
           python -m http.server 8137 --bind 127.0.0.1 --directory _site >/tmp/st-radar-review.log 2>&1 &
           node scripts/test-gympie-gladstone-incremental-webkit-20261101.mjs
