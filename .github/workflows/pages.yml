@@ -441,6 +441,7 @@ jobs:
           grep -Fq 'V10.2.38 VERIFIED RADAR HISTORY' <<< "$root"
           grep -Fq 'V10.2.39 RADAR CROSS-SITE LIVE RECOVERY' <<< "$root"
           grep -Fq 'const wasFollowingLatest = automatic' <<< "$live_engine"
+          grep -Fq 'if (displayed !== true) throw Error(' <<< "$live_engine"
           grep -Fq 'LIVE_LOOP_SOURCE_RETRY_MS = 60000' <<< "$live_refresh"
           grep -Fq 'isRejected(time,region)' <<< "$wmts_source"
           history_source="$(curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors "$base/src/context-layers/bom-recent-river-history-v1.js")"
@@ -1679,6 +1680,7 @@ jobs:
                grep -Fq 'discoverBoundedBomReflectivityHistory(now,180,region)' <<< "$runtime" &&
                grep -Fq 'recordRadarAutoRefreshAudit' <<< "$runtime" &&
                grep -Fq 'const wasFollowingLatest = automatic' <<< "$runtime" &&
+               grep -Fq 'if (displayed !== true) throw Error(' <<< "$runtime" &&
                grep -Fq 'checkRadarOnForegroundReturn' <<< "$runtime" &&
                grep -Fq 'LIVE_LOOP_BUSY_RETRY_MS = 2000' <<< "$scheduler" &&
                grep -Fq 'LIVE_LOOP_SOURCE_RETRY_MS = 60000' <<< "$scheduler" &&
