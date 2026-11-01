@@ -40,6 +40,20 @@ export function createWmtsTimeFailureGuard({
   };
 }
 const unavailableTime=createWmtsTimeFailureGuard();
+// Read-only bounded per-region WMTS failure evidence; no invented tiles and no
+// new requests. Includes exact UTC and tile col/row already reported by loader.
+const wmtsFrameFailures=[];
+function logWmtsFailure(region,observedUtc,reason){
+ const message=String(reason?.message??reason).slice(0,1100);
+ wmtsFrameFailures.push({region,observedUtc,utc:new Date().toISOString(),
+   message,tiles:[...message.matchAll(/tile (\\d+)\\/(\\d+): ([^;]+)/g)]
+     .map(m=>({col:Number(m[1]),row:Number(m[2]),reason:m[3]}))});
+ if(wmtsFrameFailures.length>48)wmtsFrameFailures.shift();
+}
+export function radarTileFailureSnapshot(region=null){
+ return wmtsFrameFailures.filter(entry=>region==null||entry.region===region)
+   .map(entry=>({...entry,tiles:entry.tiles.map(tile=>({...tile}))}));
+}
 
 // Current BOM observed-weather WMTS matrix metadata for native zoom 8.
 const MATRIX = Object.freeze({
@@ -171,6 +185,7 @@ async function validatedNationalTimes(now,region,publishedTimes,verifyTile=probe
    // Only an explicit 400 signals a source-rejected timestamp/tile.
    if(Number(error?.status)===400 || /HTTP\s+400\b/.test(String(error?.message??error)))
      unavailableTime.reject(observedUtc,region);
+   logWmtsFailure(region,observedUtc,error);
    console.warn("National BoM reflectivity frame unavailable",observedUtc,
     String(error?.message??error));
   }
@@ -240,6 +255,8 @@ export async function loadVerifiedNationalMosaicAtTime(observedUtc, region = 'SE
   }catch(error){
     if(/HTTP\s+400\b/.test(String(error?.message??error)))
       unavailableTime.reject(observedUtc,region);
+    logWmtsFailure(region,observedUtc,
+      "tile "+first.col+"/"+first.row+": "+String(error?.message??error));
     throw Error("BoM WMTS source time preflight failed at "+
       observedUtc+": "+String(error?.message??error));
   }
@@ -252,6 +269,7 @@ export async function loadVerifiedNationalMosaicAtTime(observedUtc, region = 'SE
   }catch(error){
     if(/HTTP\s+400\b/.test(String(error?.message??error)))
       unavailableTime.reject(observedUtc,region);
+    logWmtsFailure(region,observedUtc,error);
     throw error;
   }
 
@@ -335,8 +353,10 @@ export async function loadBomReflectivityMosaicAtTime(
   Array.isArray(knownPublishedTimes)?knownPublishedTimes:await publishedReflectivityTimes(),
   Date.now(),region
  );
- if(!sourceTimes.includes(observedUtc))
+ if(!sourceTimes.includes(observedUtc)){
+  logWmtsFailure(region,observedUtc,"BoM published history excludes requested UTC");
   throw Error("BoM high-resolution frame not published in bounded history: "+observedUtc);
+ }
  return loadVerifiedNationalMosaicAtTime(observedUtc,region);
 }
 
