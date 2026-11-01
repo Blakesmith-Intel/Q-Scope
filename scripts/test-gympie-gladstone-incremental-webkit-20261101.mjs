@@ -39,7 +39,7 @@ async function stable(region){
  });
 }
 try{
- await page.goto("https://blakesmith-intel.github.io/StormTracker/live3d-operational-v9.html?qaIncrementalRadar=1",
+ await page.goto("https://blakesmith-intel.github.io/StormTracker/preview/radar-refresh-review/live3d-operational-v9.html?qaIncrementalRadar=1",
   {waitUntil:"domcontentloaded",timeout:60000});
  await page.locator("#cesiumContainer .cesium-widget canvas").waitFor({state:"attached"});
  // Two previously failing locations plus five geographically and operationally
@@ -58,6 +58,8 @@ try{
     assert.equal(baselineCount,6,
       "BoM publishes six source-complete frames but UI loaded "+baseline.label+
       " at radar "+region);
+  assert(baseline.graphics,
+    "QA subpath wrongly bypassed production radar graphics/recovery path");
   assert.equal(baseline.diagnostic?.lifecycle?.bootCount,1,
     "An unexpected page restart occurred before refresh checks");
   const initialCanvas=await page.locator("#cesiumContainer canvas").count();
