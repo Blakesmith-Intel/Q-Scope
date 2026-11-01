@@ -10,8 +10,9 @@ import {
   discoverBomReflectivityHistory,
   discoverBoundedBomReflectivityHistory,
   loadBomReflectivityMosaicAtTime,
-  reflectivityWindowForRegion
-} from "./bom-wmts-loop-v2.js?v=20261101-source-verified-recovery-v10-2-40";
+  reflectivityWindowForRegion,
+  radarTileFailureSnapshot
+} from "./bom-wmts-loop-v2.js?v=20261101-source-verified-incremental-v10-2-43";
 
 import {
   RadarWorkerClient
@@ -144,6 +145,7 @@ import {
 } from "./live-loop-refresh-v1.js?v=20261101-radar-live-follow-v10-2-39";
 import { createContinuousPlayback } from "./continuous-playback-v1.js?v=20261101-incremental-cursor-v1";
 import {planIncrementalRadarWindow} from "./radar-incremental-window-v1.js?v=20261101-verified-append-v1";
+import {installRadarLifecycleDiagnostics} from "./radar-lifecycle-diagnostics-v1.js?v=20261101-iframe-webgl-evidence-v1";
 import { buildTrackThreatCone } from "./track-threat-cone-v1.js?v=v9-cone-observed-tip-v3";
 import {
   evaluateChronologicalTrackThreatCone,
@@ -278,6 +280,10 @@ const viewer = new Cesium.Viewer(
 );
 
 const scene = viewer.scene;
+const radarLifecycle=installRadarLifecycleDiagnostics({
+  win:window,doc:document,canvas:scene.canvas
+});
+window.__stormtrackerRadarLifecycle=()=>radarLifecycle.snapshot();
 // V9.20.0: limit surplus Cesium off-screen tile residency without discarding
 // tiles needed for the currently visible official satellite imagery.
 if(INCREMENTAL_VOLUME_PREVIEW){
@@ -849,6 +855,12 @@ function recordRadarAutoRefreshAudit({
   }
 }
 window.__stormtrackerRadarAutoRefreshAudit = () => ({ ...radarAutoRefreshAudit });
+window.__stormtrackerRadarDiagnostics=()=>({
+  automatic:{...radarAutoRefreshAudit},
+  incremental:{...radarIncrementalAudit},
+  lifecycle:radarLifecycle.snapshot(),
+  tileFailures:radarTileFailureSnapshot(selectedRadarRegion())
+});
 const autoRefresh = createLiveLoopRefresh({
   refresh: () => {
     if (document.hidden) return undefined;
@@ -5009,6 +5021,10 @@ async function loadHybridSequence(automatic = false) {
   // A paused Latest operator still sees the just-accepted newest observation.
   if(!incrementalCommit || !playback.isPlaying())
     await showHybridFrame(hybridFrameIndex);
+  radarLifecycle.sampleMemory({
+    region,latestUtc:frames.at(-1).observedUtc,
+    frameCount:hybridFrames.length,incremental:!!incrementalCommit
+  });
   recordRadarAutoRefreshAudit({
     acceptedUtc: frames.at(-1).observedUtc,
     failure: frameFailures.detail || null,
