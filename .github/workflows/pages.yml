@@ -1751,9 +1751,10 @@ jobs:
   seal_radar_wmts_40:
     name: Seal V10.2.40 WMTS browser recovery after published Pages verification
     needs: deploy
-    # Only the first release merge commit may create this immutable seal.
-    # Later source/docs commits cannot re-seal V10.2.40.
-    if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, 'V10.2.40')
+    # Historical release creation belongs ONLY to the exact original
+    # V10.2.40 commit; a future PR body mentioning V10.2.40 must not
+    # re-run its immutable-tag compare against a later production SHA.
+    if: github.ref == 'refs/heads/main' && github.sha == 'b00119e423659d2aec713124bc5828da84a3138a'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
