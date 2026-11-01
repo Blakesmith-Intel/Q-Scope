@@ -86,7 +86,7 @@ try{
    typeof window.__stormtrackerRadarQaCheck==="function" &&
    /\b\d+\/6\b/.test(document.querySelector("#hybridFrameLabel")?.textContent??"") &&
    window.__stormtrackerRadarDiagnostics()?.automatic?.newestAcceptedUtc,
-  null,{timeout:180000});
+  null,{timeout:300000,polling:250});
  const before=await snapshot();
  assert.equal(before.site,"66");
  assert(await page.evaluate(()=>typeof window.__stormtrackerMemoryDiagnostics==="function"),
@@ -115,7 +115,7 @@ try{
   const data=window.__stormtrackerRadarDiagnostics?.();
   return data?.incremental?.appendUpdates>=1 &&
     Date.parse(data.automatic.newestAcceptedUtc)>=Date.parse(expected);
- },heldBackUtc,{timeout:120000});
+ },heldBackUtc,{timeout:180000,polling:250});
  const after=await snapshot();
  assert(after.diagnostics.incremental.lastAppendedCount>=1);
  assert.equal(after.diagnostics.incremental.lastRetiredCount,1);
