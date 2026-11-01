@@ -14,7 +14,7 @@ assert.doesNotMatch(html,/<select id="dopplerOverlayRadar"/);
 assert.doesNotMatch(html,/for="dopplerOverlayRadar"/);
 assert.doesNotMatch(html,/<option value="SEQ">/);
 assert.match(runtime,/function configureRadarSite\(\)[\s\S]*?\$\("dopplerOverlayRadar"\)\.value=ids\[0\]\?\?""/);
-assert.match(runtime,/configureRadarSite\(\); resetView\(\); clearDopplerOverlay\(\);/,
+assert.match(runtime,/configureRadarSite\(\); resetView\(\); saveOperatorRadarView\(\);\s*clearDopplerOverlay\(\);/,
   "primary radar change must reset previous wind layers and frames");
 assert.doesNotMatch(runtime,/\$\("dopplerOverlayRadar"\)\.addEventListener\("change"/);
 assert.match(runtime,/function isDopplerSourceActive\(\) \{ return Boolean\(\$\("dopplerOverlayRadar"\)\?\.value\); \}/,
