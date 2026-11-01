@@ -7,6 +7,7 @@ const page=await browser.newPage({
   viewport:{width:390,height:780},
   deviceScaleFactor:2,isMobile:true,hasTouch:true
 });
+page.setDefaultTimeout(420000);
 const faults=[];
 page.on("pageerror",e=>faults.push(String(e)));
 page.on("console",m=>{if(/HTTP 4|HTTP 5|incomplete BoM/i.test(m.text()))faults.push(m.text().slice(0,250));});
@@ -33,7 +34,7 @@ try{
         count:actual.length,pressure:networkPressureDiagnostics()});
     }
     return logs;
-  },null,{timeout:420000});
+  });
   for(const site of result)assert.equal(site.count,6);
   console.log("LIVE_WEBKIT_MOBILE_ALL_FAILING_RADAR_SITES_PASS",JSON.stringify(result));
   if(faults.length)console.log("LIVE_WEBKIT_MOBILE_NON_FATAL_DIAGNOSTICS",JSON.stringify(faults.slice(0,12)));
