@@ -1,3 +1,17 @@
+# Development queue — frozen V10.2.42 production baseline (1 November 2026)
+
+**Operator instruction: Stop tinkering with accepted production.** The 1 November 2026 field-tested StormTracker application is frozen as `v10.2.42` / `restore/v10.2.42`, capturing V10.2.41 camera continuity and V10.2.40 authentic national BoM radar history and recovery. The operator confirmed **all features functional**.
+
+**[x] Production baseline freeze / documentation / restore refs:** preserve every approved data layer, source-time rule, default control, refresh cadence, report, geographical placement, marker priority, radar science, severe weather and cyclone negative-reporting behaviour. [Authoritative contract](PRODUCTION_BASELINE_V10.2.42.md) · [Current guide](OPERATOR_GUIDE_CURRENT.md) · [Handover](DEVELOPMENT_HANDOVER_CURRENT.md).
+
+**[ ] Enhancements:** *none authorised by this freeze*. Each future item requires a specific operator request and a branch originating from `v10.2.42`; do not combine unrelated wishlist items or deploy unapproved work. Run source, science and full mobile/desktop/real-map regressions before a new version. Existing frozen tags and restore refs are never changed.
+
+**[ ] Optional future reliability monitoring (not implemented):** separately discussed independent read-only health checks for authentic newest radar timestamp, per-site frame counts and refresh outcomes. **Not a licence to add services or change monitoring without operator approval**, and not a claimed capability of V10.2.42.
+
+The older wishlists and completed checklists below are preserved as historical records only; their unfinished checkboxes do not authorise development or supersede this baseline.
+
+---
+
 # V10.2.36 — unified cyclone interface and multiple original track systems
 
 - **[x] Cyclones** under Severe Weather now shows the original live-source checkbox and source verification status directly below a consistent heading, with a compact Details/Hide details control instead of an extra floating/panel workflow.
