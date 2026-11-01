@@ -4184,6 +4184,10 @@ async function warmRadarHistoryCache(
           candidates
         );
 
+      // An old region's request may finish AFTER the user switches sites.
+      // Its pixels must never enter the new primary's timestamp-keyed cache.
+      if(selectedRadarRegion() !== region || sequenceLoading ||
+          frame?.sourceMetadata?.region !== region) return;
       radarFrameCache.set(
         observedUtc,
         frame
