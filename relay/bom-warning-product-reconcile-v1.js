@@ -38,6 +38,7 @@ export function reconcileLatestBoMWarnings(messages,{complete=true,nowMs=Date.no
   const allComplete=complete&&malformed===0;
   const officialActive=qldCurrentIndex?.verified===true&&Array.isArray(qldCurrentIndex.activeCodes)?
     new Set(qldCurrentIndex.activeCodes):null;
+  const officialIndexAt=validMs(qldCurrentIndex?.checkedUtc);
   for(const code of WATCHED_QLD_PRODUCT_CODES){
     const options=(candidates.get(code)??[]).sort((a,b)=>b.issued-a.issued||
       (a.notice.status==="cancelled"?-1:1));
@@ -50,10 +51,22 @@ export function reconcileLatestBoMWarnings(messages,{complete=true,nowMs=Date.no
       continue;
     }
     const latest=options[0],notice=latest.notice;
+    // The freshly published official CURRENT index takes precedence over an
+    // older issued CAP record still present in bounded national RSS history.
+    // Otherwise a cancelled warning remains falsely active until that old
+    // CAP issue drops out of the sample. Never suppress a NEWER CAP issue
+    // against an index generated before the issue was published.
+    if(officialActive&&!officialActive.has(code)&&
+       Number.isFinite(officialIndexAt)&&officialIndexAt>=latest.issued){
+      products[code]=stateRow(notice.status==="cancelled"?"cancelled":"no-active",notice);
+      continue;
+    }
     if(notice.status==="cancelled"){
-      // A later independent current-index confirmation takes precedence
-      // over an old CAP cancellation that the 22-link sample may not supersede.
-      products[code]=stateRow(officialActive?.has(code)?"listed-active":"cancelled",notice);
+      // A newer cancellation overrides an older still-active index; a newer
+      // live current-list entry overrides older CAP cancellation history.
+      const newerIndex=officialActive?.has(code)&&
+        (!Number.isFinite(officialIndexAt)||officialIndexAt>=latest.issued);
+      products[code]=stateRow(newerIndex?"listed-active":"cancelled",notice);
       continue;
     }
     if(notice.status==="expired"){
