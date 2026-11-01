@@ -44,6 +44,10 @@ for (const site of ["66", "50", "08", "23"]) {
     "Previously missed 06:05 and 06:10 scans are recoverable");
 }
 assert.match(runtime, /needsChronologicalRadarRebuild/);
+assert.match(runtime, /loadBomReflectivityMosaicAtTime\(entry\.observedUtc, selectedRadarRegion\(\), discoveredTimes\)/);
+assert.match(runtime, /observedUtc,\s*region,\s*candidates/);
+assert.match(packager, /20261101-source-history-replay/);
+assert.match(packager, /V10\.2\.38 VERIFIED RADAR HISTORY/);
 assert.match(runtime, /radarFrameCache\.has\(entry\.observedUtc\)/);
 assert.match(runtime, /getRadarFrames\(region, cacheCutoff\)/);
 assert.match(packager, /copyfile\("frontend\/src\/live-loop-refresh-v1\.js"/);
@@ -58,8 +62,8 @@ if (existsSync(fileURLToPath(packagedEngine))) {
   assert.match(live, /discoverBoundedBomReflectivityHistory\(now,180,region\)/);
   assert.doesNotMatch(live, /discoverBoundedBomReflectivityHistory\(now,5,region\)/);
   assert.match(shippedScheduler, /LIVE_LOOP_BUSY_RETRY_MS = 2000/);
-  assert.match(build, /V10\.2\.37 RADAR AUTO REFRESH/);
-  assert.match(read("_site/index.html"), /v10\.2\.37-radar-auto-recovery-/);
-  assert.match(read("_site/live3d-operational-v9.html"), /v10\.2\.37-radar-auto-recovery-/);
+  assert.match(build, /V10\.2\.38 VERIFIED RADAR HISTORY/);
+  assert.match(read("_site/index.html"), /v10\.2\.38-radar-verified-history-/);
+  assert.match(read("_site/live3d-operational-v9.html"), /v10\.2\.38-radar-verified-history-/);
 }
 console.log("PASS radar auto refresh production contract, real published catch-up across sites, busy deferred retry, cadence, diagnostics and build overlay");

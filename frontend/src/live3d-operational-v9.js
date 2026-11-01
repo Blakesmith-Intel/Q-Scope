@@ -10,7 +10,7 @@ import {
   discoverBoundedBomReflectivityHistory,
   loadBomReflectivityMosaicAtTime,
   reflectivityWindowForRegion
-} from "./bom-wmts-loop-v2.js?v=9.18.6-bounded-published-history";
+} from "./bom-wmts-loop-v2.js?v=20261101-source-history-replay";
 
 import {
   RadarWorkerClient
@@ -4180,7 +4180,8 @@ async function warmRadarHistoryCache(
       const frame =
         await loadBomReflectivityMosaicAtTime(
           observedUtc,
-          region
+          region,
+          candidates
         );
 
       radarFrameCache.set(
@@ -4528,7 +4529,7 @@ async function loadHybridSequence(automatic = false) {
     const radarLoad = (await Promise.allSettled([
       radarFrameCache.has(entry.observedUtc)
         ? Promise.resolve(radarFrameCache.get(entry.observedUtc))
-        : loadBomReflectivityMosaicAtTime(entry.observedUtc, selectedRadarRegion())
+        : loadBomReflectivityMosaicAtTime(entry.observedUtc, selectedRadarRegion(), discoveredTimes)
     ]))[0];
     const dopplerLoad = { status:"fulfilled", value:{
       reflectivityUtc:entry.observedUtc, pairings:[], records:[], sourceFailures:0

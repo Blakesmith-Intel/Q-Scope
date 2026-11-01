@@ -41,6 +41,14 @@ try{
  await page.goto("https://blakesmith-intel.github.io/StormTracker/live3d-operational-v9.html?qaFtpAep=20261019",
   {waitUntil:"domcontentloaded",timeout:45000});
  await page.waitForSelector("#cesiumContainer .cesium-widget canvas",{state:"attached",timeout:45000});
+ // The approved four-section operator layout starts collapsed. Navigate
+ // to the existing Rainfall Observations section like an actual operator;
+ // never make operational controls permanently visible just for CI.
+ const rainfallDisclosure=page.locator("#rainfallObservationsDetails");
+ if(!(await rainfallDisclosure.evaluate(element=>element.open))) {
+   await page.locator("#rainfallObservationsDetails > summary").click();
+ }
+ await page.waitForFunction(()=>document.querySelector("#rainfallObservationsDetails")?.open===true);
  await page.locator("#significantRainfallPeriod").selectOption("lastHour");
  await page.locator("#showSignificantRainfall").check();
  await page.waitForFunction(()=>{

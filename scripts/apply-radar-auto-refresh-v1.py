@@ -21,6 +21,10 @@ def replace_once(old, new):
     data = data.replace(old, new, 1)
 
 replace_once(
+    "bom-wmts-loop-v2.js?v=9.18.6-bounded-published-history",
+    "bom-wmts-loop-v2.js?v=20261101-source-history-replay"
+)
+replace_once(
     "live-loop-refresh-v1.js?v=9.9.0-4",
     "live-loop-refresh-v1.js?v=20261031-radar-refresh-v1"
 )
@@ -46,6 +50,21 @@ replace_once(
       outcome: "source unavailable; retaining genuine imagery"
     });
     $("autoRefreshNote").textContent ='''
+)
+replace_once(
+    "loadBomReflectivityMosaicAtTime(entry.observedUtc, selectedRadarRegion())",
+    "loadBomReflectivityMosaicAtTime(entry.observedUtc, selectedRadarRegion(), discoveredTimes)"
+)
+replace_once(
+    """await loadBomReflectivityMosaicAtTime(
+          observedUtc,
+          region
+        );""",
+    """await loadBomReflectivityMosaicAtTime(
+          observedUtc,
+          region,
+          candidates
+        );"""
 )
 replace_once(
     '''  if (sequenceLoading || !model) return;
@@ -110,16 +129,16 @@ for relative, marker in (
     page = site / relative
     html = page.read_text(encoding="utf-8")
     assert html.count(marker) == 1, f"Cannot refresh production browser cache: {marker}"
-    html = html.replace(marker, marker + "v10.2.37-radar-auto-recovery-", 1)
+    html = html.replace(marker, marker + "v10.2.38-radar-verified-history-", 1)
     page.write_text(html, encoding="utf-8")
 
 with (site / "BUILD.txt").open("a", encoding="utf-8") as build:
     build.write(
-        "V10.2.37 RADAR AUTO REFRESH: fixed 5m polling, 2s busy retry, "
-        "foreground check, authentic missed-scan recovery, last-check/last-observed/failure diagnostics 2026-10-31\n"
+        "V10.2.38 VERIFIED RADAR HISTORY: source-published older replay scans, "
+        "one capability snapshot during loading and preserved 5-minute polling 2026-11-01\n"
     )
 assert "discoverBoundedBomReflectivityHistory(now,5,region)" not in data
 assert "discoverBoundedBomReflectivityHistory(now,180,region)" in data
 assert "recordRadarAutoRefreshAudit" in data
 assert "LIVE_LOOP_BUSY_RETRY_MS" in (site / "src/live-loop-refresh-v1.js").read_text()
-print("RADAR_AUTO_REFRESH_V10_2_37_PACKAGED")
+print("RADAR_VERIFIED_HISTORY_V10_2_38_PACKAGED")

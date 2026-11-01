@@ -124,26 +124,41 @@ async function probeTimestamp(observedUtc, region = 'SEQ') {
 // WMTS GetCapabilities publishes the nine ACTUAL source times. NEVER probe
 // speculative 5-minute UTC offsets: BoM reports "failed to validate requested
 // value for dimension (time)" and HTTP 400 for unpublished timestamps.
-function currentPublishedTimes(times,now=Date.now()){
+// Source freshness decides whether a new live scan can be discovered.
+// Replay eligibility independently preserves older genuine observations.
+export function publishedRadarHistoryTimes(times,now=Date.now()){
   const epoch=Number(now);
   return [...new Set(Array.isArray(times)?times:[])]
     .filter(time=>{
       const t=Date.parse(time);
       return Number.isFinite(t)&&Number.isFinite(epoch)&&
-        t>=epoch-WMTS_SOURCE_FRESHNESS_MS&&t<=epoch+5*60000&&
+        t>=epoch-180*60000&&t<=epoch+5*60000&&
         !unavailableTime.isRejected(time);
     }).sort();
 }
+function currentPublishedTimes(times,now=Date.now()){
+  const epoch=Number(now);
+  return publishedRadarHistoryTimes(times,now)
+    .filter(time=>Date.parse(time)>=epoch-WMTS_SOURCE_FRESHNESS_MS);
+}
 async function validatedNationalTimes(now,region,publishedTimes,verifyTile=probeTimestamp){
- const published=currentPublishedTimes(await publishedTimes(),now);
+ const history=publishedRadarHistoryTimes(await publishedTimes(),now);
+ const published=currentPublishedTimes(history,now);
  if(!published.length)
   throw Error("National BoM mosaic has no verified current observation timestamp");
  // BoM GetCapabilities may list times with missing 400 tiles. Check one REAL
  // central source PNG before exposing a whole history or prewarming images.
  for(const observedUtc of published.slice(-3).reverse()){
   try{
-   if(await verifyTile(observedUtc,region))
-    return published.filter(t=>t<=observedUtc);
+   if(await verifyTile(observedUtc,region)) {
+    // GetCapabilities may advertise stale observations that cannot be
+    // retrieved; keep only a bounded recent replay tail relative to the
+    // newest readable source scan. The browser's verified local archive
+    // independently serves longer historical loops.
+    const verifiedEpoch=Date.parse(observedUtc);
+    return history.filter(t=>Date.parse(t)<=verifiedEpoch &&
+      Date.parse(t)>=verifiedEpoch-55*60000);
+   }
   }catch(error){
    unavailableTime.reject(observedUtc);
    console.warn("National BoM reflectivity frame unavailable",observedUtc,
@@ -300,11 +315,17 @@ export async function loadVerifiedNationalMosaicAtTime(observedUtc, region = 'SE
   };
 }
 
-export async function loadBomReflectivityMosaicAtTime(observedUtc,region='SEQ'){
+export async function loadBomReflectivityMosaicAtTime(
+ observedUtc,region='SEQ',knownPublishedTimes=null
+){
  if(!observedUtc)throw Error("observedUtc is required");
- const sourceTimes=currentPublishedTimes(await publishedReflectivityTimes());
+ // Keep one authentic capability snapshot during a multi-frame load.
+ // Every individual PNG tile must still pass source verification.
+ const sourceTimes=publishedRadarHistoryTimes(
+  Array.isArray(knownPublishedTimes)?knownPublishedTimes:await publishedReflectivityTimes()
+ );
  if(!sourceTimes.includes(observedUtc))
-  throw Error("BoM high-resolution national frame not currently published: "+observedUtc);
+  throw Error("BoM high-resolution frame not published in bounded history: "+observedUtc);
  return loadVerifiedNationalMosaicAtTime(observedUtc,region);
 }
 
