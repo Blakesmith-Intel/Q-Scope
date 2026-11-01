@@ -3,7 +3,9 @@
 // HTTP 400 is cached by exact (tile + source timestamp) URL. A permission/
 // service outage temporarily opens a circuit for THIS WMTS request class.
 export function createRadarRequestPressureGuard({
-  maxConcurrent=3,maxPending=72,
+  // BoM/Cloudflare may refuse bursty multi-site tile fetches (HTTP 403).
+  // Two simultaneous tiles preserve interactive throughput without bursts.
+  maxConcurrent=2,maxPending=72,
   // Published-but-not-ready BoM tiles can recover within a minute.
   negativeTtlMs=45000,deniedCooldownMs=30000,
   serviceCooldownMs=15000,now=()=>Date.now()
