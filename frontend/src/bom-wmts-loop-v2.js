@@ -46,7 +46,7 @@ const wmtsFrameFailures=[];
 function logWmtsFailure(region,observedUtc,reason){
  const message=String(reason?.message??reason).slice(0,1100);
  wmtsFrameFailures.push({region,observedUtc,utc:new Date().toISOString(),
-   message,tiles:[...message.matchAll(/tile (\\d+)\\/(\\d+): ([^;]+)/g)]
+   message,tiles:[...message.matchAll(/tile (\d+)\/(\d+): ([^;]+)/g)]
      .map(m=>({col:Number(m[1]),row:Number(m[2]),reason:m[3]}))});
  if(wmtsFrameFailures.length>48)wmtsFrameFailures.shift();
 }
