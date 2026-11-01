@@ -131,7 +131,7 @@ jobs:
       - name: Checkout tested radar refresh candidate for isolated operator QA
         uses: actions/checkout@v4
         with:
-          ref: 33931468c3b8637c492de02344aff5697bd02ca5
+          ref: a48ed0c37a7ba192e59b5a3bc2afae69ea5378b4
           path: checked/radar-refresh-review
           persist-credentials: false
 
@@ -258,7 +258,7 @@ jobs:
         run: |
           set -euo pipefail
           # Pin to the tested source, never a floating feature branch.
-          test "$(git -C checked/radar-refresh-review rev-parse HEAD)" = "33931468c3b8637c492de02344aff5697bd02ca5"
+          test "$(git -C checked/radar-refresh-review rev-parse HEAD)" = "a48ed0c37a7ba192e59b5a3bc2afae69ea5378b4"
           # The normal operational build has already completed. Compare its
           # accepted root assets before and after producing ONLY preview files.
           sha256sum _site/index.html _site/live3d-operational-v9.html \
@@ -279,7 +279,7 @@ jobs:
           rsync -a --exclude='/preview/' \
             checked/radar-refresh-review/_site/ \
             _site/preview/radar-refresh-review/
-          printf 'REVIEW BUILD from tested source 33931468c3b8637c492de02344aff5697bd02ca5; NOT OPERATIONAL PRODUCTION\n' \
+          printf 'REVIEW BUILD from tested source a48ed0c37a7ba192e59b5a3bc2afae69ea5378b4; NOT OPERATIONAL PRODUCTION\n' \
             > _site/preview/radar-refresh-review/REVIEW.txt
           python - <<'PY'
           from pathlib import Path
@@ -292,7 +292,27 @@ jobs:
             'font:11px system-ui;border:1px solid #9d792d;border-radius:4px">'
             'RADAR QA PREVIEW — production unaffected</div>')
           p.write_text(s.replace("</body>",banner+"\n</body>"),encoding="utf-8")
+          # Give this QA-only revision fresh browser cache identities at every
+          # modified ES-module boundary. iOS in-app Safari may otherwise keep
+          # the earlier, defective preview even after Pages publishes new code.
+          root=Path("_site/preview/radar-refresh-review")
+          revision="qa-six-frame-recovery-v10-2-45-20261101-"
+          def bust(file,fragment):
+            file=root/file
+            original=file.read_text(encoding="utf-8")
+            assert original.count(fragment)==1, f"QA asset version anchor changed: {file}: {fragment}"
+            file.write_text(original.replace(fragment,
+              fragment+revision,1),encoding="utf-8")
+          bust("index.html","live3d-operational-v9.html?v=")
+          bust("live3d-operational-v9.html","src/live3d-operational-v9.js?v=")
+          bust("src/live3d-operational-v9.js","bom-wmts-loop-v2.js?v=")
+          bust("src/bom-wmts-loop-v2.js","radar-source.js?v=")
+          bust("src/bom-wmts-loop-v2.js","bom-wmts-published-times-v1.js?v=")
           PY
+          grep -Fq 'OPERATOR_RADAR_REVIEW' _site/preview/radar-refresh-review/src/live3d-operational-v9.js
+          grep -Fq 'retryableWmtsMosaicFailure' _site/preview/radar-refresh-review/src/bom-wmts-loop-v2.js
+          grep -Fq 'qa-six-frame-recovery-v10-2-45-20261101-' _site/preview/radar-refresh-review/index.html
+          node --check _site/preview/radar-refresh-review/src/live3d-operational-v9.js
           sha256sum -c /tmp/st-frozen-root-before.sha256
           test -s _site/preview/radar-refresh-review/BUILD.txt
 
