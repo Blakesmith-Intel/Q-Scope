@@ -230,7 +230,7 @@ export async function fetchWmtsPreflightTile(url,fetchTile,{
     return await fetchTile(url);
   }catch(error){
     const message=String(error?.message??error);
-    const code=Number(error?.status)||Number(/HTTP\\s+(\\d{3})/.exec(message)?.[1])||0;
+    const code=Number(error?.status)||Number(/HTTP\s+(\d{3})/.exec(message)?.[1])||0;
     // BoM 400 = unpublished/rejected time. 403 = denied. 429 = relay
     // cooldown. Never blindly retry and amplify any of these failures.
     if([400,403,429].includes(code)||/relay cooldown|queue full/i.test(message))
