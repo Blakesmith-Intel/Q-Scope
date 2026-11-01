@@ -17,6 +17,8 @@ assert.match(runtime, /document\.addEventListener\("visibilitychange", checkRada
 assert.match(runtime, /window\.addEventListener\("pageshow", checkRadarOnForegroundReturn\)/);
 assert.match(runtime, /window\.addEventListener\("focus", checkRadarOnForegroundReturn\)/);
 assert.match(runtime, /const wasFollowingLatest = automatic/);
+assert.match(runtime, /radarAutoRefreshAudit\.newestAcceptedUtc \?\? ""/);
+assert.match(runtime, /if \(displayed !== true\) throw Error/);
 assert.match(runtime, /\? hybridFrames\.length - 1/);
 assert.match(runtime, /if \(automatic\) throw new Error/);
 assert.match(runtime, /throw error;\s*}\s*else setStatus\(error\.message/);
