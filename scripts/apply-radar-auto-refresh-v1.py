@@ -129,6 +129,12 @@ replace_once(
         );"""
 )
 replace_once(
+    '''          hybridFrames.at(-1).observedUtc
+          )''',
+    '''          radarAutoRefreshAudit.newestAcceptedUtc ?? ""
+          )'''
+)
+replace_once(
     '''  if (sequenceLoading || !model) return;
   if (!background) motionTransition.cancel();''',
     '''  if (sequenceLoading || !model) return false;
@@ -153,7 +159,12 @@ replace_once(
   await showHybridFrame(hybridFrameIndex);
   if (resume) playback.play();''',
     '''  $("hybridPlayButton").disabled = hybridFrames.length < 2;
-  await showHybridFrame(hybridFrameIndex);
+  const displayed = await showHybridFrame(hybridFrameIndex);
+  // Decoding tiles is not a successful radar refresh unless the Cesium map
+  // actually committed the matching source observation.
+  if (displayed !== true) throw Error(
+    "Verified BoM radar scan loaded but was not displayed; automatic retry required"
+  );
   recordRadarAutoRefreshAudit({
     acceptedUtc: frames.at(-1).observedUtc,
     failure: frameFailures.detail || null,
