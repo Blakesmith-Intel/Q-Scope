@@ -20,6 +20,18 @@ def replace_once(old, new):
     assert new in source, f"Radar refresh source implementation missing: {new[:120]!r}"
     data = data.replace(old, new, 1)
 
+# The release is assembled from the V10.2.0 pinned runtime, not from the
+# edited frontend JavaScript wholesale. Explicitly carry the review-path
+# parity fix into the DELIVERED application; otherwise even a perfect source
+# fix never reaches the Pages preview and previous CI tests exercised root.
+old_radar_runtime = '''const INCREMENTAL_VOLUME_PREVIEW =
+  window.location.pathname.includes("/preview/incremental-3d/") ||
+  (/\\/live3d-operational-v9\\.html$/.test(window.location.pathname) &&
+    !window.location.pathname.includes("/preview/"));'''
+start = source.index("// The isolated operator-acceptance preview MUST")
+end = source.index("const MODEL_URL =", start)
+replace_once(old_radar_runtime, source[start:end].rstrip())
+
 replace_once(
     "bom-wmts-loop-v2.js?v=9.18.6-bounded-published-history",
     "bom-wmts-loop-v2.js?v=20261101-source-verified-incremental-v10-2-43"
