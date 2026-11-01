@@ -22,7 +22,7 @@ def replace_once(old, new):
 
 replace_once(
     "bom-wmts-loop-v2.js?v=9.18.6-bounded-published-history",
-    "bom-wmts-loop-v2.js?v=20261101-region-independent-v10-2-39"
+    "bom-wmts-loop-v2.js?v=20261101-source-verified-recovery-v10-2-40"
 )
 replace_once(
     "live-loop-refresh-v1.js?v=9.9.0-4",
@@ -96,7 +96,21 @@ replace_once(
       // applies bounded retry without resetting the normal 5-minute cadence.
       throw error;
     }
-    else setStatus(error.message, "error");
+    else {
+      setStatus(error.message, "error");
+      recordRadarAutoRefreshAudit({
+        failure:String(error?.message??error),
+        outcome:"manual site load failed; automatic retry queued"
+      });
+      // A failure when switching sites must recover in the existing tab.
+      // Allow BoM tile publication and 45-second negative caches to settle,
+      // then request a scheduler-managed background recovery.
+      if(manualRadarRecoveryTimer!==null)clearTimeout(manualRadarRecoveryTimer);
+      manualRadarRecoveryTimer=setTimeout(()=>{
+        manualRadarRecoveryTimer=null;
+        if(!document.hidden)void autoRefresh.check();
+      },50000);
+    }
   } finally {'''
 )
 replace_once(
@@ -128,6 +142,41 @@ replace_once(
           candidates
         );"""
 )
+# Keep background cache warming from writing into the wrong primary radar
+# if the user switches sites while an old source tile request is in flight.
+replace_once(
+    '''      const frame =
+        await loadBomReflectivityMosaicAtTime(
+          observedUtc,
+          region,
+          candidates
+        );
+
+      radarFrameCache.set(
+        observedUtc,
+        frame
+      );''',
+    '''      const frame =
+        await loadBomReflectivityMosaicAtTime(
+          observedUtc,
+          region,
+          candidates
+        );
+
+      // An old region's request may finish AFTER the user switches sites.
+      // Its pixels must never enter the new primary's timestamp-keyed cache.
+      if(selectedRadarRegion() !== region || sequenceLoading ||
+          frame?.sourceMetadata?.region !== region) return;
+      radarFrameCache.set(
+        observedUtc,
+        frame
+      );'''
+)
+replace_once(
+    '''async function runSourceLoad(loader, background = false) {''',
+    '''let manualRadarRecoveryTimer=null;
+async function runSourceLoad(loader, background = false) {'''
+)
 replace_once(
     '''  if (sequenceLoading || !model) return;
   if (!background) motionTransition.cancel();''',
@@ -141,6 +190,10 @@ replace_once(
     if (background) {''',
     '''  try {
     await loader();
+    if(manualRadarRecoveryTimer!==null){
+      clearTimeout(manualRadarRecoveryTimer);
+      manualRadarRecoveryTimer=null;
+    }
     return true;
   } catch (error) {
     if (background) {
@@ -181,6 +234,11 @@ replace_once(
 
 app.write_text(data, encoding="utf-8")
 copyfile("frontend/src/live-loop-refresh-v1.js", site / "src/live-loop-refresh-v1.js")
+# The sealed production bundle historically used an older radar-source and
+# pressure guard from the pinned build. Copy the tested bounded PNG blob cache
+# and 45-second tile rejection policy into actual production, not QA only.
+copyfile("frontend/src/radar-source.js", site / "src/radar-source.js")
+copyfile("frontend/src/radar-request-pressure-v1.js", site / "src/radar-request-pressure-v1.js")
 
 # Both the outer iframe and the inner ES-module need a new immutable URL key:
 # returning iOS Safari tabs otherwise continue using the old running loader.
@@ -191,7 +249,7 @@ for relative, marker in (
     page = site / relative
     html = page.read_text(encoding="utf-8")
     assert html.count(marker) == 1, f"Cannot refresh production browser cache: {marker}"
-    html = html.replace(marker, marker + "v10.2.39-radar-live-follow-", 1)
+    html = html.replace(marker, marker + "v10.2.40-radar-wmts-resilience-", 1)
     page.write_text(html, encoding="utf-8")
 
 # Preserve the existing V10.2.38 marker, and append a new independent
@@ -205,8 +263,16 @@ with (site / "BUILD.txt").open("a", encoding="utf-8") as build:
         "V10.2.39 RADAR CROSS-SITE LIVE RECOVERY: regional tile rejection isolation, "
         "latest-frame following, bounded error retry, Safari foreground reconciliation 2026-11-01\n"
     )
+    build.write(
+        "V10.2.40 VERIFIED WMTS RESILIENCE: published scan recovery, bounded PNG "
+        "tile cache, transient request isolation and cross-site cache safety 2026-11-01\n"
+    )
 assert "discoverBoundedBomReflectivityHistory(now,5,region)" not in data
 assert "discoverBoundedBomReflectivityHistory(now,180,region)" in data
 assert "recordRadarAutoRefreshAudit" in data
 assert "LIVE_LOOP_BUSY_RETRY_MS" in (site / "src/live-loop-refresh-v1.js").read_text()
-print("RADAR_CROSS_SITE_LIVE_V10_2_39_PACKAGED")
+assert "verifiedWmtsBlobs" in (site / "src/radar-source.js").read_text()
+assert "negativeTtlMs=45000" in (site / "src/radar-request-pressure-v1.js").read_text()
+assert "frame?.sourceMetadata?.region !== region" in data
+assert "manual site load failed; automatic retry queued" in data
+print("RADAR_SOURCE_RESILIENCE_V10_2_40_PACKAGED")

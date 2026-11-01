@@ -10,7 +10,7 @@ import {
   discoverBoundedBomReflectivityHistory,
   loadBomReflectivityMosaicAtTime,
   reflectivityWindowForRegion
-} from "./bom-wmts-loop-v2.js?v=20261101-region-independent-v10-2-39";
+} from "./bom-wmts-loop-v2.js?v=20261101-source-verified-recovery-v10-2-40";
 
 import {
   RadarWorkerClient
@@ -4184,6 +4184,10 @@ async function warmRadarHistoryCache(
           candidates
         );
 
+      // An old region's request may finish AFTER the user switches sites.
+      // Its pixels must never enter the new primary's timestamp-keyed cache.
+      if(selectedRadarRegion() !== region || sequenceLoading ||
+          frame?.sourceMetadata?.region !== region) return;
       radarFrameCache.set(
         observedUtc,
         frame
@@ -4990,6 +4994,7 @@ async function loadHybridSequence(automatic = false) {
   }
 }
 
+let manualRadarRecoveryTimer=null;
 async function runSourceLoad(loader, background = false) {
   if (sequenceLoading || !model) return false;
   if (!background) motionTransition.cancel();
@@ -5004,6 +5009,10 @@ async function runSourceLoad(loader, background = false) {
   }
   try {
     await loader();
+    if(manualRadarRecoveryTimer!==null){
+      clearTimeout(manualRadarRecoveryTimer);
+      manualRadarRecoveryTimer=null;
+    }
     return true;
   } catch (error) {
     if (background) {
@@ -5019,7 +5028,21 @@ async function runSourceLoad(loader, background = false) {
       // applies bounded retry without resetting the normal 5-minute cadence.
       throw error;
     }
-    else setStatus(error.message, "error");
+    else {
+      setStatus(error.message, "error");
+      recordRadarAutoRefreshAudit({
+        failure:String(error?.message??error),
+        outcome:"manual site load failed; automatic retry queued"
+      });
+      // A failure when switching sites must recover in the existing tab.
+      // Allow BoM tile publication and 45-second negative caches to settle,
+      // then request a scheduler-managed background recovery.
+      if(manualRadarRecoveryTimer!==null)clearTimeout(manualRadarRecoveryTimer);
+      manualRadarRecoveryTimer=setTimeout(()=>{
+        manualRadarRecoveryTimer=null;
+        if(!document.hidden)void autoRefresh.check();
+      },50000);
+    }
   } finally {
     sequenceLoading = false;
     prewarmUpcomingFrames(hybridFrameIndex);

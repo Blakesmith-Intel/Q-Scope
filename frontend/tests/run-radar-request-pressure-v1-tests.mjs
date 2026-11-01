@@ -33,16 +33,35 @@ assert.equal(invalidCalls,1,"known-unavailable time is never reprobed immediatel
 clock+=5100;
 await assert.rejects(guard.run("missing-time-01",bad),/HTTP 400/);
 assert.equal(invalidCalls,2,"new TTL allows legitimate radar availability rechecks");
+let temporaryCalls=0;
+const transient=()=>{
+  temporaryCalls++;
+  const error=Error("Image request failed: HTTP 503");error.status=503;
+  return Promise.reject(error);
+};
+await assert.rejects(guard.run("site-24-temporary",transient),/HTTP 503/);
+const unaffectedRegion=await guard.run("site-75-same-genuine-time",
+  ()=>Promise.resolve({width:256,height:256}));
+assert.equal(unaffectedRegion.width,256,
+  "A single 503 in Bowen cannot block valid Mount Isa tiles");
+assert.equal(temporaryCalls,1);
+
 let deniedCalls=0;
 const denied=()=>{
   deniedCalls++;
   const error=Error("Image request failed: HTTP 403");error.status=403;
   return Promise.reject(error);
 };
-const noProgress=guard.run("refused",denied);
+const noProgress=guard.run("refused-1",denied);
 await assert.rejects(noProgress,/HTTP 403/);
+const independent=await guard.run("different-region-tile",
+  ()=>Promise.resolve({width:256,height:256}));
+assert.equal(independent.width,256,
+  "One 403 on an individual radar tile must not block another radar");
+await assert.rejects(guard.run("refused-2",denied),/HTTP 403/);
+await assert.rejects(guard.run("refused-3",denied),/HTTP 403/);
 await assert.rejects(guard.run("different-source-time",denied),/relay cooldown/);
-assert.equal(deniedCalls,1,"permission denial opens finite circuit instead of hammering relay");
+assert.equal(deniedCalls,3,"Three refusals trigger finite circuit to prevent source hammering");
 clock+=2100;
 const recovered=await guard.run("after-cooldown",()=>Promise.resolve({width:256,height:256}));
 assert.equal(recovered.width,256);
@@ -57,4 +76,4 @@ assert.equal(joinStarts,1);
 resolveJoin({width:256,height:256});
 await Promise.all([j1,j2]);
 assert.equal(join.snapshot().joined,1);
-console.log("PASS bounded WMTS concurrency, duplicate request sharing, 400 negative TTL, 403 cooldown and recovery.");
+console.log("PASS bounded WMTS concurrency, cache sharing, 400 expiry, single-tile 403 isolation and repeated-refusal cooldown.");

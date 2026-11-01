@@ -41,6 +41,35 @@ transientFail=false;
 assert.deepEqual(await discoverBoundedBomReflectivityHistory(transientNow,180,"23",transientOptions),transientTimes,
   "Transient HTTP 503 on Gladstone must be retried, not treated as withdrawn source time");
 
+// Newest advertised BoM tiles may return HTTP 400 while being published.
+// Source discovery must try the older REAL published timestamps instead
+// of failing the entire radar after only the newest three attempts.
+const nine=Array.from({length:9},(_,i)=>
+  new Date(Date.parse("2026-11-01T02:00:00Z")+i*300000).toISOString().replace(".000Z","Z"));
+const probed=[];
+const recovered=await discoverBoundedBomReflectivityHistory(
+  Date.parse("2026-11-01T02:42:00Z"),180,"24",{
+    publishedTimes:async()=>nine,
+    verifyNationalTile:async time=>{
+      probed.push(time);
+      if(time>nine[4]){const e=Error("Image request failed: HTTP 400");e.status=400;throw e;}
+      return true;
+    }
+  });
+assert.equal(recovered.at(-1),nine[4],"Return newest source-verified older scan");
+assert.deepEqual(probed,[...nine.slice(5).reverse(),nine[4]],
+  "Try all genuine source times, not newest three only");
+const recoveringGuard=createWmtsTimeFailureGuard({
+  now:()=>retryClock,ttlMs:45000
+});
+let retryClock=0;
+recoveringGuard.reject(nine[8],"24");
+assert.equal(recoveringGuard.isRejected(nine[8],"24"),true);
+assert.equal(recoveringGuard.isRejected(nine[8],"75"),false);
+retryClock=45001;
+assert.equal(recoveringGuard.isRejected(nine[8],"24"),false,
+  "Genuine source timestamp becomes eligible again after 45 seconds");
+
 const guard=createWmtsTimeFailureGuard({now:()=>current,ttlMs:300000,maxEntries:2});
 assert.equal(guard.isRejected(old[0]),false);
 guard.reject(old[0]);

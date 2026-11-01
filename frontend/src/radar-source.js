@@ -1,8 +1,29 @@
 import { decodeReflectivityImageData, decodeDopplerImageData } from "./palette.js?v=live-bom-v1";
-import { createRadarRequestPressureGuard } from "./radar-request-pressure-v1.js?v=9.18.4";
+import { createRadarRequestPressureGuard } from "./radar-request-pressure-v1.js?v=20261101-multi-radar-reliability";
 
 const guardedRadarRequests=createRadarRequestPressureGuard();
-export function networkPressureDiagnostics(){return guardedRadarRequests.snapshot();}
+// Keep source-verified compressed PNGs rather than 256x256 RGBA bitmaps:
+// adjacent radar sites may share many tiles, and rapid site switches must
+// not re-download identical original BoM images. URLs include exact UTC,
+// tile row/column and product, so a cached blob cannot be misdated.
+const VERIFIED_WMTS_BLOB_LIMIT=96;
+const verifiedWmtsBlobs=new Map();
+const isWmtsTile=url=>/\/wmts\?/i.test(String(url));
+function cachedVerifiedWmtsBlob(url){
+  const key=String(url),blob=verifiedWmtsBlobs.get(key);
+  if(blob){verifiedWmtsBlobs.delete(key);verifiedWmtsBlobs.set(key,blob);}
+  return blob;
+}
+function rememberVerifiedWmtsBlob(url,blob){
+  const key=String(url);
+  verifiedWmtsBlobs.delete(key);
+  verifiedWmtsBlobs.set(key,blob);
+  while(verifiedWmtsBlobs.size>VERIFIED_WMTS_BLOB_LIMIT)
+    verifiedWmtsBlobs.delete(verifiedWmtsBlobs.keys().next().value);
+}
+export function networkPressureDiagnostics(){
+  return {...guardedRadarRequests.snapshot(),verifiedTileBlobs:verifiedWmtsBlobs.size};
+}
 function isNetworkGuardPreview(){
   // Production V9.19.0 uses the same bounded WMTS request pressure as its
   // accepted preview, not the obsolete unguarded V9.18 network path.
@@ -68,6 +89,11 @@ async function blobToImageData(blob) {
 }
 
 export async function fetchReadableImage(url) {
+  // Valid previously decoded BoM PNGs may be reused without contacting a
+  // busy relay again. Decode on demand to bound mobile memory use.
+  const isWmts=isWmtsTile(url);
+  const verifiedBlob=isWmts?cachedVerifiedWmtsBlob(url):null;
+  if(verifiedBlob)return blobToImageData(verifiedBlob);
   const read=async()=>{
   let response;
 
@@ -88,7 +114,10 @@ export async function fetchReadableImage(url) {
     throw error;
   }
 
-  return blobToImageData(await response.blob());
+  const blob=await response.blob();
+  const pixels=await blobToImageData(blob);
+  if(isWmts)rememberVerifiedWmtsBlob(url,blob);
+  return pixels;
   };
   // Radar scan source is unchanged. Only bound request pressure in this
   // isolated review path; all previously approved previews stay identical.

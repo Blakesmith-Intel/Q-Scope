@@ -3,12 +3,16 @@
 // HTTP 400 is cached by exact (tile + source timestamp) URL. A permission/
 // service outage temporarily opens a circuit for THIS WMTS request class.
 export function createRadarRequestPressureGuard({
-  maxConcurrent=3,maxPending=72,
-  negativeTtlMs=300000,deniedCooldownMs=30000,
+  // BoM/Cloudflare may refuse bursty multi-site tile fetches (HTTP 403).
+  // Two simultaneous tiles preserve interactive throughput without bursts.
+  maxConcurrent=2,maxPending=72,
+  // Published-but-not-ready BoM tiles can recover within a minute.
+  negativeTtlMs=45000,deniedCooldownMs=30000,
   serviceCooldownMs=15000,now=()=>Date.now()
 }={}) {
   const inflight=new Map(), negative=new Map(), queue=[];
   let active=0,blockedUntil=0,blockedStatus=0;
+  let consecutiveRefusals=0,lastRefusalAt=0;
   const metrics={started:0,joined:0,negativeHits:0,blocked:0,peakActive:0};
   const statusError=(status,reason="")=>{
     const e=new Error("Image request failed: HTTP "+status+(reason?" ("+reason+")":""));
@@ -38,10 +42,20 @@ export function createRadarRequestPressureGuard({
             negative.set(item.url,{until:now()+negativeTtlMs,status});
             if(negative.size>320)negative.delete(negative.keys().next().value);
           }
-          if(status===403||status===429||
-            status===502||status===503||status===504){
-            const until=now()+((status===403||status===429)
-              ?deniedCooldownMs:serviceCooldownMs);
+          // A single HTTP 403 on a geographic WMTS tile may be local to
+          // that query. Do NOT block every radar on one refused tile.
+          // Three fresh refusals in 30 seconds or one explicit HTTP 429
+          // indicate wider access pressure and justify brief backoff.
+          const t=now();
+          if(status===403){
+            consecutiveRefusals=(t-lastRefusalAt<=30000)
+              ? consecutiveRefusals+1 : 1;
+            lastRefusalAt=t;
+          } else if(status!==429 && status!==400){
+            consecutiveRefusals=0;
+          }
+          if(status===429 || (status===403 && consecutiveRefusals>=3)){
+            const until=t+deniedCooldownMs;
             if(until>blockedUntil){blockedUntil=until;blockedStatus=status;}
           }
           item.reject(error);

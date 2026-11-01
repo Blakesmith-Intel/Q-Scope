@@ -238,3 +238,15 @@ The **Cyclones** controls within **Severe Weather** do **not** independently gua
 ## Which overlapping marker is displayed on top?
 
 Higher severity markers are deliberately drawn in front of lower severity markers, including when flood and rainfall layers are both on. Flood icons progress **major, moderate, minor, rapid rise**; rainfall rarity icons progress **Exceptional, Very rare, Rare, Unusual, Notable**, then Less rare/Unrated. This is only a visual order; actual BoM measurements and flood stages are unchanged.
+
+## 1 November 2026 — radar availability and automatic refresh (V10.2.40)
+
+StormTracker uses real BoM national high-resolution reflectivity WMTS observations. In the 30-minute rain loop, **six separately retrieved original five-minute scans** are expected when the source has published and all six are readable. A shorter or blank loop is a source/loading limitation, not evidence that no weather exists.
+
+The active browser automatically checks for new radar observations every **five minutes**, recovers missed authentic frames, and makes additional bounded recovery checks after source errors. A failed manual change of radar site is retried in the same tab after approximately 50 seconds; a page refresh should not be routinely required. A suspended iPhone Safari tab cannot continue networking while iOS has frozen it, but the page checks again on return to the foreground.
+
+If an operator sees **no readable radar tiles**, a partial frame count or an unexpectedly old last observation, read the reported source timestamp and status. BoM may briefly advertise a time before all tiles become readable or may refuse an individual request. StormTracker should retry without inventing timestamps or showing a different radar's data. Continue to use other authoritative sources for operational decisions until current radar is verified; do not treat a blank radar as a negative weather report.
+
+The V10.2.40 internal change reuses source-verified PNGs, limits simultaneous tile requests, isolates single-tile failures, protects radar switching from stale cache writes, and supports automatic in-tab recovery. It **does not change** radar site positions, 3-D science, imagery colour thresholds, the five-minute refresh interval, Doppler source rules, approved rainfall/AEP or flood gauges, or any BoM warning semantics. Reload the site once after a published release to obtain its new script identity.
+
+See [V10.2.40 source and acceptance notes](RELEASE_NOTES_V10.2.40.md). Native iPhone Safari field acceptance should still be completed by an operator; automated WebKit/Chromium tests alone do not establish sustained field reliability.

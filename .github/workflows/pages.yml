@@ -1747,3 +1747,77 @@ jobs:
           test "$(git ls-remote origin "refs/tags/$tag^{}" | cut -f1)" = "$release_sha"
           test "$(git ls-remote origin "refs/heads/$restore" | cut -f1)" = "$release_sha"
           echo "SEALED $tag and $restore at $release_sha; older tags/restore refs untouched"
+
+  seal_radar_wmts_40:
+    name: Seal V10.2.40 WMTS browser recovery after published Pages verification
+    needs: deploy
+    # Only the first release merge commit may create this immutable seal.
+    # Later source/docs commits cannot re-seal V10.2.40.
+    if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, 'V10.2.40')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - name: Verify native radar recovery is published and seal new refs only
+        env:
+          GH_TOKEN: ${{ secrets.STORMTRACKER_RELEASE_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          release_sha="$GITHUB_SHA"
+          tag="v10.2.40"
+          restore="restore/v10.2.40"
+          test -f docs/RELEASE_NOTES_V10.2.40.md
+          grep -Fq 'V10.2.40 VERIFIED WMTS RESILIENCE' scripts/apply-radar-auto-refresh-v1.py
+          previous_tag="$(git ls-remote origin 'refs/tags/v10.2.39^{}' | cut -f1)"
+          previous_restore="$(git ls-remote origin 'refs/heads/restore/v10.2.39' | cut -f1)"
+          test -n "$previous_tag" && test "$previous_tag" = "$previous_restore" ||
+            { echo "Refuse seal: previous radar tag/restore do not match"; exit 1; }
+          base="https://blakesmith-intel.github.io/StormTracker"
+          published=false
+          for attempt in $(seq 1 12); do
+            query="?wmtsFix=$release_sha&try=$attempt"
+            build="$(curl -fsSL --max-time 20 "$base/BUILD.txt$query" || true)"
+            wmts="$(curl -fsSL --max-time 20 "$base/src/bom-wmts-loop-v2.js$query" || true)"
+            source="$(curl -fsSL --max-time 20 "$base/src/radar-source.js$query" || true)"
+            pressure="$(curl -fsSL --max-time 20 "$base/src/radar-request-pressure-v1.js$query" || true)"
+            runtime="$(curl -fsSL --max-time 20 "$base/src/live3d-operational-v9.js$query" || true)"
+            if grep -Fq 'V10.2.40 VERIFIED WMTS RESILIENCE' <<< "$build" &&
+               grep -Fq 'published.slice(-9).reverse()' <<< "$wmts" &&
+               grep -Fq 'ttlMs=45000' <<< "$wmts" &&
+               grep -Fq 'verifiedWmtsBlobs' <<< "$source" &&
+               grep -Fq 'negativeTtlMs=45000' <<< "$pressure" &&
+               grep -Fq 'manual site load failed; automatic retry queued' <<< "$runtime" &&
+               grep -Fq 'frame?.sourceMetadata?.region !== region' <<< "$runtime"; then
+              published=true; break
+            fi
+            sleep 5
+          done
+          test "$published" = true ||
+            { echo "Refuse seal: public V10.2.40 recovery modules not verified"; exit 1; }
+          current_tag="$(git ls-remote origin "refs/tags/$tag^{}" | cut -f1)"
+          current_restore="$(git ls-remote origin "refs/heads/$restore" | cut -f1)"
+          if [ -n "$current_tag" ] && [ -n "$current_restore" ]; then
+            test "$current_tag" = "$current_restore" &&
+              test "$current_tag" = "$release_sha" ||
+              { echo "Existing immutable V10.2.40 refs conflict; do not overwrite"; exit 1; }
+            echo "$tag already sealed; no changes"
+            exit 0
+          fi
+          test -z "$current_tag" || test "$current_tag" = "$release_sha"
+          test -z "$current_restore" || test "$current_restore" = "$release_sha"
+          if [ -z "$current_restore" ]; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/heads/$restore" -f sha="$release_sha" >/dev/null
+          fi
+          if [ -z "$current_tag" ]; then
+            obj="$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/tags" \
+              -f tag="$tag" -f message="StormTracker V10.2.40: published source recovery and Safari WMTS client resilience" \
+              -f object="$release_sha" -f type=commit --jq .sha)"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/tags/$tag" -f sha="$obj" >/dev/null
+          fi
+          test "$(git ls-remote origin "refs/tags/$tag^{}" | cut -f1)" = "$release_sha"
+          test "$(git ls-remote origin "refs/heads/$restore" | cut -f1)" = "$release_sha"
+          echo "SEALED $tag at $release_sha; all older frozen releases remain untouched"

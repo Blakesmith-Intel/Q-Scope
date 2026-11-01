@@ -1,0 +1,20 @@
+name: Live Queensland WMTS timestamp and tile diagnostic
+on:
+  push:
+    branches: [fix/radar-wmts-source-acceptance-20261101]
+    paths:
+      - .github/workflows/diagnose-wmts-12-noon-20261101.yml
+      - scripts/diagnose-wmts-12-noon-20261101.mjs
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '24'}
+      - name: Probe every actually published timestamp at failed radar regions
+        run: node scripts/diagnose-wmts-12-noon-20261101.mjs

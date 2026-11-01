@@ -19,7 +19,9 @@ assert.match(runtime, /window\.addEventListener\("focus", checkRadarOnForeground
 assert.match(runtime, /const wasFollowingLatest = automatic/);
 assert.match(runtime, /\? hybridFrames\.length - 1/);
 assert.match(runtime, /if \(automatic\) throw new Error/);
-assert.match(runtime, /throw error;\s*}\s*else setStatus\(error\.message/);
+assert.match(runtime, /throw error;\s*}\s*else\s*\{\s*setStatus\(error\.message/);
+assert.match(runtime, /manual site load failed; automatic retry queued/);
+assert.match(runtime, /manualRadarRecoveryTimer=setTimeout/);
 assert.match(scheduler, /LIVE_LOOP_SOURCE_RETRY_MS = 60000/);
 assert.match(runtime, /runSourceLoad\(\(\) => loadHybridSequence\(true\), true\)\.then/);
 assert.match(runtime, /if \(sequenceLoading \|\| !model\) return false;/);
@@ -53,7 +55,10 @@ for (const site of ["66", "50", "08", "23"]) {
 assert.match(runtime, /needsChronologicalRadarRebuild/);
 assert.match(runtime, /loadBomReflectivityMosaicAtTime\(entry\.observedUtc, selectedRadarRegion\(\), discoveredTimes\)/);
 assert.match(runtime, /observedUtc,\s*region,\s*candidates/);
-assert.match(packager, /20261101-region-independent-v10-2-39/);
+assert.match(packager, /20261101-source-verified-recovery-v10-2-40/);
+assert.match(runtime, /frame\?\.sourceMetadata\?\.region !== region/);
+assert.match(packager, /copyfile\("frontend\/src\/radar-source\.js"/);
+assert.match(packager, /copyfile\("frontend\/src\/radar-request-pressure-v1\.js"/);
 assert.match(packager, /V10\.2\.39 RADAR CROSS-SITE LIVE RECOVERY/);
 assert.match(runtime, /radarFrameCache\.has\(entry\.observedUtc\)/);
 assert.match(runtime, /getRadarFrames\(region, cacheCutoff\)/);
@@ -71,7 +76,10 @@ if (existsSync(fileURLToPath(packagedEngine))) {
   assert.match(shippedScheduler, /LIVE_LOOP_BUSY_RETRY_MS = 2000/);
   assert.match(build, /V10\.2\.38 VERIFIED RADAR HISTORY/);
   assert.match(build, /V10\.2\.39 RADAR CROSS-SITE LIVE RECOVERY/);
-  assert.match(read("_site/index.html"), /v10\.2\.39-radar-live-follow-/);
-  assert.match(read("_site/live3d-operational-v9.html"), /v10\.2\.39-radar-live-follow-/);
+  assert.match(build, /V10\.2\.40 VERIFIED WMTS RESILIENCE/);
+  assert.match(read("_site/src/radar-source.js"), /verifiedWmtsBlobs/);
+  assert.match(read("_site/src/radar-request-pressure-v1.js"), /negativeTtlMs=45000/);
+  assert.match(read("_site/index.html"), /v10\.2\.40-radar-wmts-resilience-/);
+  assert.match(read("_site/live3d-operational-v9.html"), /v10\.2\.40-radar-wmts-resilience-/);
 }
 console.log("PASS radar auto refresh production contract, real published catch-up across sites, busy deferred retry, cadence, diagnostics and build overlay");
