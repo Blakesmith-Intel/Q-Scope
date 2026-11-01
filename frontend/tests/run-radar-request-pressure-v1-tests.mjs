@@ -33,6 +33,19 @@ assert.equal(invalidCalls,1,"known-unavailable time is never reprobed immediatel
 clock+=5100;
 await assert.rejects(guard.run("missing-time-01",bad),/HTTP 400/);
 assert.equal(invalidCalls,2,"new TTL allows legitimate radar availability rechecks");
+let temporaryCalls=0;
+const transient=()=>{
+  temporaryCalls++;
+  const error=Error("Image request failed: HTTP 503");error.status=503;
+  return Promise.reject(error);
+};
+await assert.rejects(guard.run("site-24-temporary",transient),/HTTP 503/);
+const unaffectedRegion=await guard.run("site-75-same-genuine-time",
+  ()=>Promise.resolve({width:256,height:256}));
+assert.equal(unaffectedRegion.width,256,
+  "A single 503 in Bowen cannot block valid Mount Isa tiles");
+assert.equal(temporaryCalls,1);
+
 let deniedCalls=0;
 const denied=()=>{
   deniedCalls++;
