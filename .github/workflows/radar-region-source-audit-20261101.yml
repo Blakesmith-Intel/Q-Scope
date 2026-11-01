@@ -1,7 +1,7 @@
 name: Radar 30-minute cross-region live source audit (one-off)
 on:
   push:
-    branches: [fix/radar-region-loop-20261101]
+    branches: [fix/radar-region-loop-20261101, fix/radar-wmts-source-acceptance-20261101]
     paths:
       - .github/workflows/radar-region-source-audit-20261101.yml
       - scripts/probe-radar-region-loop-20261101.mjs
@@ -11,6 +11,9 @@ on:
       - frontend/src/live3d-operational-v9.js
       - frontend/src/live-loop-refresh-v1.js
       - frontend/src/bom-wmts-loop-v2.js
+      - frontend/src/radar-source.js
+      - frontend/src/radar-request-pressure-v1.js
+      - frontend/tests/run-wmts-400-idr74-502-cascade-20261018-tests.mjs
   workflow_dispatch:
 permissions:
   contents: read
@@ -30,7 +33,7 @@ jobs:
 
   browser-site-switch:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
