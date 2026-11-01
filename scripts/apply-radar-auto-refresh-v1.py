@@ -245,9 +245,11 @@ inject_once(
     'import {planIncrementalRadarWindow} from "./radar-incremental-window-v1.js?v=20261101-verified-append-v1";\n'
     'import {installRadarLifecycleDiagnostics} from "./radar-lifecycle-diagnostics-v1.js?v=20261101-iframe-webgl-evidence-v1";'
 )
+# The pinned builder appends a legacy chain cache-buster to this import,
+# so match only the stable named-import lines, not the URL's trailing suffix.
 inject_once(
-    '  reflectivityWindowForRegion\n} from "./bom-wmts-loop-v2.js?v=20261101-source-verified-incremental-v10-2-43";',
-    '  reflectivityWindowForRegion,\n  radarTileFailureSnapshot\n} from "./bom-wmts-loop-v2.js?v=20261101-source-verified-incremental-v10-2-43";'
+    '  reflectivityWindowForRegion\n',
+    '  reflectivityWindowForRegion,\n  radarTileFailureSnapshot\n'
 )
 start=source.index("const radarIncrementalAudit = {")
 end=source.index("const radarAutoRefreshAudit = {",start)
