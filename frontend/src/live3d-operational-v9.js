@@ -876,6 +876,11 @@ const autoRefresh = createLiveLoopRefresh({
   }
 });
 
+// A QA-only hook tests repeated real source checks in the actual shipped
+// engine without changing the five-minute production polling interval.
+if(new URLSearchParams(window.location.search).has("qaIncrementalRadar"))
+  window.__stormtrackerRadarQaCheck=()=>autoRefresh.check();
+
 // Opportunistically prepare the next two genuine source images while the
 // current frame is visible. All preparation is display-only, never a new
 // radar/Doppler measurement, and never blocks the playback clock.
