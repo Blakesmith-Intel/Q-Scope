@@ -7,6 +7,8 @@ on:
       - scripts/test-radar-camera-continuity-browser-20261101.mjs
       - frontend/src/live3d-operational-v9.js
       - frontend/src/radar-viewport-continuity-v1.js
+      - frontend/tests/run-radar-viewport-continuity-v1-tests.mjs
+      - frontend/tests/run-radar-auto-refresh-v10-2-37-tests.mjs
       - scripts/apply-radar-auto-refresh-v1.py
   workflow_dispatch:
 permissions:
