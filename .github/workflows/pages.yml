@@ -186,6 +186,8 @@ jobs:
 
       - name: Build pinned V10.2.0 plus QA-approved FTP/AEP production overlay
         run: |
+          set -Eeuo pipefail
+          trap 'echo "::error::Production package command failed at line $LINENO: $BASH_COMMAND" >&2' ERR
           bash scripts/build-current-site.sh
           python scripts/apply-ftp-aep-release-v10.py
           # Preserve the pre-radar-overlay package as a source for a separate
