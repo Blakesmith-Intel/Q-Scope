@@ -43,11 +43,16 @@ function checkGeometry(g){
    polys.map(p=>p.map(checkRing))};
 }
 export function sourceExactQldBomWfsFeatures(collection,notice,{nowMs=Date.now()}={}){
- const code=notice?.productCode,source=allowed(code);
- if(!source||!QLD_WARNING_PRODUCTS[code]||
-    notice.status!=="issued"||!Number.isFinite(timeMs(notice.issuedUtc))||
-    !Number.isFinite(timeMs(notice.expiresUtc))||
-    timeMs(notice.expiresUtc)<=nowMs)return [];
+ // Separately issued active CAP bulletins under one IDQ product may each
+ // have their own independently valid geospatial features. Source-match
+ // EACH feature to its authentic, current issue instead of latest-only.
+ const notices=Array.isArray(notice)?notice:[notice];
+ const code=notices[0]?.productCode,source=allowed(code);
+ const activeNotices=notices.filter(n=>n?.productCode===code&&
+   n.status==="issued"&&Number.isFinite(timeMs(n.issuedUtc))&&
+   Number.isFinite(timeMs(n.expiresUtc))&&
+   timeMs(n.issuedUtc)<=nowMs+300000&&timeMs(n.expiresUtc)>nowMs);
+ if(!source||!QLD_WARNING_PRODUCTS[code]||!activeNotices.length)return [];
  if(collection?.type!=="FeatureCollection"||!Array.isArray(collection.features)||
     collection.error||collection.features.length>500||
     collection.exceededTransferLimit===true)
@@ -65,8 +70,10 @@ export function sourceExactQldBomWfsFeatures(collection,notice,{nowMs=Date.now()
   // validity end, which can legitimately be hours earlier.
   // Observed 30 Oct 2026: CAP expires 10:45:08Z, original GIS polygon
   // expires 08:45:08Z, but both issue times match within four seconds.
-  if(Math.abs(from-timeMs(notice.issuedUtc))>120000)continue;
-  const visibleUntil=Math.min(to,timeMs(notice.expiresUtc));
+  const matchedNotice=activeNotices.find(n=>
+    Math.abs(from-timeMs(n.issuedUtc))<=120000);
+  if(!matchedNotice)continue;
+  const visibleUntil=Math.min(to,timeMs(matchedNotice.expiresUtc));
   if(visibleUntil<=nowMs)continue;
   let geometry;
   try{geometry=checkGeometry(feature.geometry);}catch{continue;}
@@ -78,20 +85,20 @@ export function sourceExactQldBomWfsFeatures(collection,notice,{nowMs=Date.now()
    type:QLD_WARNING_PRODUCTS[code].kind,productCode:code,
    polygonProductCodes:[source.axf],
    productType:QLD_WARNING_PRODUCTS[code].productType,
-   state:"QLD",event:notice.headline,
-   headline:notice.headline,description:notice.description,
-   instruction:notice.instruction,areaDescription:notice.areaDescription,
+   state:"QLD",event:matchedNotice.headline,
+   headline:matchedNotice.headline,description:matchedNotice.description,
+   instruction:matchedNotice.instruction,areaDescription:matchedNotice.areaDescription,
    issuedUtc:new Date(from).toISOString(),expiresUtc:new Date(visibleUntil).toISOString(),
    // Preserve BOTH source expiry times; never extend the plotted geometry
    // beyond its own published validity even while the bulletin remains live.
    geometryExpiresUtc:new Date(to).toISOString(),
    bulletinExpiresUtc:new Date(timeMs(notice.expiresUtc)).toISOString(),
-   bulletinUrl:notice.bulletinUrl,severity:"",certainty:"",
+   bulletinUrl:matchedNotice.bulletinUrl,severity:"",certainty:"",
    phenomena:String(p.phenomena??"").slice(0,350),
    // Bulletin- / geometry-attribute-level hazard wording only. For regional
    // IDQ21033 this is NOT an attribution to any particular storm cell.
    hazardAssessment:classifyPublishedBoMThunderstormHazards({
-    headline:notice.headline,description:notice.description,
+    headline:matchedNotice.headline,description:matchedNotice.description,
     phenomena:String(p.phenomena??"")
    }),
    warningGeometrySource:"Queensland emergency-management Bureau GIS2Web WFS-derived feature service",
@@ -103,7 +110,7 @@ export function sourceExactQldBomWfsFeatures(collection,notice,{nowMs=Date.now()
  }
  return warnings;
 }
-export async function fetchQldBomWfsGeometry(notice,{fetchImpl=fetch,nowMs=Date.now()}={}){
+export async function fetchQldBomWfsGeometry(notice,{fetchImpl=fetch,nowMs=Date.now(),relatedNotices=null}={}){
  const source=allowed(notice?.productCode);
  if(!source)return [];
  const url=new URL(QLD_BOM_GIS_WARNING_REPLICA+"/"+source.layer+"/query");
@@ -123,7 +130,7 @@ export async function fetchQldBomWfsGeometry(notice,{fetchImpl=fetch,nowMs=Date.
  let collection;
  try{collection=JSON.parse(text);}catch{throw Error("Invalid government BoM GIS JSON");}
  if(collection?.error)throw Error("Government BoM GIS unavailable: "+String(collection.error.code??"API error"));
- return sourceExactQldBomWfsFeatures(collection,notice,{nowMs});
+ return sourceExactQldBomWfsFeatures(collection,relatedNotices??notice,{nowMs});
 }
 
 // IDQ21035 also has a DISTINCT BoM product for source-issued storm-cell
