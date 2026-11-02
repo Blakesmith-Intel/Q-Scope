@@ -102,7 +102,7 @@ export async function fetchReadableImage(url) {
   const read=async()=>{
   let blob;
   const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),WMTS_TILE_REQUEST_TIMEOUT_MS);
+  const timer=isWmts?setTimeout(()=>controller.abort(),WMTS_TILE_REQUEST_TIMEOUT_MS):null;
   try {
     const response=await fetch(url, {
       mode: "cors",
@@ -125,7 +125,7 @@ export async function fetchReadableImage(url) {
       `Browser could not fetch readable radar pixels (network/CORS): ${error?.message??error}`
     );
   } finally {
-    clearTimeout(timer);
+    if(timer!==null)clearTimeout(timer);
   }
   const pixels=await blobToImageData(blob);
   if(isWmts)rememberVerifiedWmtsBlob(url,blob);
