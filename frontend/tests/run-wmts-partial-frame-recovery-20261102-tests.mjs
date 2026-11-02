@@ -94,6 +94,19 @@ assert(needsChronologicalRadarRebuild(
   [...acceptedTimes,withheldUtc],acceptedTimes.at(-1),acceptedTimes),
   "Once the authentic missing scan is accepted, chronological replay is required");
 
+// When the six-frame window shifts under an in-flight Cesium render, an
+// unchanged array index now identifies a DIFFERENT real observation.
+const beforeShift=[
+ "2026-11-02T10:00:00Z","2026-11-02T10:05:00Z",
+ "2026-11-02T10:10:00Z","2026-11-02T10:15:00Z",
+ "2026-11-02T10:20:00Z","2026-11-02T10:25:00Z"
+];
+const afterShift=[...beforeShift.slice(1),"2026-11-02T10:30:00Z"];
+const inFlightOldIndex=3;
+assert.notEqual(afterShift[inFlightOldIndex],beforeShift[inFlightOldIndex]);
+assert.equal(afterShift.indexOf(beforeShift[inFlightOldIndex]),2,
+ "Actual BoM UTC, not the old index, is the only safe 2-D/3-D frame anchor");
+
 // Source and operational Pages overlay must both schedule backfill when
 // a manual load finishes with fewer measured observations than advertised.
 const root=new URL("../../",import.meta.url);
@@ -120,6 +133,15 @@ assert.match(source,/const incrementalCommit = automatic && !isCombined && !rebu
 assert(packageOverlay.includes("rebuild_start=source.index"));
 assert(packageOverlay.includes("source[rebuild_start:rebuild_end].rstrip()"));
 assert.match(packageOverlay,/const incrementalCommit = automatic && !isCombined && !rebuild &&/);
+assert(source.includes("const liveMeasuredIndex=hybridCombinedSchedule.length"));
+assert(source.includes("const liveDisplayedIndex=hybridCombinedSchedule.length"));
+assert(source.includes("hybridFrames.findIndex(item=>item.observedUtc===frame.observedUtc)"));
+assert(source.includes("updateTrackDisplayControls(liveMeasuredIndex)"));
+assert(source.includes("hybridFrameIndex=liveDisplayedIndex"));
+assert(packageOverlay.includes("old_geometry="));
+assert(packageOverlay.includes("old_cursor="));
+assert(packageOverlay.includes("source[geometry_start:geometry_end].rstrip()"));
+assert(packageOverlay.includes("source[cursor_start:cursor_end].rstrip()"));
 assert.match(source,/A refused NEWEST scan must not discard other newly verified scans/);
 assert.match(source,/Date\.parse\(frames\.at\(-1\)\.observedUtc\)\s*<\s*Date\.parse\(hybridFrames\.at\(-1\)\.observedUtc\)/);
 assert.match(source,/playback\.isPlaying\(\) \|\| hybridFrames\.length === 0/);
