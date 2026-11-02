@@ -4,6 +4,18 @@
 **Release state:** Candidate until the exact rebuilt public Pages site and mobile/desktop warnings are accepted. This note does not claim that an unverified deployment is live.
 **Base:** Immutable V10.2.46 plus the separate approved current-warnings cancellation correction on `main`; all earlier tags and restore branches remain unchanged.
 
+## 2 November 2026 15:51 AEST — operator visual rejection and correction
+
+Operator screenshot of actual live display at 20 km scale showed a huge fuzzy yellow border despite the previous 3px/1024px tile checks passing. **Root cause: an outline baked into a Cesium imagery tile grows and blurs as the tile is resampled with camera zoom.** The QA only measured the source tile, not the final globe projection, so the earlier acceptance statement was invalid.
+
+**Revised operator acceptance:** each original BoM polygon must be one complete **terrain-following object containing both its translucent fill and a crisp screen-fixed yellow boundary**. It must not use separately controlled fill and line layers.
+
+**Implementation contract:** for each original source feature, construct ONE `Cesium.PrimitiveCollection` that owns both its `GroundPrimitive` fill and `GroundPolylinePrimitive` outline, using precisely the same unmodified exterior and hole coordinates. Cesium needs two GPU draws internally for a translucent terrain surface and pixel-fixed outline, but neither component has an independent operator lifecycle, feed, selector or geometry. On refresh, cancellation, hide and product selection, the ONE grouped source polygon is added/removed atomically. The fixed yellow border is 2 CSS pixels, 2.5px for source-authenticated ordinary cells and 3px for explicit VERY DANGEROUS source cells. The verified VD label is owned by that same grouped cell object; no standalone label or fabricated cell.
+
+This replacement removes the live warning raster-stroke path rather than merely turning down its opacity. Existing imagery painter remains test-compatible but fills are no longer published as separate Cesium warning imagery. The terrain clamped polygon is always a single coherent fill/border object, with true holes and multisurface boundaries; radar/other source ingestion, polling and all science stay unchanged.
+
+**Release gate:** original screenshot does not satisfy acceptance. A passing source tile test alone does NOT prove final rendered width: test the genuine Cesium ground primitive constructors and source geometry on mobile WebKit and desktop Chromium, then visually verify the live mobile map at the operator's original 20km view, with radar visible, before sealing an immutable production tag.
+
 ## Operator change
 
 BoM warning polygons were source-correct but appeared as blurry orange “crayon” lines on the iPhone. The operator confirmed the three regional IDQ21033 and two detailed IDQ21035 polygons were loading correctly and approved **presentation-only** visual refinement.
