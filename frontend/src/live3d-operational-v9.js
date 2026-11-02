@@ -105,7 +105,7 @@ import { buildSharedProductTimeline, buildRadarPrimaryProductTimeline } from "./
 import {
   canMotionInterpolateRadar,createRadarMotionTransition,radarMotionStepsForSpeed
 } from "./radar-motion-interpolation-v1.js?v=9.16.7-motion";
-import { createRadarImageryHandover } from "./radar-imagery-handover-v1.js?v=9.18.5-deferred-retire";
+import { createRadarImageryHandover } from "./radar-imagery-handover-v1.js?v=20261103-primary-measured-layer-reuse-v1";
 import {MAX_DISPLAY_RADAR_SITES,chooseSupplementalRadarSites,
   fitSelectedRadarSites,createSupplementalRadarDisplay
 } from "./multi-radar-display-v9.js?v=render-provider-cache-20261016-v1";
@@ -357,7 +357,11 @@ let visualMotionGeneration=0;
 const motionTransition={cancel(){visualMotionGeneration++;}};
 const radarImageryHandover = createRadarImageryHandover({
   imageryLayers: viewer.imageryLayers, scene,
-  retireLayer:deferredImageryRetirement?.retire
+  retireLayer:deferredImageryRetirement?.retire,
+  // Five hidden + one visible authentic primary scan. Avoid repeated GPU
+  // texture allocation and teardown during the normal six-frame loop.
+  // All supplemental radar/Doppler handovers retain their existing logic.
+  maxRetainedLayers:5
 });
 let additionalRadarSiteIds=[];
 let previousPrimaryRadarId=null;
