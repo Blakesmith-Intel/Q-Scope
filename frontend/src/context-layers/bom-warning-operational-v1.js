@@ -1,5 +1,6 @@
 import {createUnifiedBoMWarningTerrainPolygons,warningContainsPoint} from "./bom-warning-terrain-imagery-v1.js?v=20261102-unified-terrain-warning-polygon-v1";
 import {formatAgencyTimestamp} from "./agency-source-time-v1.js?v=20261027-agency-panels-v1";
+import {QLD_WARNING_PRODUCTS} from "./bom-qld-warning-product-catalogue-v1.js?v=20261102-idq-source-isolation-v1";
 const SOURCE="https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev/bom-official-warning-polygons";
 const SCHEMA="StormTrackerOfficialBoMWarningPolygonsV1",INTERVAL_MS=15*60*1000;
 export const PRODUCT_FILTERS=Object.freeze(["all","IDQ21035","IDQ21033","IDQ21037","IDQ21038"]);
@@ -7,6 +8,32 @@ export function filterOfficialWarnings(warnings,productCode="all"){
  if(!PRODUCT_FILTERS.includes(productCode))return [];
  return (Array.isArray(warnings)?warnings:[]).filter(w=>
    productCode==="all"||w?.productCode===productCode);
+}
+// The selected warning bulletin AND its original BoM polygon product must
+// agree. A detailed IDQ65650 feature must never masquerade as IDQ21033's
+// regional IDQ65654 geometry, even if a relay labels it incorrectly.
+// Original CAP geometry provides a validated polygonProductCodes list and no
+// separate WFS sourceProduct; original GIS2Web features carry both.
+export function isSourceMatchedOfficialWarningPolygon(warning){
+ const expected=QLD_WARNING_PRODUCTS[warning?.productCode]?.polygonAxfs;
+ const listed=warning?.polygonProductCodes;
+ if(!expected||!Array.isArray(listed)||listed.length!==expected.length||
+    !listed.every(code=>expected.includes(code)))return false;
+ return warning.sourceProduct==null||expected.includes(warning.sourceProduct);
+}
+export function sourceQualifiedOfficialWarnings(warnings,productCode="all"){
+ return filterOfficialWarnings(warnings,productCode)
+  .filter(isSourceMatchedOfficialWarningPolygon);
+}
+// A single selection contract keeps map, locate and click in sync.
+// 'All' combines genuine areas and valid IDQ21035 storm locations.
+export function selectVisibleOfficialBoMGeometry(warnings,stormCells,selected="all"){
+ const areas=sourceQualifiedOfficialWarnings(warnings,selected);
+ const cells=(selected==="all"||selected==="IDQ21035"?
+  (Array.isArray(stormCells)?stormCells:[]):[]).filter(cell=>
+   cell?.official===true&&cell.productCode==="IDQ21035"&&
+   cell.sourceProduct==="IDQ65652"&&cell.type==="severe-thunderstorm-cell");
+ return [...areas,...cells];
 }
 export function warningProductAffectedGroups(warnings,productCode="all"){
  const visible=filterOfficialWarnings(warnings,productCode);
@@ -207,10 +234,8 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   state.textContent=message;state.dataset.kind=kind;
  };
  function showProductStatus(){
-  locateBtn.hidden=!toggle.checked||!officialWarningBounds([
-   ...filterOfficialWarnings(warnings,filter.value),
-   ...(filter.value==="all"||filter.value==="IDQ21035"?stormCells:[])
-  ]);
+  locateBtn.hidden=!toggle.checked||!officialWarningBounds(
+   selectVisibleOfficialBoMGeometry(warnings,stormCells,filter.value));
   if(!toggle.checked){report("BoM warning polygons off");return;}
   const result=describeOfficialBomWarningState({
     products:productStatuses,warnings,selected:filter.value
@@ -226,8 +251,7 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
  };
  function display(){
   discard();
-  const visible=[...filterOfficialWarnings(warnings,filter.value),
-   ...(filter.value==="all"||filter.value==="IDQ21035"?stormCells:[])];
+  const visible=selectVisibleOfficialBoMGeometry(warnings,stormCells,filter.value);
   if(!toggle.checked||!visible.length)return;
   // ONE logical and render-lifecycle object per original BoM polygon:
   // translucent terrain fill + precisely coincident 2px on-ground outline,
@@ -318,7 +342,8 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
     if(data?.schema!==SCHEMA||!Array.isArray(data.warnings)||
       !["active","no-verified-current-polygons","partial-source-unavailable"].includes(data.status))
       throw Error(data?.message||"Official CAP source unavailable");
-    warnings=data.warnings.filter(w=>isVerifiedActiveBomWarning(w,now()));
+    warnings=data.warnings.filter(w=>isVerifiedActiveBomWarning(w,now())&&
+      isSourceMatchedOfficialWarningPolygon(w));
     stormCells=(Array.isArray(data.stormCells)?data.stormCells:[]).filter(c=>
       c?.official===true&&c.issuer==="Bureau of Meteorology"&&
       c.productCode==="IDQ21035"&&c.sourceProduct==="IDQ65652"&&
@@ -471,10 +496,8 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   void refresh({force:true});
  };
  const onLocate=()=>{
-  const bounds=officialWarningBounds([
-   ...filterOfficialWarnings(warnings,filter.value),
-   ...(filter.value==="all"||filter.value==="IDQ21035"?stormCells:[])
-  ]);
+  const bounds=officialWarningBounds(
+    selectVisibleOfficialBoMGeometry(warnings,stormCells,filter.value));
   if(!toggle.checked||!bounds||!cameraController?.setView)return;
   const target=officialWarningCameraTarget(bounds,{
    width:canvas.clientWidth||canvas.width||430,
@@ -524,8 +547,7 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   const loc=CesiumRef.Cartographic.fromCartesian(hit);
   const longitude=CesiumRef.Math.toDegrees(loc.longitude);
   const latitude=CesiumRef.Math.toDegrees(loc.latitude);
-  const selected=[...filterOfficialWarnings(warnings,filter.value),
-    ...(filter.value==="all"||filter.value==="IDQ21035"?stormCells:[])];
+  const selected=selectVisibleOfficialBoMGeometry(warnings,stormCells,filter.value);
   if(officialWarningAtPoint(selected,longitude,latitude)){
    // Identical report and selected-product scope as the existing button.
    openGroups();
