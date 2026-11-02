@@ -24,8 +24,10 @@ function iso(value){
  return Number.isFinite(m)?new Date(m).toISOString():String(value??"");
 }
 const notices=new Map();
+let liveIndex=null;
 try{
  const index=await fetchCurrentQldBoMWarningsIndex({nowMs:NOW});
+ liveIndex=index;
  console.log("OFFICIAL_CURRENT_QSIGNAL",JSON.stringify(index));
 }catch(error){console.log("OFFICIAL_CURRENT_QSIGNAL_ERROR",String(error));}
 try{
@@ -89,6 +91,19 @@ for(const [code,axf] of Object.entries(CODES)){
   });
   const n=notices.get(code);
   const joined=n?sourceExactQldBomWfsFeatures(features,n,{nowMs:NOW}):[];
+  const activeInIndex=liveIndex?.verified===true&&liveIndex.activeCodes.includes(code);
+  const sourcePlusIndex=sourceExactQldBomWfsFeatures(
+   features,n??{productCode:code},{nowMs:NOW,officialIndexActive:activeInIndex});
+  console.log("CANDIDATE_SOURCE_INDEX_GIS_MATCH",JSON.stringify({
+   code,indexVerifiedActive:activeInIndex,
+   sourcePolygons:rows.filter(x=>x.validNow).length,
+   currentCapMatched:joined.length,
+   candidateSourceVerifiedCount:sourcePlusIndex.length,
+   capPendingCount:sourcePlusIndex.filter(x=>
+     x.capBulletinStatus==="pending-current-source").length,
+   productIdentityValid:sourcePlusIndex.every(x=>x.sourceProduct===axf&&
+     x.productCode===code&&Date.parse(x.expiresUtc)>NOW)
+  }));
   console.log("SOURCE_GIS_POLYGON_EVIDENCE",JSON.stringify({
    code,requestedAxF:axf,serverCount:rows.length,mostRecent:rows.slice(0,12),
    latestWmoNotice:n?{issued:n.issuedUtc,expires:n.expiresUtc,status:n.status}:null,
