@@ -119,6 +119,19 @@ cursor_start=source.index("  const liveDisplayedIndex=hybridCombinedSchedule.len
 cursor_end=source.index("  // Supplemental image+volume reveal",cursor_start)
 replace_once(old_cursor,source[cursor_start:cursor_end].rstrip())
 
+# The primary measured-frame cache must not retain visual-only
+# inferred motion previews: exact original BoM PNGs alone may be recycled.
+replace_once(
+    '''      decodedSingleTile: true,
+      beforeReveal:onBeforeReveal,''',
+    '''      decodedSingleTile: true,
+      // Cache only genuine measured BoM observations. The existing
+      // display-only temporal/motion intermediates are never retained as
+      // measured scans or silently promoted to the GPU source cache.
+      cacheEligible: !frame?.sourceMetadata?.temporalInference,
+      beforeReveal:onBeforeReveal,'''
+)
+
 # Source discovery failures must be handed back to the refresh scheduler.
 replace_once(
     '''    $("autoRefreshNote").textContent =
