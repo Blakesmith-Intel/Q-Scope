@@ -4056,11 +4056,21 @@ async function showHybridFrame(index) {
     // Synchronously create/show the measured-frame inference and tracks
     // BEFORE the newly decoded 2-D BoM surface becomes visible. Cesium then
     // renders both together, never offset by a source observation.
+    // An automatic genuine-scan append/backfill may replace hybridFrames
+    // while this render is waiting on Cesium. Resolve by immutable BoM UTC,
+    // never by an array index captured BEFORE the live window was shifted.
+    // Combined radar/Doppler schedules may intentionally reuse one rain UTC;
+    // keep their established step index and atomic synchronisation untouched.
+    const liveMeasuredIndex=hybridCombinedSchedule.length
+      ? requestedIndex
+      : hybridFrames.findIndex(item=>item.observedUtc===frame.observedUtc);
+    if(liveMeasuredIndex<0)
+      throw Error("Radar observation retired before its measured image handover");
     renderInferredVolume(frame);
-    updateTrackDisplayControls(requestedIndex);
-    applyHybridVolumeMode(requestedIndex);
-    renderHybridTracks(requestedIndex);
-    syncSevereStormAlerts(requestedIndex);
+    updateTrackDisplayControls(liveMeasuredIndex);
+    applyHybridVolumeMode(liveMeasuredIndex);
+    renderHybridTracks(liveMeasuredIndex);
+    syncSevereStormAlerts(liveMeasuredIndex);
     if(supplementalMeasurable){
       if(supplementalAnchor.held &&
          supplementalRadarDisplay.targetTime!==supplementalAnchor.observedUtc){
@@ -4113,7 +4123,14 @@ async function showHybridFrame(index) {
   }
   // All requested imagery is now staged/committed. The UI cursor and source
   // clocks finally advance together, never at the beginning of a render.
-  hybridFrameIndex=requestedIndex;
+  const liveDisplayedIndex=hybridCombinedSchedule.length
+    ? requestedIndex
+    : hybridFrames.findIndex(item=>item.observedUtc===frame.observedUtc);
+  if(liveDisplayedIndex<0){
+    setStatus("Radar frame retired during playback; advancing on the verified current timeline.", "warning");
+    return false;
+  }
+  hybridFrameIndex=liveDisplayedIndex;
   latestFrame=frame;
   // Supplemental image+volume reveal already happened synchronously inside
   // primary beforeReveal; never run a second asynchronous show/hide here.
