@@ -55,46 +55,100 @@ export function officialBoMWarningVisualStyle(entry){
  if(entry?.type==="severe-weather")return BOM_WARNING_VISUAL_STYLES.severeWeather;
  return null;
 }
-// Paint original warning AREAS as low-alpha imagery below radar, but draw their
-// BOUNDARIES separately as terrain-following GPU polylines in fixed screen px.
-// A stroke baked into a raster tile gets upsampled as Cesium zooms, yielding
-// the operator-observed wide fuzzy yellow band even with 1024px tiles.
-export function createWarningGroundBoundaryPrimitive(CesiumRef,warnings){
- const geometryInstances=[],seen=new Set();
- for(const warning of warnings??[]){
-  const style=officialBoMWarningVisualStyle(warning);
-  if(!style)continue;
-  for(const ring of ringsOf(warning.geometry)){
-   if(!Array.isArray(ring)||ring.length<4)continue;
-   // Original source polygon rings contain a closing duplicate vertex.
-   // GroundPolylineGeometry(loop:true) supplies that same final segment.
-   const closed=ring[0]?.[0]===ring.at(-1)?.[0]&&
-    ring[0]?.[1]===ring.at(-1)?.[1];
-   const unique=closed?ring.slice(0,-1):ring;
-   if(unique.length<3||unique.some(p=>!Array.isArray(p)||
-     !Number.isFinite(p[0])||!Number.isFinite(p[1])||
-     Math.abs(p[1])>90||Math.abs(p[0])>180))continue;
-   const degrees=unique.flatMap(([lon,lat])=>[lon,lat]);
-   const key=style.stroke+":"+JSON.stringify(degrees);
-   if(seen.has(key))continue;
-   seen.add(key);
-   geometryInstances.push(new CesiumRef.GeometryInstance({
-    geometry:new CesiumRef.GroundPolylineGeometry({
-     positions:CesiumRef.Cartesian3.fromDegreesArray(degrees),
-     width:style.width,loop:true
+// One operator-visible polygon object per source warning. Cesium requires
+// terrain polygon and screen-pixel boundary geometry to be two GPU draws; keep
+// both INSIDE one ownership/visibility/lifecycle PrimitiveCollection per
+// warning. The same untouched source rings drive the two draws. Never publish
+// an independent imagery fill or a separately managed line layer.
+export function createUnifiedBoMWarningTerrainPolygons(CesiumRef,warnings){
+ const all=new CesiumRef.PrimitiveCollection({destroyPrimitives:true});
+ let count=0;
+ const positions=ring=>{
+  if(!Array.isArray(ring)||ring.length<4)return null;
+  const first=ring[0],last=ring.at(-1);
+  const closed=first?.[0]===last?.[0]&&first?.[1]===last?.[1];
+  const original=closed?ring.slice(0,-1):ring.slice();
+  if(original.length<3||original.some(p=>!Array.isArray(p)||
+    !Number.isFinite(p[0])||!Number.isFinite(p[1])||
+    Math.abs(p[0])>180||Math.abs(p[1])>90))return null;
+  return CesiumRef.Cartesian3.fromDegreesArray(original.flatMap(([lon,lat])=>[lon,lat]));
+ };
+ for(const entry of warnings??[]){
+  const style=officialBoMWarningVisualStyle(entry);
+  if(!style||!["Polygon","MultiPolygon"].includes(entry?.geometry?.type))continue;
+  const eachPolygon=entry.geometry.type==="Polygon"?
+   [entry.geometry.coordinates]:entry.geometry.coordinates;
+  const shape=new CesiumRef.PrimitiveCollection({destroyPrimitives:true});
+  const fillInstances=[],borderInstances=[],seen=new Set();
+  for(const polygon of eachPolygon){
+   const exterior=positions(polygon?.[0]);
+   if(!exterior)continue;
+   const holes=polygon.slice(1).map(positions).filter(Boolean);
+   fillInstances.push(new CesiumRef.GeometryInstance({
+    geometry:new CesiumRef.PolygonGeometry({
+     polygonHierarchy:new CesiumRef.PolygonHierarchy(exterior,
+      holes.map(h=>new CesiumRef.PolygonHierarchy(h))),
+     vertexFormat:CesiumRef.PerInstanceColorAppearance.VERTEX_FORMAT
     }),
     attributes:{color:CesiumRef.ColorGeometryInstanceAttribute.fromColor(
-     CesiumRef.Color.fromCssColorString(style.stroke))}
+     CesiumRef.Color.fromCssColorString(style.fill))}
    }));
+   // Boundary rings, including actual source holes. No Douglas-Peucker,
+   // double strokes or invented closing points. A real GroundPolyline is
+   // 2 CSS pixels wide at all zooms, not a scaled 1024px imagery stroke.
+   for(const ring of polygon){
+    const p=positions(ring);
+    if(!p)continue;
+    const id=JSON.stringify(ring);
+    if(seen.has(id))continue;
+    seen.add(id);
+    borderInstances.push(new CesiumRef.GeometryInstance({
+     geometry:new CesiumRef.GroundPolylineGeometry({
+      positions:p,loop:true,width:style.width
+     }),
+     attributes:{color:CesiumRef.ColorGeometryInstanceAttribute.fromColor(
+      CesiumRef.Color.fromCssColorString(style.stroke))}
+    }));
+   }
   }
+  if(!fillInstances.length||!borderInstances.length)continue;
+  shape.add(new CesiumRef.GroundPrimitive({
+   geometryInstances:fillInstances,
+   appearance:new CesiumRef.PerInstanceColorAppearance({
+    flat:true,translucent:true
+   }),
+   classificationType:CesiumRef.ClassificationType.TERRAIN,
+   allowPicking:false,asynchronous:true
+  }));
+  shape.add(new CesiumRef.GroundPolylinePrimitive({
+   geometryInstances:borderInstances,
+   appearance:new CesiumRef.PolylineColorAppearance({translucent:false}),
+   classificationType:CesiumRef.ClassificationType.TERRAIN,
+   allowPicking:false,asynchronous:true
+  }));
+  if(entry.type==="severe-thunderstorm-cell"&&
+     entry.sourceProduct==="IDQ65652"&&entry.veryDangerous===true){
+   const anchor=officialStormCellLabelPoint(entry.geometry);
+   if(anchor){
+    const labels=new CesiumRef.LabelCollection();
+    labels.add({
+     position:CesiumRef.Cartesian3.fromDegrees(anchor[0],anchor[1]),
+     text:"VD",font:"bold 12px sans-serif",
+     fillColor:CesiumRef.Color.WHITE,
+     showBackground:true,
+     backgroundColor:CesiumRef.Color.fromCssColorString("#870c23"),
+     backgroundPadding:new CesiumRef.Cartesian2(7,4),
+     verticalOrigin:CesiumRef.VerticalOrigin.CENTER,
+     horizontalOrigin:CesiumRef.HorizontalOrigin.CENTER,
+     heightReference:CesiumRef.HeightReference.CLAMP_TO_GROUND
+    });
+    shape.add(labels);
+   }
+  }
+  all.add(shape);
+  count++;
  }
- if(!geometryInstances.length)return null;
- return new CesiumRef.GroundPolylinePrimitive({
-  geometryInstances,
-  appearance:new CesiumRef.PolylineColorAppearance({translucent:false}),
-  classificationType:CesiumRef.ClassificationType.TERRAIN,
-  allowPicking:false,asynchronous:true
- });
+ return count?all:null;
 }
 export function createWarningImageryProvider(CesiumRef,warnings){
  const tilingScheme=new CesiumRef.GeographicTilingScheme({
