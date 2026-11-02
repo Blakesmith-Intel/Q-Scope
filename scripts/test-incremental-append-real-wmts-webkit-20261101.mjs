@@ -168,6 +168,20 @@ try{
  assert.equal(navigations.length,1,"Unexpected navigation");
  assert(metadataRequests>=2,"New genuine metadata was not fetched");
  assert.equal(after.label.split("/")[1],"6");
+ // "Pause" on a button is NOT evidence of advancing images: this exact
+ // desktop defect previously returned a green source append but 1/6 stayed
+ // on screen. Require a new rendered frame index in the same running tab.
+ await page.waitForFunction(previous=>{
+  const now=document.querySelector("#hybridFrameLabel")?.textContent?.trim();
+  return document.querySelector("#hybridPlayButton")?.textContent?.trim()==="Pause" &&
+    /\\b\\d+\\/6\\b/.test(now??"") && now!==previous;
+ },after.label,{timeout:90000,polling:250});
+ const progressed=await snapshot();
+ assert.equal(progressed.button,"Pause","Visible frame advanced but playback stopped");
+ console.log("REAL_SOURCE_VISIBLE_PLAYBACK_PROGRESS_PASS",JSON.stringify({
+  platform:isDesktop?"desktop Chromium":"mobile WebKit",
+  originalFrame:after.label,displayedFrame:progressed.label
+ }));
  console.log("REAL_SOURCE_INCREMENTAL_APPEND_PASS",JSON.stringify({platform:isDesktop?"desktop Chromium":"mobile WebKit",
   beforeUtc:before.diagnostics.automatic.newestAcceptedUtc,
   afterUtc:after.diagnostics.automatic.newestAcceptedUtc,heldBackUtc,
