@@ -92,5 +92,11 @@ for(const text of [source,packageOverlay]){
   assert.match(text,/if\(background\)throw new Error\(/);
   assert.match(text,/\},60000\);/);
 }
+// An automatically recovered interior scan must not stop the existing
+// playback timer while the historical track/window data are rebuilt.
+assert.match(source,/const noninterruptingBackfill = automatic/);
+assert.match(source,/if\(!incrementalCommit && !noninterruptingBackfill\)\{/);
+assert.match(source,/if\(resume && !incrementalCommit && !noninterruptingBackfill\)playback\.play\(\)/);
+assert.match(packageOverlay,/source\[start:end\]\+"  hybridFrames = displayFrames;"/);
 assert.match(packageOverlay,/copyfile\("frontend\/src\/radar-source\.js"/);
 console.log("PASS Taroom/global real-tile timeout and six-frame missing-observation recovery source + shipped overlay");
