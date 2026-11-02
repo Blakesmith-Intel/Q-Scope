@@ -141,7 +141,7 @@ const genuineProviders=Array.from({length:6},(_,i)=>({utc:"2026-11-03T00:"+Strin
 const firstLayers=[];
 for(let cycle=0;cycle<3;cycle++){
   for(let i=0;i<6;i++){
-    const next={name:"source-"+i+"-cycle-"+cycle,imageryProvider:genuineProviders[i],alpha:1};
+    const next={name:"source-"+i+"-cycle-"+cycle,imageryProvider:genuineProviders[i],alpha:1,show:true};
     if(cycle===0)firstLayers.push(next);
     let beforeReveal=0;
     const swap=warm.api.replace(next,{decodedSingleTile:true,beforeReveal:()=>beforeReveal++});
