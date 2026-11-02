@@ -63,6 +63,31 @@ replace_once(
     });
     $("autoRefreshNote").textContent ='''
 )
+# Do not throw away otherwise verified real frames solely because the
+# latest advertised BoM scan was denied. Only allow forward/non-regressing
+# source windows, and keep bounded automatic recovery for the failed UTC.
+replace_once(
+    '''  if (!frames.length || (automatic && !isCombined && frames.at(-1).observedUtc !== availableEndUtc)) {
+    throw new Error(newestFailure || "Newest matching images could not be loaded; keeping the current loop and retrying automatically.");
+  }''',
+    '''  if (!frames.length) {
+    // No genuine observations survived: leave the previous loop untouched.
+    // The scheduler retries without promoting an empty or synthetic frame.
+    throw new Error(newestFailure ||
+      "No verified BoM radar images could be loaded; keeping the current loop and retrying automatically.");
+  }
+  if(automatic && !isCombined && hybridFrames.length &&
+     Date.parse(frames.at(-1).observedUtc) <
+       Date.parse(hybridFrames.at(-1).observedUtc)){
+    // Never replace a currently playing newer observation with an older
+    // one if the source now refuses the latest tile.
+    throw new Error(newestFailure ||
+      "BoM source returned only older imagery; retaining newer verified loop.");
+  }
+  // A refused NEWEST scan must not discard other newly verified scans.
+  // Commit the available real window and let the existing one-minute
+  // source-recovery timer retry the missing UTC while playback continues.'''
+)
 # Source discovery failures must be handed back to the refresh scheduler.
 replace_once(
     '''    $("autoRefreshNote").textContent =
@@ -81,7 +106,7 @@ replace_once(
 replace_once(
     '''  const oldTime = hybridFrames[hybridFrameIndex]?.observedUtc;
   const resume = automatic ? playback.isPlaying() : true;''',
-    "  // This exact measured-frame window can be shifted in place when its retained\n  // observations are unchanged. Historical backfill, temporal-inference edits\n  // and selection changes retain the original chronological rebuild path.\n  const incrementalCommit = automatic && !isCombined && !needsHistoricalRebuild &&\n    loadedLoopSelection === loopSelection &&\n    planIncrementalRadarWindow(hybridFrames,displayFrames);\n  const oldTime = hybridFrames[hybridFrameIndex]?.observedUtc;\n  // Operators parked on Latest must follow genuine newly accepted scans.\n  // Preserve a deliberately scrubbed historical position instead.\n  const wasFollowingLatest = automatic && !isCombined &&\n    !playback.isPlaying() && hybridFrames.length > 0 &&\n    hybridFrameIndex === hybridFrames.length - 1;\n  const resume = automatic ? playback.isPlaying() : true;"
+    "  // This exact measured-frame window can be shifted in place when its retained\n  // observations are unchanged. Historical backfill, temporal-inference edits\n  // and selection changes retain the original chronological rebuild path.\n  const incrementalCommit = automatic && !isCombined && !needsHistoricalRebuild &&\n    loadedLoopSelection === loopSelection &&\n    planIncrementalRadarWindow(hybridFrames,displayFrames);\n  const oldTime = hybridFrames[hybridFrameIndex]?.observedUtc;\n  // Operators parked on Latest must follow genuine newly accepted scans.\n  // Preserve a deliberately scrubbed historical position instead.\n  const wasFollowingLatest = automatic && !isCombined &&\n    !playback.isPlaying() && hybridFrames.length > 0 &&\n    hybridFrameIndex === hybridFrames.length - 1;\n  // If startup/site-switch failed completely, the next successful recovery\n  // with genuine frames must be able to restart the playback automatically.\n  const resume = automatic ? (playback.isPlaying() || hybridFrames.length === 0) : true;"
 )
 replace_once(
     '''  hybridFrameIndex = automatic

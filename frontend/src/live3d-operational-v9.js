@@ -4747,9 +4747,23 @@ async function loadHybridSequence(automatic = false) {
     frames.push(radarLoad.value);
     states.push(availability.state);
   }
-  if (!frames.length || (automatic && !isCombined && frames.at(-1).observedUtc !== availableEndUtc)) {
-    throw new Error(newestFailure || "Newest matching images could not be loaded; keeping the current loop and retrying automatically.");
+  if (!frames.length) {
+    // No genuine observations survived: leave the previous loop untouched.
+    // The scheduler retries without promoting an empty or synthetic frame.
+    throw new Error(newestFailure ||
+      "No verified BoM radar images could be loaded; keeping the current loop and retrying automatically.");
   }
+  if(automatic && !isCombined && hybridFrames.length &&
+     Date.parse(frames.at(-1).observedUtc) <
+       Date.parse(hybridFrames.at(-1).observedUtc)){
+    // Never replace a currently playing newer observation with an older
+    // one if the source now refuses the latest tile.
+    throw new Error(newestFailure ||
+      "BoM source returned only older imagery; retaining newer verified loop.");
+  }
+  // A refused NEWEST scan must not discard other newly verified scans.
+  // Commit the available real window and let the existing one-minute
+  // source-recovery timer retry the missing UTC while playback continues.
   // Reuse observations across normal forward refreshes so the worker sees each
   // scan once and retains storm IDs/history. Manual backfill and detected
   // browser-cache backfill rebuild chronologically before continuing forward.
@@ -4892,7 +4906,9 @@ async function loadHybridSequence(automatic = false) {
   const wasFollowingLatest = automatic && !isCombined &&
     !playback.isPlaying() && hybridFrames.length > 0 &&
     hybridFrameIndex === hybridFrames.length - 1;
-  const resume = automatic ? playback.isPlaying() : true;
+  // If startup/site-switch failed completely, the next successful recovery
+  // with genuine frames must be able to restart the playback automatically.
+  const resume = automatic ? (playback.isPlaying() || hybridFrames.length === 0) : true;
   // Historical backfill can insert an older genuine observation into a live
   // loop. When the currently displayed UTC survives, remap its index without
   // stopping the playback worker or interrupting its in-flight render.
