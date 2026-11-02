@@ -56,6 +56,8 @@ assert.match(runtime,/function renderHybridTracks\(index\) \{\s*\/\/ Source-mode
   "Queued old radar work must not redraw selected cone after entering Doppler");
 assert.match(runtime,/supplementalDopplerDisplay\.setEnabled\(false\);\s*windPlaybackFrames=\[\];\s*hybridSource\.show=true;\s*\$\("showTrackLabels"\)\.disabled=false;/,
   "Returning to measured reflectivity restores label controls");
-assert.match(runtime,/renderHybridTracks\(requestedIndex\);/,
-  "Returning to reflectivity re-creates current-frame geometry from measured tracking");
+assert.match(runtime,/renderHybridTracks\(liveMeasuredIndex\);/,
+  "Returning to reflectivity re-creates measured geometry at the source-time-resolved frame");
+assert(runtime.includes("const liveMeasuredIndex=hybridCombinedSchedule.length"),
+  "Combined Doppler must retain its preexisting positional playback schedule");
 console.log("PASS Doppler mode removes selected ST cone/trails/labels and independent 3-D primitives; radar mode can re-render.");
