@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createRadarImageryHandover } from "../src/radar-imagery-handover-v1.js";
 
-function fixture() {
+function fixture({maxRetainedLayers=0}={}) {
   const listeners=new Set(), layers=[], queue=[], removed=[];
   let nextId=0;
   const scene={globe:{tilesLoaded:false},requests:0,
@@ -18,7 +18,8 @@ function fixture() {
   };
   const api=createRadarImageryHandover({imageryLayers,scene,
     setTimeoutImpl:fn=>{queue.push(fn);return ++nextId},
-    clearTimeoutImpl:()=>{}});
+    clearTimeoutImpl:()=>{},
+    maxRetainedLayers});
   const fire=()=>[...listeners].forEach(fn=>fn());
   return {scene,layers,removed,api,fire,queue,listeners};
 }
@@ -131,4 +132,32 @@ assert.equal(await cancelled,false);
 assert.equal(geometryFrame,oldGeometry,
   "failed radar tile must not advance volume to an unrenderable observation");
 synced.api.reset();
-console.log("PASS original BoM 2-D and measured-frame inferred 3-D reveal atomically, with failed tile rollback.");
+
+// One real 30-minute BoM six-frame loop must reuse the same six GPU-ready
+// raster layers on every subsequent cycle. The original PNG/provider is
+// identified by object identity, never a fabricated image or guessed UTC.
+const warm=fixture({maxRetainedLayers:5});
+const genuineProviders=Array.from({length:6},(_,i)=>({utc:"2026-11-03T00:"+String(i*5).padStart(2,"0")+":00Z"}));
+const firstLayers=[];
+for(let cycle=0;cycle<3;cycle++){
+  for(let i=0;i<6;i++){
+    const next={name:"source-"+i+"-cycle-"+cycle,imageryProvider:genuineProviders[i],alpha:1};
+    if(cycle===0)firstLayers.push(next);
+    let beforeReveal=0;
+    const swap=warm.api.replace(next,{decodedSingleTile:true,beforeReveal:()=>beforeReveal++});
+    if(cycle!==0||i!==0){warm.fire();warm.fire();warm.fire();}
+    assert.equal(await swap,true);
+    assert.equal(beforeReveal,1,"Atomic measured image and geometry handover retained");
+    assert.equal(warm.api.currentLayer.imageryProvider,genuineProviders[i]);
+    assert.equal(warm.api.currentLayer.show,true);
+    assert(warm.layers.length<=6,"Six source frames have a hard GPU-layer bound");
+  }
+}
+assert.equal(warm.layers.length,6,"Exactly one retained image per authentic UTC");
+assert.deepEqual(warm.removed,[],"No repetitive GPU teardown during six-frame playback");
+for(const layer of firstLayers)
+  assert(warm.layers.includes(layer),"Reuse original decoded source layer after repeated loops");
+warm.api.reset();
+assert.equal(warm.layers.length,0,"Site switch releases cached source layers");
+assert.equal(warm.removed.length,6,"No retained GPU resources after site reset");
+console.log("PASS original BoM 2-D and measured-frame inferred 3-D reveal atomically, with failed tile rollback and bounded six-frame GPU reuse.");
