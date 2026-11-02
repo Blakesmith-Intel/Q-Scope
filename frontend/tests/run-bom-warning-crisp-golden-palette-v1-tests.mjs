@@ -91,6 +91,8 @@ assert(importer.includes("20261102-unified-terrain-warning-polygon-v1"));
 const build=readFileSync(new URL("../../scripts/build-current-site.sh",import.meta.url),"utf8");
 assert(build.includes("20261102-idq-product-source-isolation-v1"),
  "New source-qualified warning controller must bust previously cached modules");
+assert(build.includes("idq-source-isolation-20261102-v1"),
+ "Every new browser page must force the latest source-qualified controller");
 assert(build.includes("unified-terrain-warning-polygon-20261102-v1"),
  "Fresh web application import chain must bust existing Safari/desktop module cache");
 assert(build.includes("initialiseOfficialBomWarningPolygons({viewer,CesiumRef:Cesium"),
