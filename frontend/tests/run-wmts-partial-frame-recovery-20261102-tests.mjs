@@ -81,6 +81,19 @@ try{
   globalThis.clearTimeout=originalClear;
 }
 
+// A refused but advertised old UTC is NOT a recovered measurement.
+const {needsChronologicalRadarRebuild}=await import("../src/live-loop-refresh-v1.js");
+const acceptedTimes=["2026-11-02T10:00:00Z","2026-11-02T10:10:00Z"];
+const withheldUtc="2026-11-02T10:05:00Z";
+assert(needsChronologicalRadarRebuild(
+  [...acceptedTimes,withheldUtc],acceptedTimes.at(-1),acceptedTimes));
+assert(!needsChronologicalRadarRebuild(
+  acceptedTimes,acceptedTimes.at(-1),acceptedTimes),
+  "Refused historical WMTS time must not reset worker or running player");
+assert(needsChronologicalRadarRebuild(
+  [...acceptedTimes,withheldUtc],acceptedTimes.at(-1),acceptedTimes),
+  "Once the authentic missing scan is accepted, chronological replay is required");
+
 // Source and operational Pages overlay must both schedule backfill when
 // a manual load finishes with fewer measured observations than advertised.
 const root=new URL("../../",import.meta.url);
@@ -99,6 +112,14 @@ assert.match(source,/if\(!incrementalCommit && !noninterruptingBackfill\)\{/);
 assert.match(source,/if\(resume && !incrementalCommit && !noninterruptingBackfill\)playback\.play\(\)/);
 assert.match(packageOverlay,/source\[start:end\]\+"  hybridFrames = displayFrames;"/);
 assert.match(packageOverlay,/copyfile\("frontend\/src\/radar-source\.js"/);
+// Source and exact production overlay must never full-rebuild merely
+// because a published old UTC was refused before its actual PNGs arrived.
+assert.match(source,/const recoveredHistoricalObservation =/);
+assert.match(source,/const rebuild = trackedThrough == null \\|\\| recoveredHistoricalObservation/);
+assert.match(source,/const incrementalCommit = automatic && !isCombined && !rebuild &&/);
+assert.match(packageOverlay,/rebuild_start=source\\.index/);
+assert.match(packageOverlay,/source\\[rebuild_start:rebuild_end\\]\\.rstrip\\(\\)/);
+assert.match(packageOverlay,/const incrementalCommit = automatic && !isCombined && !rebuild &&/);
 assert.match(source,/A refused NEWEST scan must not discard other newly verified scans/);
 assert.match(source,/Date\.parse\(frames\.at\(-1\)\.observedUtc\)\s*<\s*Date\.parse\(hybridFrames\.at\(-1\)\.observedUtc\)/);
 assert.match(source,/playback\.isPlaying\(\) \|\| hybridFrames\.length === 0/);
