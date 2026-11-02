@@ -96,8 +96,9 @@ export function reconcileIndexVerifiedWarningGeometry(reconciled,index,indexOnly
      !(Date.parse(warning.expiresUtc)>nowMs)||
      seen.has(warning.id))continue;
   seen.add(warning.id);warnings.push(warning);indexOnlyCount++;
-  const p=products[code],hasCurrentCap=warnings.some(w=>w.productCode===code&&
-    w.capBulletinStatus==="source-matched");
+  const p=products[code],hasCurrentCap=
+    (p.status==="active"||p.status==="geometry-unavailable")&&
+    Date.parse(p.issuedUtc)<=nowMs&&Date.parse(p.expiresUtc)>nowMs;
   products[code]={...p,status:"active",count:(p.count??0)+1,
    bulletinVerification:"pending-current-source",
    // An old cancelled CAP is NOT the current bulletin; never present its
