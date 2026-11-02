@@ -57,6 +57,8 @@ await page.route("https://blakesmith-intel.github.io/StormTracker/**",async rout
       '  window.__qaRadarStage?.("wind-preparation-start");\n  let preparedWind=null;');
     add('  await extraPreparation;',
       '  window.__qaRadarStage?.("supplemental-await");\n  await extraPreparation;\n  window.__qaRadarStage?.("supplemental-ready");');
+    add('const scene = viewer.scene;',
+      'const scene = viewer.scene;\\n  // QA-only: distinguish the start/end of a Cesium GPU render.\\n  scene.preRender.addEventListener(()=>{if(window.__qaRadarPresenting)window.__qaRadarStage?.("scene-prerender")});\\n  scene.postRender.addEventListener(()=>{if(window.__qaRadarPresenting)window.__qaRadarStage?.("scene-postrender")});');
     add('  const radarStart=performance.now();',
       '  window.__qaRadarStage?.("surface-call");\n  const radarStart=performance.now();');
     // Instrument ONLY this intercepted QA module to localise long SwiftShader
@@ -81,9 +83,26 @@ await page.route("https://blakesmith-intel.github.io/StormTracker/**",async rout
     add('  const provider=await prepareRadarSurfaceProvider(frame);',
       '  window.__qaRadarStage?.("provider-await",{utc:frame?.observedUtc});\n  const provider=await prepareRadarSurfaceProvider(frame);\n  window.__qaRadarStage?.("provider-ready",{utc:frame?.observedUtc});');
     add('  const committed = await radarImageryHandover.replace(',
-      '  window.__qaRadarStage?.("cesium-handover-await",{utc:frame?.observedUtc});\n  const committed = await radarImageryHandover.replace(');
+      '  window.__qaRadarPresenting=true;\\n  window.__qaRadarStage?.("cesium-handover-await",{utc:frame?.observedUtc});\\n  const committed = await radarImageryHandover.replace(');
     add('  if (!committed) return false;',
-      '  window.__qaRadarStage?.("cesium-handover-result",{committed});\n  if (!committed) return false;');
+      '  window.__qaRadarPresenting=false;\\n  window.__qaRadarStage?.("cesium-handover-result",{committed});\\n  if (!committed) return false;');
+    body=Buffer.from(code,"utf8");
+  }
+  if(uri.pathname.endsWith("/src/imagery-layer-retirement-v1.js")){
+    let code=body.toString("utf8");
+    const inject=(needle,replacement)=>{
+      assert.equal(code.split(needle).length,2,
+        "QA-only imagery retirement probe drift: "+needle.slice(0,70));
+      code=code.replace(needle,replacement);
+    };
+    inject('  function safelyDestroy(layer){',
+      '  function safelyDestroy(layer){\\n    window.__qaRadarStage?.("retirement-destroy-begin",{id:layer?.imageryProvider?.url??null});');
+    inject('    counts.destroyed++;',
+      '    counts.destroyed++;\\n    window.__qaRadarStage?.("retirement-destroy-end");');
+    inject('  const detach=scene.postRender.addEventListener(()=>{',
+      '  const detach=scene.postRender.addEventListener(()=>{\\n    if(window.__qaRadarPresenting)window.__qaRadarStage?.("retirement-postrender-enter");');
+    inject('    sweep();\n  // Timer requests',
+      '    sweep();\\n    if(window.__qaRadarPresenting)window.__qaRadarStage?.("retirement-postrender-exit");\\n  // Timer requests');
     body=Buffer.from(code,"utf8");
   }
   await route.fulfill({status:res.status,body,
@@ -130,7 +149,7 @@ async function snapshot(){
   button:document.querySelector("#hybridPlayButton")?.textContent?.trim(),
   diagnostics:window.__stormtrackerRadarDiagnostics?.(),
   canvases:document.querySelectorAll("#cesiumContainer canvas").length,
-  renderStages:window.__qaRadarStages?.slice(-35)
+  renderStages:window.__qaRadarStages?.slice(-65),\n  graphics:window.__stormtrackerGraphicsDiagnostics?.()??null
  }));
 }
 try{
