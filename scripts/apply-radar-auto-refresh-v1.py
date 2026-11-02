@@ -288,7 +288,7 @@ start=source.index("function buildTrackVolumeMap(")
 end=source.index("async function loadHybridSequence(automatic = false)",start)
 inject_once("async function loadHybridSequence(automatic = false)",
     source[start:end]+"async function loadHybridSequence(automatic = false)")
-start=source.index("  // On an ordinary new scan the live player")
+start=source.index("  // Historical backfill can insert an older genuine observation")
 end=source.index("  hybridFrames = displayFrames;",start)
 inject_once(
     '  $("hybridFrameSlider").disabled = true;\n  $("hybridPlayButton").disabled = true;\n  await playback.pause();\n  hybridFrames = displayFrames;',
