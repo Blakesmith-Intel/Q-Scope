@@ -21,6 +21,30 @@ const page=await browser.newPage(isDesktop
  ? {viewport:{width:1440,height:900},deviceScaleFactor:1,isMobile:false,hasTouch:false}
  : {viewport:{width:390,height:780},deviceScaleFactor:2,isMobile:true,hasTouch:true});
 page.setDefaultTimeout(180000);
+// QA-only playback transition trace: the source-verified 5->6 backfill is
+// currently successful, but WebKit sometimes exits Play unexpectedly.
+// Capture the ACTUAL call stack changing the button, not a guessed cause.
+// No modification to the packaged radar code or production behaviour.
+await page.addInitScript(()=>{
+  window.__qaPlaybackTransitions=[];
+  const descriptor=Object.getOwnPropertyDescriptor(Node.prototype,"textContent");
+  if(!descriptor?.set || !descriptor?.get)return;
+  Object.defineProperty(Node.prototype,"textContent",{
+    configurable:true,enumerable:descriptor.enumerable,
+    get(){return descriptor.get.call(this);},
+    set(value){
+      if(this?.id==="hybridPlayButton"){
+        window.__qaPlaybackTransitions.push({
+          time:Date.now(),value:String(value),
+          stack:(new Error("playback state transition")).stack?.slice(0,1700)
+        });
+        if(window.__qaPlaybackTransitions.length>20)
+          window.__qaPlaybackTransitions.shift();
+      }
+      return descriptor.set.call(this,value);
+    }
+  });
+});
 let phase="initial",heldBackUtc=null,metadataRequests=0;
 let authenticCapabilitySnapshot=null;
 const navigations=[],errors=[];
@@ -76,7 +100,8 @@ async function snapshot(){
   diagnostics:window.__stormtrackerRadarDiagnostics?.(),
   canvases:document.querySelectorAll("#cesiumContainer canvas").length,
   qaHook:typeof window.__stormtrackerRadarQaCheck,
-  status:document.querySelector("#status")?.textContent?.trim()
+  status:document.querySelector("#status")?.textContent?.trim(),
+  playbackTransitions:window.__qaPlaybackTransitions?.slice(-12)
  }));
 }
 try{
