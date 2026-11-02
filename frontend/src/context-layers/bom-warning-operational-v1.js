@@ -1,4 +1,4 @@
-import {createWarningImageryProvider,warningContainsPoint} from "./bom-warning-terrain-imagery-v1.js?v=20261030-compact-vd-hazard-v1-20261102-crisp-boM-golden-v1";
+import {createWarningImageryProvider,createWarningGroundBoundaryPrimitive,warningContainsPoint} from "./bom-warning-terrain-imagery-v1.js?v=20261102-screen-space-bom-lines-v1";
 import {formatAgencyTimestamp} from "./agency-source-time-v1.js?v=20261027-agency-panels-v1";
 const SOURCE="https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev/bom-official-warning-polygons";
 const SCHEMA="StormTrackerOfficialBoMWarningPolygonsV1",INTERVAL_MS=15*60*1000;
@@ -186,7 +186,7 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
    reportClose=$("closeOfficialBomWarningGroupsReport"),reportBody=$("officialBomWarningGroupsBody");
  if(!viewer||!CesiumRef||![toggle,state,panel,content,title,dismiss,refreshBtn,locateBtn,filter,reportButton,reportDialog,reportClose,reportBody].every(Boolean))
   return {destroy(){}};
- let warnings=[],stormCells=[],stormCellSourceStatus="unavailable",imagery=null,lastAttemptAt=0,pending=null,timer=null,activeId="",destroyed=false,sourceStatus="unavailable",productStatuses={};
+ let warnings=[],stormCells=[],stormCellSourceStatus="unavailable",imagery=null,warningBoundary=null,lastAttemptAt=0,pending=null,timer=null,activeId="",destroyed=false,sourceStatus="unavailable",productStatuses={};
  let geometryRecoveryPolls=0,geometryRecoverySignature="",temporaryFailures=0;
  const currentRefreshMs=()=>officialWarningRefreshInterval({
    products:productStatuses,warnings,recoveryPolls:geometryRecoveryPolls,
@@ -221,6 +221,10 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   if(imagery){
    viewer.imageryLayers.remove(imagery,true);imagery=null;
   }
+  if(warningBoundary){
+   viewer.scene.groundPrimitives.remove(warningBoundary);
+   warningBoundary=null;
+  }
   viewer.scene.requestRender();
  };
  function display(){
@@ -238,6 +242,11 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   // the verified polygon count was one. Insert ABOVE every basemap, but
   // restore the current primary radar to the top of the imagery stack.
   insertOfficialWarningImageryAboveBasemap(viewer.imageryLayers,imagery,getRadarLayer);
+  // Source-exact polygons, one 2px on-ground GPU boundary per true ring.
+  // Unlike a stroke baked into an imagery tile, this stays crisp at every
+  // camera zoom; only the translucent polygon fill remains below radar.
+  warningBoundary=createWarningGroundBoundaryPrimitive(CesiumRef,visible);
+  if(warningBoundary)viewer.scene.groundPrimitives.add(warningBoundary);
   viewer.scene.requestRender();
  }
  function openInfo(warning){
