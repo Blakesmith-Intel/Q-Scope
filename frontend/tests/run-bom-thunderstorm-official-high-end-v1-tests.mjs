@@ -4,6 +4,7 @@ import {classifyPublishedBoMThunderstormHazards as classify}
 import {sourceExactQldBomWfsFeatures} from "../../relay/bom-warning-gis2web-replica-v1.js";
 import {reconcileLatestBoMWarnings} from "../../relay/bom-warning-product-reconcile-v1.js";
 import {readFileSync} from "node:fs";
+import {officialBoMWarningVisualStyle} from "../src/context-layers/bom-warning-terrain-imagery-v1.js";
 
 const normal=classify({headline:"Severe Thunderstorm Warning for damaging winds, large hail and heavy rainfall"});
 assert.equal(normal.level,"severe");
@@ -52,6 +53,8 @@ assert.match(ui,/HIGH-END: /);
 assert.match(ui,/warning-area language only, no identified individual storm cells/);
 assert.match(ui,/highEnd\.join\(" · "\)/);
 const imagery=readFileSync(new URL("frontend/src/context-layers/bom-warning-terrain-imagery-v1.js",root),"utf8");
-assert.match(imagery,/entry\.productCode==="IDQ21033"&&/);
+assert.match(imagery,/BoM-yellow AREA/);
+assert.equal(officialBoMWarningVisualStyle(source[0]).stroke,"#F5C427",
+ "Regional warning areas remain golden yellow even for source-named destructive hazards");
 assert(!/\bIDQ21033\b[^\n]*veryDangerous/.test(imagery));
 console.log("PASS BoM 90/125 kmh, 2/5cm, heavy/intense, tornado escalation terms: source-verified regional high-end, never invented detailed cell identities");
