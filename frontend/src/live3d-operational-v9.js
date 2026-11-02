@@ -4767,12 +4767,34 @@ async function loadHybridSequence(automatic = false) {
   // Reuse observations across normal forward refreshes so the worker sees each
   // scan once and retains storm IDs/history. Manual backfill and detected
   // browser-cache backfill rebuild chronologically before continuing forward.
-  const rebuild =
-    trackedThrough == null
-    || needsHistoricalRebuild
-    || frames.some(frame =>
-      !radarResultCache.has(frame.observedUtc)
-      && Date.parse(frame.observedUtc) <= Date.parse(trackedThrough));
+  // Discovery may advertise a missing older UTC whose WMTS pixels are
+  // still unavailable. Do not reset the worker merely for that hint:
+  // chronological replay is necessary only after a REAL older frame loads.
+  const recoveredHistoricalObservation =
+    needsChronologicalRadarRebuild(
+      frames.map(frame => frame.observedUtc),
+      trackedThrough,
+      radarResultCache.keys()
+    );
+  const rebuild = trackedThrough == null || recoveredHistoricalObservation;
+  if(automatic && !isCombined && hybridFrames.length &&
+     loadedLoopSelection === loopSelection && !recoveredHistoricalObservation &&
+     frames.at(-1).observedUtc === hybridFrames.at(-1).observedUtc &&
+     frames.every(frame => hybridFrames.some(
+       displayed => displayed.observedUtc === frame.observedUtc))) {
+    // No new genuine frame was accepted. Keep the measured display, tracks,
+    // player and Cesium layers entirely untouched, and let the existing
+    // scheduler retry any refused older UTC after its source cooldown.
+    const skipped=summariseSkippedObservedFrames(failureDiagnostics);
+    recordRadarAutoRefreshAudit({
+      acceptedUtc:hybridFrames.at(-1).observedUtc,
+      failure:skipped.detail||null,
+      outcome:skipped.summary
+        ? "updated; some genuine source frames unavailable"
+        : "waiting for new published scan"
+    });
+    return;
+  }
   if (rebuild) {
     await hybridWorker.reset();
     radarResultCache.clear();
@@ -4897,7 +4919,7 @@ async function loadHybridSequence(automatic = false) {
   // This exact measured-frame window can be shifted in place when its retained
   // observations are unchanged. Historical backfill, temporal-inference edits
   // and selection changes retain the original chronological rebuild path.
-  const incrementalCommit = automatic && !isCombined && !needsHistoricalRebuild &&
+  const incrementalCommit = automatic && !isCombined && !rebuild &&
     loadedLoopSelection === loopSelection &&
     planIncrementalRadarWindow(hybridFrames,displayFrames);
   const oldTime = hybridFrames[hybridFrameIndex]?.observedUtc;
