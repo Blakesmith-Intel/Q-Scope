@@ -107,7 +107,8 @@ const resilient=createContinuousPlayback({
 });
 resilient.play();
 await recoveredFrames;
-await resilient.pause();
+// The test's own successful second render has already paused the player.
+// A second test-side pause would record a redundant false notification.
 assert.equal(recovered,2,"Playback must resume real frames after delayed handovers");
 assert.equal(warnings,1,"One bounded warning per failed playback cycle");
 assert.deepEqual(resilientStates,[true,false],
