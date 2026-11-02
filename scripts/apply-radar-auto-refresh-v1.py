@@ -313,6 +313,8 @@ copyfile("frontend/src/live-loop-refresh-v1.js", site / "src/live-loop-refresh-v
 # and 45-second tile rejection policy into actual production, not QA only.
 copyfile("frontend/src/radar-source.js", site / "src/radar-source.js")
 copyfile("frontend/src/radar-request-pressure-v1.js", site / "src/radar-request-pressure-v1.js")
+# Denial-aware bounded tile loading must be deployed, not only reviewed.
+copyfile("frontend/src/radar-tile-retry-v1.js", site / "src/radar-tile-retry-v1.js")
 copyfile("frontend/src/radar-viewport-continuity-v1.js", site / "src/radar-viewport-continuity-v1.js")
 copyfile("frontend/src/bom-wmts-loop-v2.js", site / "src/bom-wmts-loop-v2.js")
 copyfile("frontend/src/continuous-playback-v1.js", site / "src/continuous-playback-v1.js")
@@ -367,6 +369,7 @@ assert "radarViewportContinuityNoOp" not in data
 assert (site / "src/radar-viewport-continuity-v1.js").exists()
 assert "verifiedWmtsBlobs" in (site / "src/radar-source.js").read_text()
 assert "negativeTtlMs=45000" in (site / "src/radar-request-pressure-v1.js").read_text()
+assert "remaining tiles not requested after source refusal" in (site / "src/radar-tile-retry-v1.js").read_text()
 assert "frame?.sourceMetadata?.region !== region" in data
 assert "manual site load failed; automatic retry queued" in data
 print("RADAR_OPERATOR_CAMERA_V10_2_41_PACKAGED")

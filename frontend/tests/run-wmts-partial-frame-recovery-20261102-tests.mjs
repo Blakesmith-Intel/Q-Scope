@@ -99,4 +99,5 @@ assert.match(source,/if\(!incrementalCommit && !noninterruptingBackfill\)\{/);
 assert.match(source,/if\(resume && !incrementalCommit && !noninterruptingBackfill\)playback\.play\(\)/);
 assert.match(packageOverlay,/source\[start:end\]\+"  hybridFrames = displayFrames;"/);
 assert.match(packageOverlay,/copyfile\("frontend\/src\/radar-source\.js"/);
+assert.match(packageOverlay,/copyfile\("frontend\/src\/radar-tile-retry-v1\.js"/);
 console.log("PASS Taroom/global real-tile timeout and six-frame missing-observation recovery source + shipped overlay");
