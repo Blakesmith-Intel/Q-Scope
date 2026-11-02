@@ -160,6 +160,20 @@ try{
  assert.equal(navigations.length,1,"Unexpected navigation");
  assert(metadataRequests>=2,"New genuine metadata was not fetched");
  assert.equal(after.label.split("/")[1],"6");
+ // Completion of a source backfill is not the same as a healthy playback
+ // loop. Prove the actual displayed index advances without operator input,
+ // page restart, inferred replacement pixels or playback timer reset.
+ await page.waitForFunction(previous=>{
+  const displayed=document.querySelector("#hybridFrameLabel")?.textContent?.trim();
+  return document.querySelector("#hybridPlayButton")?.textContent?.trim()==="Pause" &&
+    String(displayed??"").includes("/6") && displayed!==previous;
+ },after.label,{timeout:90000,polling:250});
+ const progressed=await snapshot();
+ assert.equal(progressed.button,"Pause","Visible frame advanced but playback stopped");
+ console.log("REAL_SOURCE_VISIBLE_BACKFILL_PLAYBACK_PASS",JSON.stringify({
+  platform:isDesktop?"desktop Chromium":"mobile WebKit",
+  previousFrame:after.label,displayedFrame:progressed.label
+ }));
  console.log("REAL_SOURCE_MISSING_FRAME_RECOVERY_PASS",JSON.stringify({platform:isDesktop?"desktop Chromium":"mobile WebKit",
   beforeUtc:before.diagnostics.automatic.newestAcceptedUtc,
   afterUtc:after.diagnostics.automatic.newestAcceptedUtc,heldBackUtc,
