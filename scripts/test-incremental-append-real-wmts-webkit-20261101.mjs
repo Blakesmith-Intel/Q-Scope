@@ -20,6 +20,17 @@ const page=await browser.newPage(isDesktop
  ? {viewport:{width:1440,height:900},deviceScaleFactor:1,isMobile:false,hasTouch:false}
  : {viewport:{width:390,height:780},deviceScaleFactor:2,isMobile:true,hasTouch:true});
 page.setDefaultTimeout(180000);
+// Browser QA only: trace the actual frame-presentation await which stalls
+// Chromium even when the genuine BoM UTC was appended. These probes are
+// injected into the LOCAL preview response, not application/production files.
+await page.addInitScript(()=>{
+ window.__qaRadarStages=[];
+ window.__qaRadarStage=(stage,details={})=>{
+   const trail=window.__qaRadarStages;
+   trail.push({at:Math.round(performance.now()),stage,...details});
+   if(trail.length>100)trail.shift();
+ };
+});
 let phase="initial",heldBackUtc=null,metadataRequests=0;
 let authenticCapabilitySnapshot=null;
 const navigations=[],errors=[];
@@ -30,7 +41,35 @@ await page.route("https://blakesmith-intel.github.io/StormTracker/**",async rout
  const local="http://127.0.0.1:8137"+uri.pathname.replace("/StormTracker","")+uri.search;
  try{
   const res=await fetch(local);
-  await route.fulfill({status:res.status,body:Buffer.from(await res.arrayBuffer()),
+  let body=Buffer.from(await res.arrayBuffer());
+  if(uri.pathname.endsWith("/src/live3d-operational-v9.js")){
+    let code=body.toString("utf8");
+    const add=(needle,replacement)=>{
+      assert.equal(code.split(needle).length,2,
+        "QA-only playback stage probe drift: "+needle.slice(0,60));
+      code=code.replace(needle,replacement);
+    };
+    add('async function showHybridFrame(index) {',
+      'async function showHybridFrame(index) {\n  window.__qaRadarStage?.("present-start",{index});');
+    add('  const frame=hybridFrames[requestedIndex];',
+      '  const frame=hybridFrames[requestedIndex];\n  window.__qaRadarStage?.("present-frame",{index:requestedIndex,utc:frame?.observedUtc});');
+    add('  let preparedWind=null;',
+      '  window.__qaRadarStage?.("wind-preparation-start");\n  let preparedWind=null;');
+    add('  await extraPreparation;',
+      '  window.__qaRadarStage?.("supplemental-await");\n  await extraPreparation;\n  window.__qaRadarStage?.("supplemental-ready");');
+    add('  const radarStart=performance.now();',
+      '  window.__qaRadarStage?.("surface-call");\n  const radarStart=performance.now();');
+    add('  radarPresentationMs=performance.now()-radarStart;',
+      '  radarPresentationMs=performance.now()-radarStart;\n  window.__qaRadarStage?.("surface-return",{applied:surfaceApplied});');
+    add('  const provider=await prepareRadarSurfaceProvider(frame);',
+      '  window.__qaRadarStage?.("provider-await",{utc:frame?.observedUtc});\n  const provider=await prepareRadarSurfaceProvider(frame);\n  window.__qaRadarStage?.("provider-ready",{utc:frame?.observedUtc});');
+    add('  const committed = await radarImageryHandover.replace(',
+      '  window.__qaRadarStage?.("cesium-handover-await",{utc:frame?.observedUtc});\n  const committed = await radarImageryHandover.replace(');
+    add('  if (!committed) return false;',
+      '  window.__qaRadarStage?.("cesium-handover-result",{committed});\n  if (!committed) return false;');
+    body=Buffer.from(code,"utf8");
+  }
+  await route.fulfill({status:res.status,body,
    contentType:res.headers.get("content-type")||"application/octet-stream"});
  }catch{await route.abort("failed");}
 });
@@ -73,7 +112,7 @@ async function snapshot(){
   site:document.querySelector("#radarSite")?.value,
   button:document.querySelector("#hybridPlayButton")?.textContent?.trim(),
   diagnostics:window.__stormtrackerRadarDiagnostics?.(),
-  canvases:document.querySelectorAll("#cesiumContainer canvas").length
+  canvases:document.querySelectorAll("#cesiumContainer canvas").length,\n  renderStages:window.__qaRadarStages?.slice(-35)
  }));
 }
 try{
