@@ -4778,7 +4778,7 @@ async function loadHybridSequence(automatic = false) {
     );
   const rebuild = trackedThrough == null || recoveredHistoricalObservation;
   if(automatic && !isCombined && hybridFrames.length &&
-     loadedLoopSelection === loopSelection && !recoveredHistoricalObservation &&
+     loadedLoopSelection === loopSelection && !rebuild &&
      frames.at(-1).observedUtc === hybridFrames.at(-1).observedUtc &&
      frames.every(frame => hybridFrames.some(
        displayed => displayed.observedUtc === frame.observedUtc))) {
