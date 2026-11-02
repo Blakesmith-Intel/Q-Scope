@@ -1769,6 +1769,10 @@ async function renderSurface(frame,renderToken=null,{timeoutMs=2200,onBeforeReve
       // prepareRadarSurfaceProvider only returns after source image decode.
       // Global terrain/basemap tile requests must not stall this handover.
       decodedSingleTile: true,
+      // Cache only genuine measured BoM observations. The existing
+      // display-only temporal/motion intermediates are never retained as
+      // measured scans or silently promoted to the GPU source cache.
+      cacheEligible: !frame?.sourceMetadata?.temporalInference,
       beforeReveal:onBeforeReveal,
       isCurrent: () => renderToken == null ||
         renderToken === hybridSceneRenderToken
