@@ -54,14 +54,18 @@ const denied=()=>{
 };
 const noProgress=guard.run("refused-1",denied);
 await assert.rejects(noProgress,/HTTP 403/);
+await assert.rejects(guard.run("refused-1",denied),/HTTP 403.*source refusal cooldown/);
+assert.equal(deniedCalls,1,"Exact denied tile must be quarantined for one short cooldown");
 const independent=await guard.run("different-region-tile",
   ()=>Promise.resolve({width:256,height:256}));
 assert.equal(independent.width,256,
   "One 403 on an individual radar tile must not block another radar");
 await assert.rejects(guard.run("refused-2",denied),/HTTP 403/);
 await assert.rejects(guard.run("refused-3",denied),/HTTP 403/);
+await assert.rejects(guard.run("refused-4",denied),/HTTP 403/);
 await assert.rejects(guard.run("different-source-time",denied),/relay cooldown/);
-assert.equal(deniedCalls,3,"Three refusals trigger finite circuit to prevent source hammering");
+assert.equal(deniedCalls,4,
+  "Only three fresh consecutive denials, not replays of cached URLs, open the global circuit");
 clock+=2100;
 const recovered=await guard.run("after-cooldown",()=>Promise.resolve({width:256,height:256}));
 assert.equal(recovered.width,256);

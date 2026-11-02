@@ -34,12 +34,24 @@ export function createRadarRequestPressureGuard({
       const item=queue.shift();
       active++;metrics.started++;metrics.peakActive=Math.max(active,metrics.peakActive);
       Promise.resolve().then(item.fetchTile).then(
-        result=>{active--;inflight.delete(item.url);item.resolve(result);next();},
+        result=>{
+          active--;inflight.delete(item.url);
+          // A successful native PNG read breaks an apparent denial streak;
+          // independent radar tiles must not be mistaken for a global ban.
+          consecutiveRefusals=0;
+          item.resolve(result);next();
+        },
         error=>{
           active--;inflight.delete(item.url);
           const status=Number(error?.status)||0;
-          if(status===400) {
-            negative.set(item.url,{until:now()+negativeTtlMs,status});
+          if(status===400 || status===403) {
+            // Exact-URL 403 backoff is short-lived and independently scoped
+            // by genuine tile coordinate + published UTC. No cross-site
+            // quarantine or substitution of a different observation.
+            negative.set(item.url,{
+              until:now()+(status===403?deniedCooldownMs:negativeTtlMs),
+              status
+            });
             if(negative.size>320)negative.delete(negative.keys().next().value);
           }
           // A single HTTP 403 on a geographic WMTS tile may be local to
@@ -68,7 +80,9 @@ export function createRadarRequestPressureGuard({
     if(typeof fetchTile!=="function" || !url)throw TypeError("URL and loader required");
     const cached=negative.get(url),time=now();
     if(cached && cached.until>time){
-      metrics.negativeHits++;return Promise.reject(statusError(cached.status,"known unavailable tile"));
+      metrics.negativeHits++;
+      return Promise.reject(statusError(cached.status,
+        cached.status===403?"source refusal cooldown":"known unavailable tile"));
     }
     if(time<blockedUntil){
       metrics.blocked++;return Promise.reject(statusError(blockedStatus,"relay cooldown"));

@@ -51,13 +51,16 @@ try{
   assert(baselineCount>=1,"No real BoM frame at "+region);
   assert(baseline.pressure?.peakActive>0 && baseline.pressure.peakActive<=2,
     "Radar WMTS source not protected by shared two-request limit in review path");
-  // The immediately preceding authoritative source audit verifies six fully
-  // readable tilesets for these sites; 5/5 in the browser is then a real
-  // application defect, not a missing BoM source observation.
-  if(["08","23","66"].includes(region))
+  // The separate complete-mosaic source check covers Gympie (08) and
+  // Gladstone (23). It does not certify Stapylton (66), and BoM publication
+  // may change between that audit and this later browser load. Always report
+  // exact source refusals rather than diagnosing every short loop as a UI bug.
+  if(["08","23"].includes(region))
     assert.equal(baselineCount,6,
-      "BoM publishes six source-complete frames but UI loaded "+baseline.label+
-      " at radar "+region);
+      "Published six-frame audit differs from live browser at radar "+region+
+      ": "+baseline.label+"; source failures="+
+      JSON.stringify(baseline.diagnostic?.tileFailures?.slice(-5)??[])+
+      "; refresh="+JSON.stringify(baseline.diagnostic?.automatic));
   assert(baseline.graphics,
     "QA subpath wrongly bypassed production radar graphics/recovery path");
   assert.equal(baseline.diagnostic?.lifecycle?.bootCount,1,
