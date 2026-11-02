@@ -101,6 +101,24 @@ rebuild_start=source.index("  // Discovery may advertise a missing older UTC")
 rebuild_end=source.index("  if (rebuild) {",rebuild_start)
 replace_once(old_rebuild,source[rebuild_start:rebuild_end].rstrip())
 
+# The active player can finish rendering an OLD array index after the
+# six-frame source window has shifted. Resolve 2-D/3-D/slider by actual BoM
+# UTC on the exact shipped Cesium runtime. Do not alter combined Doppler steps.
+old_geometry='''    renderInferredVolume(frame);
+    updateTrackDisplayControls(requestedIndex);
+    applyHybridVolumeMode(requestedIndex);
+    renderHybridTracks(requestedIndex);
+    syncSevereStormAlerts(requestedIndex);'''
+geometry_start=source.index("    // An automatic genuine-scan append/backfill")
+geometry_end=source.index("    if(supplementalMeasurable){",geometry_start)
+replace_once(old_geometry,source[geometry_start:geometry_end].rstrip())
+
+old_cursor='''  hybridFrameIndex=requestedIndex;
+  latestFrame=frame;'''
+cursor_start=source.index("  const liveDisplayedIndex=hybridCombinedSchedule.length")
+cursor_end=source.index("  // Supplemental image+volume reveal",cursor_start)
+replace_once(old_cursor,source[cursor_start:cursor_end].rstrip())
+
 # Source discovery failures must be handed back to the refresh scheduler.
 replace_once(
     '''    $("autoRefreshNote").textContent =
