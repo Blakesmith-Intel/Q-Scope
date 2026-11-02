@@ -40,6 +40,7 @@ try{
    productCode:"IDQ21035",sourceProduct:"IDQ65652",geometry:g(148),
    veryDangerous:false};
   const vds={...cell,geometry:g(151),veryDangerous:true};
+  const originalRings=[area,cell,vds].map(f=>JSON.stringify(f.geometry));
   const provider=mod.createWarningImageryProvider(CesiumStub,[area,cell,vds]);
   const canvas=await provider.requestImage(0,0,7),ctx=canvas.getContext("2d");
   const width=canvas.width,height=canvas.height;
@@ -65,12 +66,16 @@ try{
    dangerous:edgeStats(151.5),
    areaInterior:sample(145.5,-27.5),
    outside:sample(143,-26.5),
+   authenticVerticesUnmodified:[area,cell,vds].every((f,i)=>
+    JSON.stringify(f.geometry)===originalRings[i]),
    warningModuleImport:await fetch("/src/context-layers/bom-warning-operational-v1.js")
     .then(r=>r.text()).then(s=>s.includes("20261102-crisp-boM-golden-v1"))};
  });
  assert.equal(measured.width,1024);
  assert.equal(measured.height,1024);
  assert(measured.warningModuleImport,"Compiled operator uses the fresh warning drawing module");
+ assert(measured.authenticVerticesUnmodified,
+  "Visual rendering must never modify official geometry vertices");
  const colourIs=(v,r,g,b)=>Math.abs(v[0]-r)<20&&Math.abs(v[1]-g)<20&&Math.abs(v[2]-b)<20;
  assert(colourIs(measured.area.dominant,245,196,39),
   "Regional area must be solid BoM-style golden yellow: "+JSON.stringify(measured.area));
