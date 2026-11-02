@@ -227,7 +227,12 @@ jobs:
           PY
           grep -Fq 'v10.2.45-production-source-verified-20261101-' _site/index.html
           grep -Fq 'V10.2.45 OPERATOR-APPROVED PRODUCTION' _site/BUILD.txt
-          grep -Fq 'v10-2-46-live-polygon-catchup' _site/src/live3d-operational-v9.js
+          # The browser module import now has a newer cache identity. Verify
+          # the actual source-qualified IDQ product controller instead of a
+          # historic V10.2.46 import token, while retaining recovery tests.
+          grep -Fq '20261102-idq-product-source-isolation-v1' _site/src/live3d-operational-v9.js
+          grep -Fq 'isSourceMatchedOfficialWarningPolygon' _site/src/context-layers/bom-warning-operational-v1.js
+          grep -Fq 'selectVisibleOfficialBoMGeometry' _site/src/context-layers/bom-warning-operational-v1.js
           grep -Fq 'WARNING_GEOMETRY_RECOVERY_MS=2*60*1000' _site/src/context-layers/bom-warning-operational-v1.js
           grep -Fq 'WARNING_GEOMETRY_RECOVERY_MAX=9' _site/src/context-layers/bom-warning-operational-v1.js
           grep -Fq 'INTERVAL_MS=15*60*1000' _site/src/context-layers/bom-warning-operational-v1.js
