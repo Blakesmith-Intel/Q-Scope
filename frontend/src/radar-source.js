@@ -7,6 +7,9 @@ const guardedRadarRequests=createRadarRequestPressureGuard();
 // not re-download identical original BoM images. URLs include exact UTC,
 // tile row/column and product, so a cached blob cannot be misdated.
 const VERIFIED_WMTS_BLOB_LIMIT=96;
+// A stalled relay/browser fetch must not hold a scarce source request slot
+// indefinitely. The timer starts only after the queued request runs.
+export const WMTS_TILE_REQUEST_TIMEOUT_MS=15000;
 const verifiedWmtsBlobs=new Map();
 const isWmtsTile=url=>/\/wmts\?/i.test(String(url));
 function cachedVerifiedWmtsBlob(url){
@@ -97,26 +100,33 @@ export async function fetchReadableImage(url) {
   const verifiedBlob=isWmts?cachedVerifiedWmtsBlob(url):null;
   if(verifiedBlob)return blobToImageData(verifiedBlob);
   const read=async()=>{
-  let response;
-
+  let blob;
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),WMTS_TILE_REQUEST_TIMEOUT_MS);
   try {
-    response = await fetch(url, {
+    const response=await fetch(url, {
       mode: "cors",
-      cache: "no-store"
+      cache: "no-store",
+      signal:controller.signal
     });
+    if (!response.ok) {
+      const error=new Error(`Image request failed: HTTP ${response.status}`);
+      error.status=response.status;
+      throw error;
+    }
+    // Keep the deadline active until every real PNG byte arrives. Receiving
+    // HTTP headers alone does not verify an authentic source image.
+    blob=await response.blob();
   } catch (error) {
+    if(Number(error?.status))throw error;
+    if(error?.name==="AbortError")
+      throw new Error(`BoM WMTS tile timed out after ${WMTS_TILE_REQUEST_TIMEOUT_MS} ms`);
     throw new Error(
-      `Browser could not fetch readable radar pixels (network/CORS): ${error.message}`
+      `Browser could not fetch readable radar pixels (network/CORS): ${error?.message??error}`
     );
+  } finally {
+    clearTimeout(timer);
   }
-
-  if (!response.ok) {
-    const error=new Error(`Image request failed: HTTP ${response.status}`);
-    error.status=response.status;
-    throw error;
-  }
-
-  const blob=await response.blob();
   const pixels=await blobToImageData(blob);
   if(isWmts)rememberVerifiedWmtsBlob(url,blob);
   return pixels;
