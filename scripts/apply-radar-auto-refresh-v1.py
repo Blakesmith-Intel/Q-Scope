@@ -362,6 +362,22 @@ end=data.index("  hybridDopplerFrameStates = []; // Independent Doppler never bo
 assert data.count("  const previousByTrack =\n    new Map();")==1
 data=data[:start]+new_volume+data[end:]
 
+# The exact Pages build starts from the sealed source: apply the same bounded
+# browser render budget and opt into resilient player retries there too.
+# Source WMTS pixels, 3-D geometry, Doppler, multi-radar UTC and camera stay unchanged.
+inject_once(
+    '      timeoutMs:playback.isPlaying() ? 1100 : 2200,\n      onBeforeReveal:commitMeasuredGeometry',
+    '      // This source tile is already decoded. Slow Cesium/WebKit postRender\n'
+    '      // boundaries need a finite render budget, not a 1.1-second refusal.\n'
+    '      // Handover still requires the existing three render boundaries and\n'
+    '      // atomically reveals the unchanged BoM pixels with matching 3-D.\n'
+    '      timeoutMs:10000,\n      onBeforeReveal:commitMeasuredGeometry'
+)
+inject_once(
+    '  delay: () => effectivePlaybackDelayMs(),\n  onPlayingChange:',
+    '  delay: () => effectivePlaybackDelayMs(),\n  continueOnFailedCycle: true,\n  onPlayingChange:'
+)
+
 app.write_text(data, encoding="utf-8")
 copyfile("frontend/src/live-loop-refresh-v1.js", site / "src/live-loop-refresh-v1.js")
 # The sealed production bundle historically used an older radar-source and
