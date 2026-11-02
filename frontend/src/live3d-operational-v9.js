@@ -927,6 +927,7 @@ const playback = createContinuousPlayback({
   currentIndex: () => isNativeDopplerPlayback() ? independentDopplerIndexValue : hybridFrameIndex,
   showFrame: index => isNativeDopplerPlayback() ? showDopplerOnlyFrame(index) : showHybridFrame(index),
   delay: () => effectivePlaybackDelayMs(),
+  continueOnFailedCycle: true,
   onPlayingChange: playing => {
     $("hybridPlayButton").textContent = playing ? "Pause" : "Play";
     $("hybridPlayButton").setAttribute("aria-pressed", String(playing));
@@ -4094,7 +4095,11 @@ async function showHybridFrame(index) {
   };
   try {
     surfaceApplied=windOnlyStep ? true : await renderSurface(frame,renderToken,{
-      timeoutMs:playback.isPlaying() ? 1100 : 2200,
+      // This source tile is already decoded. Slow Cesium/WebKit postRender
+      // boundaries need a finite render budget, not a 1.1-second refusal.
+      // Handover still requires the existing three render boundaries and
+      // atomically reveals the unchanged BoM pixels with matching 3-D.
+      timeoutMs:10000,
       onBeforeReveal:commitMeasuredGeometry
     });
   } catch(error) {
