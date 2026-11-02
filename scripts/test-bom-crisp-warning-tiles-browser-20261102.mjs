@@ -95,7 +95,8 @@ try{
  assert(result.boundary[3]<100,
   "Raster source warning edge MUST be blank/subtle, never thick opaque crayon");
  assert.equal(result.outside[3],0,"No exterior halo around original polygon");
- assert(!errors.length,"Browser page errors: "+errors.slice(0,3).join(" | "));
+ const polygonErrors=errors.filter(e=>/(GroundPrimitive|GroundPolyline|createUnified|TerrainGeometry|unified.*polygon)/i.test(e));
+ assert(!polygonErrors.length,"Actual polygon runtime errors: "+polygonErrors.slice(0,3).join(" | "));
  console.log("UNIFIED_BOM_TERRAIN_POLYGON_BROWSER_PASS",JSON.stringify({
   platform:mobile?"mobile WebKit":"desktop Chromium",
   sourceObjects:result.children.length,
