@@ -115,10 +115,10 @@ assert.match(packageOverlay,/copyfile\("frontend\/src\/radar-source\.js"/);
 // Source and exact production overlay must never full-rebuild merely
 // because a published old UTC was refused before its actual PNGs arrived.
 assert.match(source,/const recoveredHistoricalObservation =/);
-assert.match(source,/const rebuild = trackedThrough == null \\|\\| recoveredHistoricalObservation/);
+assert(source.includes("const rebuild = trackedThrough == null || recoveredHistoricalObservation"));
 assert.match(source,/const incrementalCommit = automatic && !isCombined && !rebuild &&/);
-assert.match(packageOverlay,/rebuild_start=source\\.index/);
-assert.match(packageOverlay,/source\\[rebuild_start:rebuild_end\\]\\.rstrip\\(\\)/);
+assert(packageOverlay.includes("rebuild_start=source.index"));
+assert(packageOverlay.includes("source[rebuild_start:rebuild_end].rstrip()"));
 assert.match(packageOverlay,/const incrementalCommit = automatic && !isCombined && !rebuild &&/);
 assert.match(source,/A refused NEWEST scan must not discard other newly verified scans/);
 assert.match(source,/Date\.parse\(frames\.at\(-1\)\.observedUtc\)\s*<\s*Date\.parse\(hybridFrames\.at\(-1\)\.observedUtc\)/);
