@@ -4893,9 +4893,18 @@ async function loadHybridSequence(automatic = false) {
     !playback.isPlaying() && hybridFrames.length > 0 &&
     hybridFrameIndex === hybridFrames.length - 1;
   const resume = automatic ? playback.isPlaying() : true;
-  // On an ordinary new scan the live player owns its existing timer.
-  // Do not pause it, reset its worker, or recreate old track volumes.
-  if(!incrementalCommit){
+  // Historical backfill can insert an older genuine observation into a live
+  // loop. When the currently displayed UTC survives, remap its index without
+  // stopping the playback worker or interrupting its in-flight render.
+  // Selection changes and incompatible timelines retain the guarded
+  // pause/rebuild path. The actual measured frames/tracks are still rebuilt.
+  const noninterruptingBackfill = automatic && !incrementalCommit &&
+    !isCombined && loadedLoopSelection === loopSelection &&
+    playback.isPlaying() && Boolean(oldTime) &&
+    displayFrames.some(frame=>frame.observedUtc===oldTime);
+  // On an ordinary new scan or compatible historical backfill the live
+  // player owns its existing timer.
+  if(!incrementalCommit && !noninterruptingBackfill){
     $("hybridFrameSlider").disabled = true;
     $("hybridPlayButton").disabled = true;
     await playback.pause();
@@ -5031,7 +5040,7 @@ async function loadHybridSequence(automatic = false) {
   $("hybridPlayButton").disabled = hybridFrames.length < 2;
   // Never cause a second render over the active player's own in-flight render.
   // A paused Latest operator still sees the just-accepted newest observation.
-  if(!incrementalCommit || !playback.isPlaying())
+  if((!incrementalCommit && !noninterruptingBackfill) || !playback.isPlaying())
     await showHybridFrame(hybridFrameIndex);
   radarLifecycle.sampleMemory({
     region,latestUtc:frames.at(-1).observedUtc,
@@ -5047,7 +5056,7 @@ async function loadHybridSequence(automatic = false) {
           incrementalCommit.dropped + " retired"
         : automatic ? "updated by chronological rebuild" : "manual load complete"
   });
-  if(resume && !incrementalCommit)playback.play();
+  if(resume && !incrementalCommit && !noninterruptingBackfill)playback.play();
   // Bound decoded imagery and per-frame results while retaining worker tracks.
   // Playback references remain in hybridFrames and hybridResults. The extra
   // archive cache can release old decoded source data beyond that window.
