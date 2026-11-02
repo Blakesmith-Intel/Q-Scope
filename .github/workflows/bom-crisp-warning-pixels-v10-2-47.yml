@@ -61,7 +61,7 @@ jobs:
           python scripts/apply-ftp-aep-release-v10.py
           python scripts/apply-radar-auto-refresh-v1.py
           node --check _site/src/context-layers/bom-warning-terrain-imagery-v1.js
-          grep -Fq '20261102-crisp-boM-golden-v1' _site/src/context-layers/bom-warning-operational-v1.js
+          grep -Fq '20261102-unified-terrain-warning-polygon-v1' _site/src/context-layers/bom-warning-operational-v1.js
       - name: Install Chromium or WebKit
         run: |
           npm install --no-save --ignore-scripts playwright@1.58.2
