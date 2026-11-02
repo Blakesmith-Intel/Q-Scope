@@ -156,4 +156,10 @@ assert(source.includes("timeoutMs:10000,"),
   "Actual predecoded Cesium tiles need a bounded but mobile-safe handover window");
 assert(packageOverlay.includes("timeoutMs:10000,"),
   "Production-equivalent build must carry the handover budget");
+assert(source.includes("maxRetainedLayers:5"),
+  "Operator primary must reuse bounded authentic GPU imagery surfaces");
+assert(packageOverlay.includes("maxRetainedLayers:5"),
+  "The production-equivalent bundle must activate primary GPU reuse");
+assert(packageOverlay.includes('copyfile("frontend/src/radar-imagery-handover-v1.js"'),
+  "The real packaged application must contain the matching GPU handover helper");
 console.log("PASS Taroom/global real-tile timeout and six-frame missing-observation recovery source + shipped overlay");
