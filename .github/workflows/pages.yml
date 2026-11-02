@@ -800,7 +800,9 @@ jobs:
             warning="$(curl -fsSL --max-time 20 "$base/src/context-layers/bom-warning-operational-v1.js$suffix" || true)"
             if grep -Fq 'v10.2.46-warning-source-catchup-20261101-' <<< "$html" &&
                grep -Fq 'V10.2.46 VERIFIED BOM WARNING POLYGON CATCH-UP' <<< "$manifest" &&
-               grep -Fq 'v10-2-46-live-polygon-catchup' <<< "$engine" &&
+               grep -Fq '20261102-idq-product-source-isolation-v1' <<< "$engine" &&
+               grep -Fq 'isSourceMatchedOfficialWarningPolygon' <<< "$warning" &&
+               grep -Fq 'selectVisibleOfficialBoMGeometry' <<< "$warning" &&
                grep -Fq 'planIncrementalRadarWindow(hybridFrames,displayFrames)' <<< "$engine" &&
                grep -Fq 'WARNING_GEOMETRY_RECOVERY_MS=2*60*1000' <<< "$warning" &&
                grep -Fq 'WARNING_GEOMETRY_RECOVERY_MAX=9' <<< "$warning" &&
