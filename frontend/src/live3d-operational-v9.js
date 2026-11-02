@@ -5104,7 +5104,22 @@ async function runSourceLoad(loader, background = false) {
   }
   try {
     await loader();
-    if(manualRadarRecoveryTimer!==null){
+    // A partial but usable loop is not a completed source check. Keep the
+    // genuine images on screen, but arrange a bounded follow-up for the
+    // missing published UTCs without disturbing the five-minute poll.
+    if(radarAutoRefreshAudit.lastOutcome ===
+        "updated; some genuine source frames unavailable"){
+      if(background)throw new Error(
+        "Incomplete BoM radar history; retrying missing genuine observations: "+
+        (radarAutoRefreshAudit.lastFailure||"source tile unavailable"));
+      if(manualRadarRecoveryTimer!==null)clearTimeout(manualRadarRecoveryTimer);
+      manualRadarRecoveryTimer=setTimeout(()=>{
+        manualRadarRecoveryTimer=null;
+        if(!document.hidden)void autoRefresh.check();
+      },60000);
+      $("autoRefreshNote").textContent =
+        "BoM radar frames incomplete; retrying missing genuine observations automatically.";
+    }else if(manualRadarRecoveryTimer!==null){
       clearTimeout(manualRadarRecoveryTimer);
       manualRadarRecoveryTimer=null;
     }
