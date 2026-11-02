@@ -43,22 +43,21 @@ function checkGeometry(g){
    polys.map(p=>p.map(checkRing))};
 }
 export function sourceExactQldBomWfsFeatures(collection,notice,{nowMs=Date.now(),officialIndexActive=false}={}){
- // Separately issued active CAP bulletins under one IDQ product may each
- // have their own independently valid geospatial features. Source-match
- // EACH feature to its authentic, current issue instead of latest-only.
- const notices=Array.isArray(notice)?notice:[notice];
- const code=notices[0]?.productCode,source=allowed(code);
- const activeNotices=notices.filter(n=>n?.productCode===code&&
-   n.status==="issued"&&Number.isFinite(timeMs(n.issuedUtc))&&
-   Number.isFinite(timeMs(n.expiresUtc))&&
-   timeMs(n.issuedUtc)<=nowMs+300000&&timeMs(n.expiresUtc)>nowMs);
+ // Keep the original newest-CAP-issue matching rule. The separately
+ // verified BoM current-index + original GIS path is ONLY a fallback when
+ // distribution of that newest CAP bulletin has not yet caught up.
+ const code=notice?.productCode,source=allowed(code);
+ const activeNotice=notice?.status==="issued"&&
+   Number.isFinite(timeMs(notice.issuedUtc))&&
+   Number.isFinite(timeMs(notice.expiresUtc))&&
+   timeMs(notice.issuedUtc)<=nowMs+300000&&timeMs(notice.expiresUtc)>nowMs;
  // CAP dissemination sometimes lags the current Queensland BoM index and
  // separately issued original GIS geometry. A source-index fallback is valid
  // only for the two thunderstorm products, with fresh independently verified
  // index AND the still-valid original government-hosted geometry.
  const indexFallback=officialIndexActive&&["IDQ21033","IDQ21035"].includes(code);
  if(!source||!QLD_WARNING_PRODUCTS[code]||
-   (!activeNotices.length&&!indexFallback))return [];
+   (!activeNotice&&!indexFallback))return [];
  if(collection?.type!=="FeatureCollection"||!Array.isArray(collection.features)||
     collection.error||collection.features.length>500||
     collection.exceededTransferLimit===true)
@@ -76,8 +75,8 @@ export function sourceExactQldBomWfsFeatures(collection,notice,{nowMs=Date.now()
   // validity end, which can legitimately be hours earlier.
   // Observed 30 Oct 2026: CAP expires 10:45:08Z, original GIS polygon
   // expires 08:45:08Z, but both issue times match within four seconds.
-  const matchedNotice=activeNotices.find(n=>
-    Math.abs(from-timeMs(n.issuedUtc))<=120000);
+  const matchedNotice=activeNotice&&
+    Math.abs(from-timeMs(notice.issuedUtc))<=120000?notice:null;
   if(!matchedNotice&&!indexFallback)continue;
   // Restrict index/GIS-only geometries to source-issued recent storm products,
   // preventing an old feature with an implausibly long expiry from appearing
@@ -128,7 +127,7 @@ export function sourceExactQldBomWfsFeatures(collection,notice,{nowMs=Date.now()
  }
  return warnings;
 }
-export async function fetchQldBomWfsGeometry(notice,{fetchImpl=fetch,nowMs=Date.now(),relatedNotices=null,officialIndexActive=false}={}){
+export async function fetchQldBomWfsGeometry(notice,{fetchImpl=fetch,nowMs=Date.now(),officialIndexActive=false}={}){
  const source=allowed(notice?.productCode);
  if(!source)return [];
  const url=new URL(QLD_BOM_GIS_WARNING_REPLICA+"/"+source.layer+"/query");
@@ -148,7 +147,7 @@ export async function fetchQldBomWfsGeometry(notice,{fetchImpl=fetch,nowMs=Date.
  let collection;
  try{collection=JSON.parse(text);}catch{throw Error("Invalid government BoM GIS JSON");}
  if(collection?.error)throw Error("Government BoM GIS unavailable: "+String(collection.error.code??"API error"));
- return sourceExactQldBomWfsFeatures(collection,relatedNotices??notice,{nowMs,officialIndexActive});
+ return sourceExactQldBomWfsFeatures(collection,notice,{nowMs,officialIndexActive});
 }
 
 // IDQ21035 also has a DISTINCT BoM product for source-issued storm-cell
