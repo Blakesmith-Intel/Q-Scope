@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   exact-tiles:
-    if: github.head_ref == 'feature/incremental-radar-frames-20261101'
+    if: github.head_ref == 'feature/incremental-radar-frames-20261101' || github.head_ref == 'fix/taroom-radar-preflight-six-frame-recovery-20261102'
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     steps:
@@ -36,7 +36,7 @@ jobs:
         run: node scripts/audit-all-radar-wmts-spotcheck-20261101.mjs
 
   genuine-mobile:
-    if: github.head_ref == 'feature/incremental-radar-frames-20261101'
+    if: github.head_ref == 'feature/incremental-radar-frames-20261101' || github.head_ref == 'fix/taroom-radar-preflight-six-frame-recovery-20261102'
     needs: exact-tiles
     runs-on: ubuntu-24.04
     timeout-minutes: 24
@@ -94,7 +94,7 @@ jobs:
           if-no-files-found: ignore
 
   genuine-desktop:
-    if: github.head_ref == 'feature/incremental-radar-frames-20261101'
+    if: github.head_ref == 'feature/incremental-radar-frames-20261101' || github.head_ref == 'fix/taroom-radar-preflight-six-frame-recovery-20261102'
     needs: exact-tiles
     runs-on: ubuntu-24.04
     timeout-minutes: 22
