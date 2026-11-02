@@ -36,8 +36,8 @@ assert.equal(three.length,3,"All three CAP-authenticated active regions must be 
 assert(three.every(w=>w.productCode==="IDQ21033"&&w.sourceProduct==="IDQ65654"));
 assert.equal(sourceExactQldBomWfsFeatures(collection,[separate],{nowMs:now}).length,1,
  "Detailed source stays isolated from regional source");
-const olderRow={notice:older,warnings:three.filter(w=>w.issuedUtc===older.issuedUtc)};
-const latestRow={notice:newer,warnings:three.filter(w=>w.issuedUtc===newer.issuedUtc)};
+const olderRow={notice:older,warnings:three.filter(w=>Date.parse(w.issuedUtc)===Date.parse(older.issuedUtc))};
+const latestRow={notice:newer,warnings:three.filter(w=>Date.parse(w.issuedUtc)===Date.parse(newer.issuedUtc))};
 const index={verified:true,activeCodes:["IDQ21033"],
  checkedUtc:"2026-11-02T04:10:00Z"};
 const current=reconcileLatestBoMWarnings([olderRow,latestRow],{
