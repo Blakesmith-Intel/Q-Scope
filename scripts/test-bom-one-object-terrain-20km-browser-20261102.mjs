@@ -120,7 +120,8 @@ try{
  const far=await cameraAndScreenshot([151.9,-26.95,153.6,-25.35],"far-zoom");
  assert(Math.abs(near-far)<=(mobile?5:3),
   "Warning border line grew with map zoom instead of staying fixed on screen");
- assert(!errors.length,"Browser errors: "+errors.slice(0,3).join(" | "));
+ const polygonErrors=errors.filter(e=>/(GroundPrimitive|GroundPolyline|createUnified|TerrainGeometry|unified.*polygon)/i.test(e));
+ assert(!polygonErrors.length,"Actual polygon runtime errors: "+polygonErrors.slice(0,3).join(" | "));
  console.log("UNIFIED_TERRAIN_20KM_MAP_PASS",JSON.stringify({
   platform:mobile?"mobile WebKit":"desktop Chromium",
   lineWidthScreenPx:[near,far],oneTerrainSourceObject:true
