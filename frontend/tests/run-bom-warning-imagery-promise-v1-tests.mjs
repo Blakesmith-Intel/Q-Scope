@@ -67,8 +67,8 @@ try{
  assert.equal(typeof tileRequest?.then,"function",
   "Cesium must receive a genuine thenable imagery tile");
  const canvas=await tileRequest;
- assert.equal(canvas.width,512);
- assert.equal(canvas.height,512);
+ assert.equal(canvas.width,1024);
+ assert.equal(canvas.height,1024);
  assert(paints.includes("fill")&&paints.includes("stroke"),
   "Original source polygon must still be painted");
  const inside=provider.pickFeatures(0,0,0,149.3*radians,-27.3*radians);

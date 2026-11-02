@@ -37,22 +37,44 @@ export function officialStormCellLabelPoint(geometry){
  const lat=ring.slice(0,length).reduce((a,p)=>a+p[1],0)/length;
  return warningContainsPoint(geometry,lon,lat)?[lon,lat]:ring[0].slice(0,2);
 }
+// BoM's map convention: yellow warning areas, red severe thunderstorm cells,
+// with an explicit stronger red callout only for a source-qualified VDS cell.
+// These are PRESENTATION colours, never a severity inferred from radar values.
+export const BOM_WARNING_VISUAL_STYLES=Object.freeze({
+ area:Object.freeze({fill:"rgba(245,196,39,0.11)",stroke:"#F5C427",width:3}),
+ severeWeather:Object.freeze({fill:"rgba(248,176,39,0.13)",stroke:"#EDBB59",width:3}),
+ cell:Object.freeze({fill:"rgba(217,39,49,0.11)",stroke:"#DB2534",width:3.5}),
+ veryDangerousCell:Object.freeze({fill:"rgba(171,6,26,0.16)",stroke:"#BD112A",width:4})
+});
+export function officialBoMWarningVisualStyle(entry){
+ if(entry?.type==="severe-thunderstorm-cell"){
+  return entry.sourceProduct==="IDQ65652"&&entry.veryDangerous===true?
+   BOM_WARNING_VISUAL_STYLES.veryDangerousCell:BOM_WARNING_VISUAL_STYLES.cell;
+ }
+ if(entry?.type==="severe-thunderstorm")return BOM_WARNING_VISUAL_STYLES.area;
+ if(entry?.type==="severe-weather")return BOM_WARNING_VISUAL_STYLES.severeWeather;
+ return null;
+}
 export function createWarningImageryProvider(CesiumRef,warnings){
  const tilingScheme=new CesiumRef.GeographicTilingScheme({
   rectangle:CesiumRef.Rectangle.fromDegrees(...WARNING_RECTANGLE),
   numberOfLevelZeroTilesX:1,numberOfLevelZeroTilesY:1
  });
- const tileWidth=512,tileHeight=512;
- const colours={"severe-thunderstorm":["rgba(241,86,43,.20)","#fc803c"],
-   "severe-thunderstorm-cell":["rgba(246,91,48,.12)","#fb6638"],
-   "severe-weather":["rgba(248,176,39,.18)","#edbb59"]};
+ // Higher source resolution resists Cesium's texture sampling/upsampling
+ // on Retina iPhones and scaled globe views. The same source vertices and
+ // warning overlay/layer priority are retained, with no fuzzy multi-pass halo.
+ const tileWidth=1024,tileHeight=1024;
  const image=(x,y,level)=>{
   const rect=tilingScheme.tileXYToRectangle(x,y,level),w=rect.east-rect.west,h=rect.north-rect.south;
   const canvas=document.createElement("canvas");canvas.width=tileWidth;canvas.height=tileHeight;
   const c=canvas.getContext("2d");
   if(!c)return canvas;
+  c.shadowBlur=0;
+  c.shadowColor="transparent";
+  c.lineCap="butt";
+  c.lineJoin="round";
   for(const entry of warnings){
-   const rings=ringsOf(entry.geometry),style=colours[entry.type];
+   const rings=ringsOf(entry.geometry),style=officialBoMWarningVisualStyle(entry);
    if(!style)continue;
    c.beginPath();let has=false;
    for(const ring of rings){
@@ -66,10 +88,12 @@ export function createWarningImageryProvider(CesiumRef,warnings){
     c.closePath();has=true;
    }
    if(!has)continue;
-   c.fillStyle=style[0];c.fill("evenodd");
-   c.strokeStyle=entry.productCode==="IDQ21033"&&
-    entry.hazardAssessment?.highEnd?.length?"#d94650":style[1];
-   c.lineWidth=entry.type==="severe-thunderstorm-cell"?2.5:2;c.stroke();
+   // One fully opaque sharp boundary stroke. Even a regional warning naming
+   // high-end hazards keeps its BoM-yellow AREA, not a fabricated red cell.
+   c.fillStyle=style.fill;c.fill("evenodd");
+   c.strokeStyle=style.stroke;
+   c.lineWidth=style.width;
+   c.stroke();
    // A map callout is permitted ONLY for an individual IDQ65652 feature
    // whose OWN published text explicitly identifies it as VERY DANGEROUS.
    // The general CAP bulletin or IDQ65650 threat area never assigns the

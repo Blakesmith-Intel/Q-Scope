@@ -1,0 +1,76 @@
+name: Validate crisp BoM golden warning polygons in WebKit and Chromium
+
+on:
+  pull_request:
+    paths:
+      - "frontend/src/context-layers/bom-warning-terrain-imagery-v1.js"
+      - "frontend/src/context-layers/bom-warning-operational-v1.js"
+      - "frontend/tests/run-bom-warning-crisp-golden-palette-v1-tests.mjs"
+      - "scripts/test-bom-crisp-warning-tiles-browser-20261102.mjs"
+      - "scripts/build-current-site.sh"
+      - ".github/workflows/bom-crisp-warning-pixels-v10-2-47.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bom-crisp-warnings-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rendered-pixels:
+    name: Renderer pixels (${{ matrix.platform }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [mobile, desktop]
+    steps:
+      - name: Checkout candidate source
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Checkout pinned accepted source
+        uses: actions/checkout@v4
+        with:
+          ref: acfa0ebd3717a793369e3e887e2d1a54785620b7
+          path: checked/accepted-v9.18
+          persist-credentials: false
+      - name: Checkout pinned operational base
+        uses: actions/checkout@v4
+        with:
+          ref: 047b3bd1c66b0ed5f070d2298202f46d0cd8dae2
+          path: checked/production-v10.2.0
+          persist-credentials: false
+      - name: Checkout isolated historic research preview
+        uses: actions/checkout@v4
+        with:
+          ref: f3a07688ca02f5f0234ae6425fc1177722518c53
+          path: checked/wind-hook-v10.3-qa
+          persist-credentials: false
+      - name: Check source and generate exact production-equivalent static site
+        run: |
+          set -euo pipefail
+          node frontend/tests/run-bom-warning-crisp-golden-palette-v1-tests.mjs
+          node --check frontend/src/context-layers/bom-warning-terrain-imagery-v1.js
+          bash scripts/build-current-site.sh
+          python scripts/apply-ftp-aep-release-v10.py
+          python scripts/apply-radar-auto-refresh-v1.py
+          node --check _site/src/context-layers/bom-warning-terrain-imagery-v1.js
+          grep -Fq '20261102-crisp-boM-golden-v1' _site/src/context-layers/bom-warning-operational-v1.js
+      - name: Install Chromium or WebKit
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.58.2
+          npx playwright install --with-deps ${{ matrix.platform == 'mobile' && 'webkit' || 'chromium' }}
+      - name: Verify real browser painting, sharpness and BoM source categories
+        env:
+          STORMTRACKER_BROWSER: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          python -m http.server 8137 --bind 127.0.0.1 --directory _site > /tmp/st-bom-pixel-test.log 2>&1 &
+          sleep 2
+          node scripts/test-bom-crisp-warning-tiles-browser-20261102.mjs
