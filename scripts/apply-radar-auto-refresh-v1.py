@@ -378,6 +378,29 @@ inject_once(
     '  delay: () => effectivePlaybackDelayMs(),\n  continueOnFailedCycle: true,\n  onPlayingChange:'
 )
 
+# The six measured scans reuse their OWN decoded/GPU-ready source raster
+# layers, rather than re-uploading identical original BoM pixels every cycle.
+# This affects only the primary radar imagery handover. The full timeline,
+# scientific 3-D, source UTC and supplemental multi-radar handovers are intact.
+inject_once(
+    '''const radarImageryHandover = createRadarImageryHandover({
+  imageryLayers: viewer.imageryLayers, scene,
+  retireLayer:deferredImageryRetirement?.retire
+});''',
+    '''const radarImageryHandover = createRadarImageryHandover({
+  imageryLayers: viewer.imageryLayers, scene,
+  retireLayer:deferredImageryRetirement?.retire,
+  // Five hidden + one visible authentic primary scan. Avoid repeated GPU
+  // texture allocation and teardown during the normal six-frame loop.
+  // All supplemental radar/Doppler handovers retain their existing logic.
+  maxRetainedLayers:5
+});'''
+)
+replace_once(
+    "radar-imagery-handover-v1.js?v=9.18.5-deferred-retire",
+    "radar-imagery-handover-v1.js?v=20261103-primary-measured-layer-reuse-v1"
+)
+
 app.write_text(data, encoding="utf-8")
 copyfile("frontend/src/live-loop-refresh-v1.js", site / "src/live-loop-refresh-v1.js")
 # The sealed production bundle historically used an older radar-source and
@@ -390,6 +413,7 @@ copyfile("frontend/src/radar-tile-retry-v1.js", site / "src/radar-tile-retry-v1.
 copyfile("frontend/src/radar-viewport-continuity-v1.js", site / "src/radar-viewport-continuity-v1.js")
 copyfile("frontend/src/bom-wmts-loop-v2.js", site / "src/bom-wmts-loop-v2.js")
 copyfile("frontend/src/continuous-playback-v1.js", site / "src/continuous-playback-v1.js")
+copyfile("frontend/src/radar-imagery-handover-v1.js", site / "src/radar-imagery-handover-v1.js")
 copyfile("frontend/src/radar-incremental-window-v1.js", site / "src/radar-incremental-window-v1.js")
 copyfile("frontend/src/radar-lifecycle-diagnostics-v1.js", site / "src/radar-lifecycle-diagnostics-v1.js")
 
@@ -429,6 +453,8 @@ assert "if(resume && !incrementalCommit && !noninterruptingBackfill)playback.pla
 assert "const noninterruptingBackfill = automatic" in data
 assert "radarTileFailureSnapshot" in data
 assert (site / "src/radar-incremental-window-v1.js").exists()
+assert "maxRetainedLayers:5" in data
+assert "maxRetainedLayers" in (site / "src/radar-imagery-handover-v1.js").read_text()
 assert (site / "src/radar-lifecycle-diagnostics-v1.js").exists()
 with (site / "BUILD.txt").open("a", encoding="utf-8") as build:
     build.write("V10.2.43 CANDIDATE — INCREMENTAL RADAR APPEND / GYMPIE GLADSTONE DIAGNOSTICS (review only)\\n")
