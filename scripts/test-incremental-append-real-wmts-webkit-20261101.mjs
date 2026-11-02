@@ -149,7 +149,8 @@ async function snapshot(){
   button:document.querySelector("#hybridPlayButton")?.textContent?.trim(),
   diagnostics:window.__stormtrackerRadarDiagnostics?.(),
   canvases:document.querySelectorAll("#cesiumContainer canvas").length,
-  renderStages:window.__qaRadarStages?.slice(-65),\n  graphics:window.__stormtrackerGraphicsDiagnostics?.()??null
+  renderStages:window.__qaRadarStages?.slice(-65),
+  graphics:window.__stormtrackerGraphicsDiagnostics?.()??null
  }));
 }
 try{
