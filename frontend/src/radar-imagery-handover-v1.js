@@ -20,13 +20,14 @@ export function createRadarImageryHandover({
   // Provider identity is tied to the actual decoded BoM image, not a
   // timestamp label. A corrected/reloaded PNG cannot reuse stale pixels.
   const retained = new Map();
+  const sourceEligible = new WeakSet();
   const retainedLimit = Math.max(0, Math.min(5, Math.trunc(Number(maxRetainedLayers)||0)));
   function forgetRetained(layer) {
     if(layer?.imageryProvider && retained.get(layer.imageryProvider)===layer)
       retained.delete(layer.imageryProvider);
   }
   function retainOldLayer(layer) {
-    if(!retainedLimit || !layer?.imageryProvider) {
+    if(!retainedLimit || !sourceEligible.has(layer) || !layer?.imageryProvider) {
       safeRemove(layer);
       return;
     }
@@ -78,6 +79,7 @@ export function createRadarImageryHandover({
     alpha = 1,
     timeoutMs = 2200,
     decodedSingleTile = false,
+    cacheEligible = false,
     beforeReveal = null,
     isCurrent = () => true
   } = {}) {
@@ -89,7 +91,7 @@ export function createRadarImageryHandover({
     // A previously rendered ORIGINAL BoM image can be reused without
     // creating and retiring a fresh WebGL texture on every six-frame loop.
     const provider = layer.imageryProvider;
-    const reusable = retainedLimit && provider ? retained.get(provider) : null;
+    const reusable = retainedLimit && cacheEligible && provider ? retained.get(provider) : null;
     const fromCache = Boolean(reusable && imageryLayers.indexOf(reusable)>=0);
     if(fromCache) {
       retained.delete(provider);
@@ -97,8 +99,9 @@ export function createRadarImageryHandover({
     } else if(reusable) {
       retained.delete(provider);
     }
+    if(cacheEligible && retainedLimit)sourceEligible.add(layer);
     // The displayed observation has not changed; do not churn GPU imagery.
-    if(retainedLimit && provider && previous?.imageryProvider===provider) {
+    if(cacheEligible && retainedLimit && provider && previous?.imageryProvider===provider) {
       if(!isCurrent())return false;
       if(beforeReveal)beforeReveal();
       previous.alpha=targetAlpha;
