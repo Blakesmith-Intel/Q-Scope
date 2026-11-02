@@ -88,6 +88,19 @@ replace_once(
   // Commit the available real window and let the existing one-minute
   // source-recovery timer retry the missing UTC while playback continues.'''
 )
+# An advertised older UTC is only a candidate. Never reset the expensive
+# worker/tracks/imagery for a refused WMTS history tile which never loaded.
+# Copy this accepted-observation-only rebuild rule into the EXACT Pages bundle.
+old_rebuild = '''  const rebuild =
+    trackedThrough == null
+    || needsHistoricalRebuild
+    || frames.some(frame =>
+      !radarResultCache.has(frame.observedUtc)
+      && Date.parse(frame.observedUtc) <= Date.parse(trackedThrough));'''
+rebuild_start=source.index("  // Discovery may advertise a missing older UTC")
+rebuild_end=source.index("  if (rebuild) {",rebuild_start)
+replace_once(old_rebuild,source[rebuild_start:rebuild_end].rstrip())
+
 # Source discovery failures must be handed back to the refresh scheduler.
 replace_once(
     '''    $("autoRefreshNote").textContent =
@@ -107,6 +120,12 @@ replace_once(
     '''  const oldTime = hybridFrames[hybridFrameIndex]?.observedUtc;
   const resume = automatic ? playback.isPlaying() : true;''',
     "  // This exact measured-frame window can be shifted in place when its retained\n  // observations are unchanged. Historical backfill, temporal-inference edits\n  // and selection changes retain the original chronological rebuild path.\n  const incrementalCommit = automatic && !isCombined && !needsHistoricalRebuild &&\n    loadedLoopSelection === loopSelection &&\n    planIncrementalRadarWindow(hybridFrames,displayFrames);\n  const oldTime = hybridFrames[hybridFrameIndex]?.observedUtc;\n  // Operators parked on Latest must follow genuine newly accepted scans.\n  // Preserve a deliberately scrubbed historical position instead.\n  const wasFollowingLatest = automatic && !isCombined &&\n    !playback.isPlaying() && hybridFrames.length > 0 &&\n    hybridFrameIndex === hybridFrames.length - 1;\n  // If startup/site-switch failed completely, the next successful recovery\n  // with genuine frames must be able to restart the playback automatically.\n  const resume = automatic ? (playback.isPlaying() || hybridFrames.length === 0) : true;"
+)
+# The incremental-window decision must use accepted history, not the mere
+# discovery of a source UTC whose imagery may still be unavailable.
+replace_once(
+    "const incrementalCommit = automatic && !isCombined && !needsHistoricalRebuild &&",
+    "const incrementalCommit = automatic && !isCombined && !rebuild &&"
 )
 replace_once(
     '''  hybridFrameIndex = automatic
