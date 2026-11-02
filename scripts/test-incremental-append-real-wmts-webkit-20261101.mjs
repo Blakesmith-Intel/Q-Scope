@@ -174,7 +174,7 @@ try{
  await page.waitForFunction(previous=>{
   const now=document.querySelector("#hybridFrameLabel")?.textContent?.trim();
   return document.querySelector("#hybridPlayButton")?.textContent?.trim()==="Pause" &&
-    /\\b\\d+\\/6\\b/.test(now??"") && now!==previous;
+    String(now??"").includes("/6") && now!==previous;
  },after.label,{timeout:90000,polling:250});
  const progressed=await snapshot();
  assert.equal(progressed.button,"Pause","Visible frame advanced but playback stopped");
