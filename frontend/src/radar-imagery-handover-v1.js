@@ -99,6 +99,7 @@ export function createRadarImageryHandover({
     }
     // The displayed observation has not changed; do not churn GPU imagery.
     if(retainedLimit && provider && previous?.imageryProvider===provider) {
+      if(!isCurrent())return false;
       if(beforeReveal)beforeReveal();
       previous.alpha=targetAlpha;
       scene.requestRender();
