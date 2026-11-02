@@ -7,6 +7,7 @@ on:
       - "frontend/src/context-layers/bom-warning-operational-v1.js"
       - "frontend/tests/run-bom-warning-crisp-golden-palette-v1-tests.mjs"
       - "scripts/test-bom-crisp-warning-tiles-browser-20261102.mjs"
+      - "scripts/test-bom-one-object-terrain-20km-browser-20261102.mjs"
       - "scripts/build-current-site.sh"
       - ".github/workflows/bom-crisp-warning-pixels-v10-2-47.yml"
   workflow_dispatch:
@@ -64,7 +65,7 @@ jobs:
           grep -Fq '20261102-unified-terrain-warning-polygon-v1' _site/src/context-layers/bom-warning-operational-v1.js
       - name: Install Chromium or WebKit
         run: |
-          npm install --no-save --ignore-scripts playwright@1.58.2
+          npm install --no-save --ignore-scripts playwright@1.58.2 pngjs@7.0.0
           npx playwright install --with-deps ${{ matrix.platform == 'mobile' && 'webkit' || 'chromium' }}
       - name: Verify real browser painting, sharpness and BoM source categories
         env:
@@ -74,3 +75,4 @@ jobs:
           python -m http.server 8137 --bind 127.0.0.1 --directory _site > /tmp/st-bom-pixel-test.log 2>&1 &
           sleep 2
           node scripts/test-bom-crisp-warning-tiles-browser-20261102.mjs
+          node scripts/test-bom-one-object-terrain-20km-browser-20261102.mjs
