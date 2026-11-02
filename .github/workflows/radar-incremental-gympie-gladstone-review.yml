@@ -71,6 +71,10 @@ jobs:
           mkdir -p _site/preview/radar-refresh-review
           rsync -a --exclude='/preview/' _site/ _site/preview/radar-refresh-review/
           grep -Fq 'OPERATOR_RADAR_REVIEW' _site/preview/radar-refresh-review/src/live3d-operational-v9.js
+      - name: Verify browser QA entrypoints parse before browser installation
+        run: |
+          node --check scripts/test-incremental-append-real-wmts-webkit-20261101.mjs
+          node --check scripts/test-real-wmts-missing-frame-recovery-20261101.mjs
       - name: Install mobile WebKit
         run: |
           npm install --no-save --ignore-scripts playwright@1.58.2
@@ -124,6 +128,10 @@ jobs:
           grep -Fq 'OPERATOR_RADAR_REVIEW' _site/preview/radar-refresh-review/src/live3d-operational-v9.js
           node --check _site/preview/radar-refresh-review/src/live3d-operational-v9.js
           node --check _site/preview/radar-refresh-review/src/bom-wmts-loop-v2.js
+      - name: Verify desktop browser QA entrypoints parse before installation
+        run: |
+          node --check scripts/test-incremental-append-real-wmts-webkit-20261101.mjs
+          node --check scripts/test-real-wmts-missing-frame-recovery-20261101.mjs
       - name: Install desktop Chromium independently of mobile
         run: |
           npm install --no-save --ignore-scripts playwright@1.58.2
