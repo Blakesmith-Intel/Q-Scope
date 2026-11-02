@@ -1,0 +1,81 @@
+name: Seal accepted StormTracker V10.2.47 source at exact approved SHA
+
+on:
+  push:
+    branches:
+      - ops/seal-v10.2.47-approved-source-20261102
+    paths:
+      - .github/workflows/seal-v10-2-47-operator-accepted-source.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: seal-exact-v10.2.47
+  cancel-in-progress: false
+
+jobs:
+  create-exact-immutable-source-tag:
+    if: github.repository == 'Blakesmith-Intel/StormTracker' && github.ref == 'refs/heads/ops/seal-v10.2.47-approved-source-20261102'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - name: Checkout operations branch only
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify exact accepted SHA and already-created recovery refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET=bda792ff8747c30082b6b978c953187006f4a19e
+          TREE=a9d09089803424288ae023781b21e42e3a2e101c
+          test "$(git rev-parse "$TARGET^{commit}")" = "$TARGET"
+          test "$(git rev-parse "$TARGET^{tree}")" = "$TREE"
+          for branch in \
+            restore/v10.2.47 \
+            release/v10.2.47-operator-approved-freeze-20261102; do
+            remote=$(git ls-remote --refs origin "refs/heads/$branch" | cut -f1)
+            test "$remote" = "$TARGET" || { echo "::error::The accepted $branch ref is missing or moved"; exit 1; }
+          done
+          git show "$TARGET:frontend/src/context-layers/bom-warning-terrain-imagery-v1.js" | grep -Fq 'createUnifiedBoMWarningTerrainPolygons'
+          git show "$TARGET:frontend/src/context-layers/bom-warning-operational-v1.js" | grep -Fq 'createUnifiedBoMWarningTerrainPolygons'
+          git show "$TARGET:scripts/build-current-site.sh" | grep -Fq '20261102-unified-terrain-warning-polygon-v1'
+          echo "Accepted source and both recovery references verified: $TARGET"
+
+      - name: Create exact annotated V10.2.47 source seal without changing any existing ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG=v10.2.47
+          TARGET=bda792ff8747c30082b6b978c953187006f4a19e
+          existing_ref=$(git ls-remote --refs origin "refs/tags/$TAG" | cut -f1)
+          existing_peeled=$(git ls-remote origin "refs/tags/$TAG^{}" | cut -f1)
+          if test -n "$existing_ref"; then
+            resolved="${existing_peeled:-$existing_ref}"
+            test "$resolved" = "$TARGET" || {
+              echo "::error::Existing tag points to a DIFFERENT commit; refusing any overwrite"; exit 1;
+            }
+            echo "Exact V10.2.47 tag already sealed at approved SHA; no changes necessary"
+          else
+            git config user.name "StormTracker immutable release seal"
+            git config user.email "actions@users.noreply.github.com"
+            git tag -a "$TAG" "$TARGET" -m "StormTracker V10.2.47 operator-approved source freeze — 2 November 2026 AEST
+
+            Exact accepted SHA: $TARGET
+            One source polygon object, terrain-clamped fill + crisp fixed 2px golden boundary.
+            Authenticated red individual cells and source-labelled VERY DANGEROUS.
+            Browser 20km and far-zoom tests: WebKit and Chromium PASS.
+            Restore: restore/v10.2.47.
+            Source sealed; public Pages deployment must be independently verified.
+            Never overwrite this or any earlier release."
+            git push origin "refs/tags/$TAG:refs/tags/$TAG"
+          fi
+          actual_peeled=$(git ls-remote origin "refs/tags/$TAG^{}" | cut -f1)
+          actual_ref=$(git ls-remote --refs origin "refs/tags/$TAG" | cut -f1)
+          test "${actual_peeled:-$actual_ref}" = "$TARGET"
+          echo "Confirmed exact immutable source tag $TAG -> $TARGET" >> "$GITHUB_STEP_SUMMARY"
+          echo "Public Pages deployment is separately pending: see docs/RELEASE_SEAL_V10.2.47_OPERATOR_ACCEPTED_20261102.md" >> "$GITHUB_STEP_SUMMARY"
