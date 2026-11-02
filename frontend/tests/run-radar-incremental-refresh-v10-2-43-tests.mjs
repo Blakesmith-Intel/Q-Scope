@@ -121,8 +121,10 @@ assert.equal(new Set(rendered.slice(0,6)).size,6,"Unintended duplicate after rot
 const runtime=readFileSync(new URL("../src/live3d-operational-v9.js",import.meta.url),"utf8");
 const packager=readFileSync(new URL("../../scripts/apply-radar-auto-refresh-v1.py",import.meta.url),"utf8");
 assert.match(runtime,/planIncrementalRadarWindow\(hybridFrames,displayFrames\)/);
-assert.match(runtime,/if\(!incrementalCommit\)\{\s*\$\("hybridFrameSlider"\)/);
-assert.match(runtime,/if\(resume && !incrementalCommit\)playback.play\(\)/);
+assert.match(runtime,/if\(!incrementalCommit && !noninterruptingBackfill\)\{\s*\$\("hybridFrameSlider"\)/);
+assert.match(runtime,/if\(resume && !incrementalCommit && !noninterruptingBackfill\)playback.play\(\)/);
+assert.match(runtime,/const noninterruptingBackfill = automatic/);
+assert.match(runtime,/displayFrames\.some\(frame=>frame\.observedUtc===oldTime\)/);
 assert.match(runtime,/hybridTrackVolumes=hybridTrackVolumes.slice\(incrementalCommit.dropped\)/);
 assert.match(runtime,/window.__stormtrackerRadarDiagnostics=/);
 assert.match(packager,/copyfile\("frontend\/src\/radar-incremental-window-v1.js"/);
