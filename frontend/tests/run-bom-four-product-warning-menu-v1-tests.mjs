@@ -3,7 +3,7 @@ import {readFileSync} from "node:fs";
 import {
  PRODUCT_FILTERS,filterOfficialWarnings,describeOfficialBomWarningState,
  warningProductAffectedGroups,isSourceMatchedOfficialWarningPolygon,
- sourceQualifiedOfficialWarnings
+ sourceQualifiedOfficialWarnings,selectVisibleOfficialBoMGeometry
 } from "../src/context-layers/bom-warning-operational-v1.js";
 import {QLD_WARNING_PRODUCTS} from "../src/context-layers/bom-qld-warning-product-catalogue-v1.js";
 
@@ -54,6 +54,18 @@ assert.deepEqual(sourceQualifiedOfficialWarnings(mixed,"IDQ21035").map(w=>w.id),
  ["detailed"],"Product selection is isolated in both directions");
 assert.deepEqual(sourceQualifiedOfficialWarnings(mixed,"all").map(w=>w.id),
  ["detailed","regional","cap-regional"],"All contains only source-qualified warnings");
+const cell={id:"cell",type:"severe-thunderstorm-cell",official:true,
+ productCode:"IDQ21035",sourceProduct:"IDQ65652",geometry};
+const invalidCell={...cell,id:"not-a-real-cell",sourceProduct:"IDQ65654"};
+const cells=[cell,invalidCell];
+assert.deepEqual(selectVisibleOfficialBoMGeometry(mixed,cells,"IDQ21033").map(w=>w.id),
+ ["regional","cap-regional"],"21033 displays NO 21035 polygon or cell");
+assert.deepEqual(selectVisibleOfficialBoMGeometry(mixed,cells,"IDQ21035").map(w=>w.id),
+ ["detailed","cell"],"21035 displays only its own threat areas and valid cells");
+assert.deepEqual(selectVisibleOfficialBoMGeometry(mixed,cells,"all").map(w=>w.id),
+ ["detailed","regional","cap-regional","cell"],"All displays every verified regional/detailed polygon and cell");
+assert.deepEqual(selectVisibleOfficialBoMGeometry(mixed,cells,"IDQ21033").map(w=>w.id),
+ ["regional","cap-regional"],"Repeated switching All -> 21033 leaves no stale 21035 entries");
 const statuses=Object.fromEntries(codes.map(code=>[code,{status:"no-active"}]));
 for(const code of codes){
  const state=describeOfficialBomWarningState({products:statuses,selected:code});
@@ -89,7 +101,7 @@ assert.match(op,/const codes=filter\.value==="all"\?WARNING_CODES:\[filter\.valu
 assert(!op.includes('"other"]:[filter.value]'),"Never hide a clear 21037/38 under Other");
 assert(op.includes("isSourceMatchedOfficialWarningPolygon(w));"),
  "Source-mismatched geometry is rejected when ingested");
-assert(op.includes("const visible=[...sourceQualifiedOfficialWarnings(warnings,filter.value)"),
+assert(op.includes("const visible=selectVisibleOfficialBoMGeometry(warnings,stormCells,filter.value)"),
  "Map draw respects source-qualified product selection");
 assert.match(op,/INTERVAL_MS=15\*60\*1000/);
 assert.match(op,/now\(\)-lastAttemptAt>=currentRefreshMs\(\)\)void refresh\(\)/);
