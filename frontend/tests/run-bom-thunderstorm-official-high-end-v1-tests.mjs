@@ -53,7 +53,7 @@ assert.match(ui,/HIGH-END: /);
 assert.match(ui,/warning-area language only, no identified individual storm cells/);
 assert.match(ui,/highEnd\.join\(" · "\)/);
 const imagery=readFileSync(new URL("frontend/src/context-layers/bom-warning-terrain-imagery-v1.js",root),"utf8");
-assert.match(imagery,/BoM-yellow AREA/);
+assert.match(imagery,/createUnifiedBoMWarningTerrainPolygons/);
 assert.equal(officialBoMWarningVisualStyle(source[0]).stroke,"#F5C427",
  "Regional warning areas remain golden yellow even for source-named destructive hazards");
 assert(!/\bIDQ21033\b[^\n]*veryDangerous/.test(imagery));

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {
  BOM_WARNING_VISUAL_STYLES,officialBoMWarningVisualStyle,
- createWarningImageryProvider
+ createWarningImageryProvider,createUnifiedBoMWarningTerrainPolygons
 } from "../src/context-layers/bom-warning-terrain-imagery-v1.js";
 
 const area={type:"severe-thunderstorm",productCode:"IDQ21033",
@@ -23,7 +23,7 @@ assert.equal(officialBoMWarningVisualStyle({type:"severe-weather"}),
  BOM_WARNING_VISUAL_STYLES.severeWeather);
 assert.equal(officialBoMWarningVisualStyle({type:"unverified"}),null);
 assert.match(BOM_WARNING_VISUAL_STYLES.area.stroke,/^#F5C427$/i);
-assert.equal(BOM_WARNING_VISUAL_STYLES.area.width,3);
+assert.equal(BOM_WARNING_VISUAL_STYLES.area.width,2);
 assert.match(BOM_WARNING_VISUAL_STYLES.cell.stroke,/^#DB2534$/i);
 assert.match(BOM_WARNING_VISUAL_STYLES.veryDangerousCell.stroke,/^#BD112A$/i);
 
@@ -70,13 +70,8 @@ try{
  assert.equal(image.width,1024);
  assert.equal(image.height,1024);
  const strokes=image.calls.filter(v=>v.action==="stroke");
- assert.equal(strokes.length,5,
-  "Single solid outline per real source polygon: no fuzzy halo / double stroke");
- assert.deepEqual(strokes.map(v=>v.colour),[
-  "#F5C427","#F5C427","#DB2534","#BD112A","#DB2534"
- ]);
- assert(strokes.every(v=>v.shadowBlur===0&&v.cap==="butt"&&v.join==="round"));
- assert(strokes.every(v=>v.width>=3&&v.width<=4));
+ assert.equal(strokes.length,0,
+  "Zoom-scaled raster imagery MUST have no border strokes: all sharp lines are terrain primitives");
  const fills=image.calls.filter(v=>v.action==="fill");
  assert.equal(fills.length,5);
  assert(fills.every(v=>v.rule==="evenodd"&&/rgba\(/.test(v.fill)));
@@ -92,11 +87,70 @@ try{
 }
 const importer=readFileSync(new URL("../src/context-layers/bom-warning-operational-v1.js",
  import.meta.url),"utf8");
-assert(importer.includes("20261102-crisp-boM-golden-v1"));
+assert(importer.includes("20261102-unified-terrain-warning-polygon-v1"));
 const build=readFileSync(new URL("../../scripts/build-current-site.sh",import.meta.url),"utf8");
-assert(build.includes("20261102-crisp-gold-v1"));
-assert(build.includes("crisp-golden-bom-polygons-20261102-v1"),
+assert(build.includes("20261102-unified-terrain-warning-polygon-v1"));
+assert(build.includes("unified-terrain-warning-polygon-20261102-v1"),
  "Fresh web application import chain must bust existing Safari/desktop module cache");
 assert(build.includes("initialiseOfficialBomWarningPolygons({viewer,CesiumRef:Cesium"),
  "Original operational warning data source and camera integration remain unchanged");
-console.log("PASS crisp BoM golden-yellow regions/detailed threats, red source cells, red VDS labels, single strokes, high-resolution canvas, unchanged geometry and cache refresh.");
+console.log("PASS crisp BoM golden-yellow source areas, red source cells, red VDS labels, NO zoom-scaled raster strokes and fresh bundle version.");
+// Every input warning is ONE terrain object with its genuine fill and
+// fixed-width boundary bound together, including source holes and cell label.
+class Collection{
+ constructor(){this.children=[];}
+ add(x){this.children.push(x);return x;}
+ get length(){return this.children.length;}
+}
+class Geom{constructor(p){Object.assign(this,p);}}
+const colours=[];
+const mock={
+ PrimitiveCollection:Collection,
+ GeometryInstance:Geom,PolygonGeometry:Geom,PolygonHierarchy:class {
+  constructor(positions,holes=[]){this.positions=positions;this.holes=holes;}
+ },
+ GroundPrimitive:Geom,GroundPolylinePrimitive:Geom,GroundPolylineGeometry:Geom,
+ PerInstanceColorAppearance:class {static VERTEX_FORMAT="COLOR_VERTEX";constructor(p){Object.assign(this,p);}},
+ PolylineColorAppearance:Geom,
+ ColorGeometryInstanceAttribute:{fromColor:c=>c},
+ Color:{WHITE:"white",fromCssColorString:s=>{colours.push(s);return s;}},
+ ClassificationType:{TERRAIN:"terrain"},
+ Cartesian3:{fromDegreesArray:n=>n,fromDegrees:(lon,lat)=>[lon,lat]},
+ Cartesian2:class{constructor(x,y){this.x=x;this.y=y;}},
+ VerticalOrigin:{CENTER:"center"},HorizontalOrigin:{CENTER:"center"},
+ HeightReference:{CLAMP_TO_GROUND:"clamp"},
+ LabelCollection:class extends Collection{}
+};
+const hole=[[152.05,-26.05],[152.15,-26.05],[152.15,-26.15],
+ [152.05,-26.15],[152.05,-26.05]];
+const items=[
+ {...area,geometry:{type:"Polygon",coordinates:[ring,hole]}},
+ {...detailed,geometry:{type:"Polygon",coordinates:[ring]}},
+ {...dangerous,geometry:{type:"MultiPolygon",coordinates:[[ring],[ring.map(([x,y])=>[x+1,y])]]}}
+];
+const original=JSON.stringify(items);
+const unified=createUnifiedBoMWarningTerrainPolygons(mock,items);
+assert.equal(unified.length,3,"One grouped object per source warning");
+assert.equal(JSON.stringify(items),original,"No mutation of original BoM vertices");
+for(let i=0;i<unified.length;i++){
+ const group=unified.children[i];
+ assert(group instanceof Collection);
+ assert.equal(group.children[0] instanceof mock.GroundPrimitive,true,
+   "Terrain fill lives inside the SAME polygon object as the boundary");
+ assert.equal(group.children[1] instanceof mock.GroundPolylinePrimitive,true,
+   "Fixed width, terrain-following border lives inside the SAME polygon object");
+ const lines=group.children[1].geometryInstances;
+ assert(lines.every(x=>x.geometry.loop===true));
+ assert(lines.every(x=>x.geometry.width=== (i===2?3:2)));
+ assert(lines.every(x=>x.geometry.positions.length>=6));
+}
+assert.equal(unified.children[0].children[0].geometryInstances[0].geometry
+ .polygonHierarchy.holes.length,1,"Original interior hole is preserved");
+assert.equal(unified.children[0].children[1].geometryInstances.length,2,
+ "Original external and interior boundary share one lifecycle");
+assert.equal(unified.children[2].children.length,3,
+ "Original Very Dangerous source cell keeps its label INSIDE its polygon object");
+assert.equal(unified.children[2].children[2].children[0].text,"VD");
+assert(colours.includes("#F5C427")&&colours.includes("#BD112A"));
+assert(colours.includes("rgba(245,196,39,0.11)"));
+console.log("PASS unified terrain warning polygons: one object per source, coincident fill+fixed pixel border, holes/multipolygons, real VDS label and unchanged source coordinates.");

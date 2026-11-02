@@ -41,10 +41,10 @@ export function officialStormCellLabelPoint(geometry){
 // with an explicit stronger red callout only for a source-qualified VDS cell.
 // These are PRESENTATION colours, never a severity inferred from radar values.
 export const BOM_WARNING_VISUAL_STYLES=Object.freeze({
- area:Object.freeze({fill:"rgba(245,196,39,0.11)",stroke:"#F5C427",width:3}),
- severeWeather:Object.freeze({fill:"rgba(248,176,39,0.13)",stroke:"#EDBB59",width:3}),
- cell:Object.freeze({fill:"rgba(217,39,49,0.11)",stroke:"#DB2534",width:3.5}),
- veryDangerousCell:Object.freeze({fill:"rgba(171,6,26,0.16)",stroke:"#BD112A",width:4})
+ area:Object.freeze({fill:"rgba(245,196,39,0.11)",stroke:"#F5C427",width:2}),
+ severeWeather:Object.freeze({fill:"rgba(248,176,39,0.13)",stroke:"#EDBB59",width:2}),
+ cell:Object.freeze({fill:"rgba(217,39,49,0.11)",stroke:"#DB2534",width:2.5}),
+ veryDangerousCell:Object.freeze({fill:"rgba(171,6,26,0.16)",stroke:"#BD112A",width:3})
 });
 export function officialBoMWarningVisualStyle(entry){
  if(entry?.type==="severe-thunderstorm-cell"){
@@ -55,14 +55,109 @@ export function officialBoMWarningVisualStyle(entry){
  if(entry?.type==="severe-weather")return BOM_WARNING_VISUAL_STYLES.severeWeather;
  return null;
 }
+// One operator-visible polygon object per source warning. Cesium requires
+// terrain polygon and screen-pixel boundary geometry to be two GPU draws; keep
+// both INSIDE one ownership/visibility/lifecycle PrimitiveCollection per
+// warning. The same untouched source rings drive the two draws. Never publish
+// an independent imagery fill or a separately managed line layer.
+export function createUnifiedBoMWarningTerrainPolygons(CesiumRef,warnings){
+ const all=new CesiumRef.PrimitiveCollection({destroyPrimitives:true});
+ let count=0;
+ const positions=ring=>{
+  if(!Array.isArray(ring)||ring.length<4)return null;
+  const first=ring[0],last=ring.at(-1);
+  const closed=first?.[0]===last?.[0]&&first?.[1]===last?.[1];
+  const original=closed?ring.slice(0,-1):ring.slice();
+  if(original.length<3||original.some(p=>!Array.isArray(p)||
+    !Number.isFinite(p[0])||!Number.isFinite(p[1])||
+    Math.abs(p[0])>180||Math.abs(p[1])>90))return null;
+  return CesiumRef.Cartesian3.fromDegreesArray(original.flatMap(([lon,lat])=>[lon,lat]));
+ };
+ for(const entry of warnings??[]){
+  const style=officialBoMWarningVisualStyle(entry);
+  if(!style||!["Polygon","MultiPolygon"].includes(entry?.geometry?.type))continue;
+  const eachPolygon=entry.geometry.type==="Polygon"?
+   [entry.geometry.coordinates]:entry.geometry.coordinates;
+  const shape=new CesiumRef.PrimitiveCollection({destroyPrimitives:true});
+  const fillInstances=[],borderInstances=[],seen=new Set();
+  for(const polygon of eachPolygon){
+   const exterior=positions(polygon?.[0]);
+   if(!exterior)continue;
+   const holes=polygon.slice(1).map(positions).filter(Boolean);
+   fillInstances.push(new CesiumRef.GeometryInstance({
+    geometry:new CesiumRef.PolygonGeometry({
+     polygonHierarchy:new CesiumRef.PolygonHierarchy(exterior,
+      holes.map(h=>new CesiumRef.PolygonHierarchy(h))),
+     vertexFormat:CesiumRef.PerInstanceColorAppearance.VERTEX_FORMAT
+    }),
+    attributes:{color:CesiumRef.ColorGeometryInstanceAttribute.fromColor(
+     CesiumRef.Color.fromCssColorString(style.fill))}
+   }));
+   // Boundary rings, including actual source holes. No Douglas-Peucker,
+   // double strokes or invented closing points. A real GroundPolyline is
+   // 2 CSS pixels wide at all zooms, not a scaled 1024px imagery stroke.
+   for(const ring of polygon){
+    const p=positions(ring);
+    if(!p)continue;
+    const id=JSON.stringify(ring);
+    if(seen.has(id))continue;
+    seen.add(id);
+    borderInstances.push(new CesiumRef.GeometryInstance({
+     geometry:new CesiumRef.GroundPolylineGeometry({
+      positions:p,loop:true,width:style.width
+     }),
+     attributes:{color:CesiumRef.ColorGeometryInstanceAttribute.fromColor(
+      CesiumRef.Color.fromCssColorString(style.stroke))}
+    }));
+   }
+  }
+  if(!fillInstances.length||!borderInstances.length)continue;
+  shape.add(new CesiumRef.GroundPrimitive({
+   geometryInstances:fillInstances,
+   appearance:new CesiumRef.PerInstanceColorAppearance({
+    flat:true,translucent:true
+   }),
+   classificationType:CesiumRef.ClassificationType.TERRAIN,
+   allowPicking:false,asynchronous:true
+  }));
+  shape.add(new CesiumRef.GroundPolylinePrimitive({
+   geometryInstances:borderInstances,
+   appearance:new CesiumRef.PolylineColorAppearance({translucent:false}),
+   classificationType:CesiumRef.ClassificationType.TERRAIN,
+   allowPicking:false,asynchronous:true
+  }));
+  if(entry.type==="severe-thunderstorm-cell"&&
+     entry.sourceProduct==="IDQ65652"&&entry.veryDangerous===true){
+   const anchor=officialStormCellLabelPoint(entry.geometry);
+   if(anchor){
+    const labels=new CesiumRef.LabelCollection();
+    labels.add({
+     position:CesiumRef.Cartesian3.fromDegrees(anchor[0],anchor[1]),
+     text:"VD",font:"bold 12px sans-serif",
+     fillColor:CesiumRef.Color.WHITE,
+     showBackground:true,
+     backgroundColor:CesiumRef.Color.fromCssColorString("#870c23"),
+     backgroundPadding:new CesiumRef.Cartesian2(7,4),
+     verticalOrigin:CesiumRef.VerticalOrigin.CENTER,
+     horizontalOrigin:CesiumRef.HorizontalOrigin.CENTER,
+     heightReference:CesiumRef.HeightReference.CLAMP_TO_GROUND
+    });
+    shape.add(labels);
+   }
+  }
+  all.add(shape);
+  count++;
+ }
+ return count?all:null;
+}
 export function createWarningImageryProvider(CesiumRef,warnings){
  const tilingScheme=new CesiumRef.GeographicTilingScheme({
   rectangle:CesiumRef.Rectangle.fromDegrees(...WARNING_RECTANGLE),
   numberOfLevelZeroTilesX:1,numberOfLevelZeroTilesY:1
  });
- // Higher source resolution resists Cesium's texture sampling/upsampling
- // on Retina iPhones and scaled globe views. The same source vertices and
- // warning overlay/layer priority are retained, with no fuzzy multi-pass halo.
+ // Imagery is for translucent fills and existing small cell labels ONLY.
+ // Source geometry strokes are exclusively screen-space GroundPolylinePrimitives.
+ // Retain full fill resolution for source geometry and hole fidelity.
  const tileWidth=1024,tileHeight=1024;
  const image=(x,y,level)=>{
   const rect=tilingScheme.tileXYToRectangle(x,y,level),w=rect.east-rect.west,h=rect.north-rect.south;
@@ -88,12 +183,10 @@ export function createWarningImageryProvider(CesiumRef,warnings){
     c.closePath();has=true;
    }
    if(!has)continue;
-   // One fully opaque sharp boundary stroke. Even a regional warning naming
-   // high-end hazards keeps its BoM-yellow AREA, not a fabricated red cell.
+   // NO raster boundary stroke: Cesium magnifies strokes painted in tiles
+   // while zooming, creating the 10-20px blurred crayon effect. GPU vector
+   // outlines draw exactly once in screen space on the ground.
    c.fillStyle=style.fill;c.fill("evenodd");
-   c.strokeStyle=style.stroke;
-   c.lineWidth=style.width;
-   c.stroke();
    // A map callout is permitted ONLY for an individual IDQ65652 feature
    // whose OWN published text explicitly identifies it as VERY DANGEROUS.
    // The general CAP bulletin or IDQ65650 threat area never assigns the
