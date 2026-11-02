@@ -143,27 +143,25 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
   // Obtain source-exact genuine GIS2Web-derived warning polygons only for
   // authenticated, active Bureau CAP issues, not arbitrary geographic guesses.
   // A separate WFS outage never converts a live CAP warning to "no warning".
-  const latestIssued=new Map(),activeIssues=new Map();
+  const latestIssued=new Map();
   for(const row of messageRecords){
    const n=row?.notice;
    if(n?.status!=="issued"||!n.productCode||
       !(Date.parse(n.expiresUtc)>now))continue;
-   const issues=activeIssues.get(n.productCode)??[];
-   issues.push(n);
-   activeIssues.set(n.productCode,issues);
    const prev=latestIssued.get(n.productCode);
    if(!prev||Date.parse(n.issuedUtc)>Date.parse(prev.issuedUtc))
     latestIssued.set(n.productCode,n);
   }
-  // One original GIS request per IDQ product; separately issued and still
-  // valid geographic features match their OWN independently verified CAP.
+  // A fresh official current index may identify a warning before its latest
+  // CAP notice reaches WMO. Query only original government GIS geometry,
+  // and preserve the original newest-CAP match whenever that CAP exists.
   const gisProducts=[...new Set([...latestIssued.keys(),
     ...(qldCurrentIndex?.activeCodes??[])])];
-  const gisResults=await Promise.allSettled(gisProducts
-   .map(code=>fetchQldBomWfsGeometry({productCode:code},{nowMs:now,
-     relatedNotices:activeIssues.get(code)??[{productCode:code}],
-     officialIndexActive:qldCurrentIndex?.verified===true&&
-      qldCurrentIndex.activeCodes.includes(code)})));
+  const gisResults=await Promise.allSettled(gisProducts.map(code=>
+   fetchQldBomWfsGeometry(latestIssued.get(code)??{productCode:code},{
+    nowMs:now,officialIndexActive:qldCurrentIndex?.verified===true&&
+      qldCurrentIndex.activeCodes.includes(code)
+   })));
   let gisFailures=0;
   const indexOnly=[];
   gisProducts.forEach((code,i)=>{
@@ -173,9 +171,9 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
     if(geometry.capBulletinStatus==="pending-current-source"){
      indexOnly.push(geometry);continue;
     }
-    const row=messageRecords.find(r=>r?.notice?.status==="issued"&&
-      r.notice.productCode===code&&
-      Math.abs(Date.parse(r.notice.issuedUtc)-Date.parse(geometry.issuedUtc))<=120000);
+    const notice=latestIssued.get(code);
+    const row=messageRecords.find(r=>r?.notice?.productCode===code&&
+      r.notice.issuedUtc===notice?.issuedUtc);
     if(row)row.warnings=[...(row.warnings??[]),geometry];
    }
   });
