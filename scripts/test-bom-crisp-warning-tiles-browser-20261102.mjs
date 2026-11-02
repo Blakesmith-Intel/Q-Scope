@@ -49,11 +49,11 @@ try{
    return [...d];
   };
   // 3 separate polygons at nonoverlapping source locations; sample the
-  // middle of each TOP edge, away from VDS pill and corner antialiasing.
+  // middle of each TOP edge: sample only +/-5px so the separate VDS label\n  // cannot be mistaken for a polygon border on a deliberately small QA cell.
   const edgeStats=(lon)=>{
    const readings=[];
    const center=(-9+27)/29*height;
-   for(let y=Math.round(center)-10;y<=Math.round(center)+10;y++)
+   for(let y=Math.round(center)-5;y<=Math.round(center)+5;y++)
     readings.push([...ctx.getImageData(Math.round((lon-136)/19*width),y,1,1).data]);
    return {
     opaquePixels:readings.filter(p=>p[3]>=190).length,
