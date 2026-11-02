@@ -1,4 +1,4 @@
-import {createWarningImageryProvider,warningContainsPoint} from "./bom-warning-terrain-imagery-v1.js?v=20261030-compact-vd-hazard-v1";
+import {createWarningImageryProvider,warningContainsPoint} from "./bom-warning-terrain-imagery-v1.js?v=20261030-compact-vd-hazard-v1-20261102-crisp-boM-golden-v1";
 import {formatAgencyTimestamp} from "./agency-source-time-v1.js?v=20261027-agency-panels-v1";
 const SOURCE="https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev/bom-official-warning-polygons";
 const SCHEMA="StormTrackerOfficialBoMWarningPolygonsV1",INTERVAL_MS=15*60*1000;
