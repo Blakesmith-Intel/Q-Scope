@@ -25,6 +25,16 @@ export function sourceQualifiedOfficialWarnings(warnings,productCode="all"){
  return filterOfficialWarnings(warnings,productCode)
   .filter(isSourceMatchedOfficialWarningPolygon);
 }
+// A single selection contract keeps map, locate and click in sync.
+// 'All' combines genuine areas and valid IDQ21035 storm locations.
+export function selectVisibleOfficialBoMGeometry(warnings,stormCells,selected="all"){
+ const areas=sourceQualifiedOfficialWarnings(warnings,selected);
+ const cells=(selected==="all"||selected==="IDQ21035"?
+  (Array.isArray(stormCells)?stormCells:[]):[]).filter(cell=>
+   cell?.official===true&&cell.productCode==="IDQ21035"&&
+   cell.sourceProduct==="IDQ65652"&&cell.type==="severe-thunderstorm-cell");
+ return [...areas,...cells];
+}
 export function warningProductAffectedGroups(warnings,productCode="all"){
  const visible=filterOfficialWarnings(warnings,productCode);
  const ldmgs=new Set(),ddmgs=new Set();
@@ -224,10 +234,8 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   state.textContent=message;state.dataset.kind=kind;
  };
  function showProductStatus(){
-  locateBtn.hidden=!toggle.checked||!officialWarningBounds([
-   ...sourceQualifiedOfficialWarnings(warnings,filter.value),
-   ...(filter.value==="all"||filter.value==="IDQ21035"?stormCells:[])
-  ]);
+  locateBtn.hidden=!toggle.checked||!officialWarningBounds(
+   selectVisibleOfficialBoMGeometry(warnings,stormCells,filter.value));
   if(!toggle.checked){report("BoM warning polygons off");return;}
   const result=describeOfficialBomWarningState({
     products:productStatuses,warnings,selected:filter.value
@@ -243,8 +251,7 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
  };
  function display(){
   discard();
-  const visible=[...sourceQualifiedOfficialWarnings(warnings,filter.value),
-   ...(filter.value==="all"||filter.value==="IDQ21035"?stormCells:[])];
+  const visible=selectVisibleOfficialBoMGeometry(warnings,stormCells,filter.value);
   if(!toggle.checked||!visible.length)return;
   // ONE logical and render-lifecycle object per original BoM polygon:
   // translucent terrain fill + precisely coincident 2px on-ground outline,
@@ -489,10 +496,8 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   void refresh({force:true});
  };
  const onLocate=()=>{
-  const bounds=officialWarningBounds([
-   ...sourceQualifiedOfficialWarnings(warnings,filter.value),
-   ...(filter.value==="all"||filter.value==="IDQ21035"?stormCells:[])
-  ]);
+  const bounds=officialWarningBounds(
+    selectVisibleOfficialBoMGeometry(warnings,stormCells,filter.value));
   if(!toggle.checked||!bounds||!cameraController?.setView)return;
   const target=officialWarningCameraTarget(bounds,{
    width:canvas.clientWidth||canvas.width||430,
@@ -542,8 +547,7 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   const loc=CesiumRef.Cartographic.fromCartesian(hit);
   const longitude=CesiumRef.Math.toDegrees(loc.longitude);
   const latitude=CesiumRef.Math.toDegrees(loc.latitude);
-  const selected=[...sourceQualifiedOfficialWarnings(warnings,filter.value),
-    ...(filter.value==="all"||filter.value==="IDQ21035"?stormCells:[])];
+  const selected=selectVisibleOfficialBoMGeometry(warnings,stormCells,filter.value);
   if(officialWarningAtPoint(selected,longitude,latitude)){
    // Identical report and selected-product scope as the existing button.
    openGroups();
