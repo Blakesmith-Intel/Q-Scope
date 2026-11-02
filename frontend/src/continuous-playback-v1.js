@@ -1,5 +1,5 @@
 // Await each complete scene update before advancing; never overlap renders.
-export function createContinuousPlayback({ count, currentIndex, showFrame, delay, onPlayingChange = () => {}, onError = () => {} }) {
+export function createContinuousPlayback({ count, currentIndex, showFrame, delay, onPlayingChange = () => {}, onError = () => {}, continueOnFailedCycle = false }) {
   let playing = false;
   let generation = 0;
   let pending = Promise.resolve();
@@ -34,8 +34,18 @@ export function createContinuousPlayback({ count, currentIndex, showFrame, delay
         if (presented === false) {
           cursor = target;
           failedSteps++;
-          if (failedSteps >= count() * 2)
-            throw new Error("Playback stopped: consecutive radar/Doppler frames could not be presented.");
+          if (failedSteps >= count() * 2) {
+            if (!continueOnFailedCycle)
+              throw new Error("Playback stopped: consecutive radar/Doppler frames could not be presented.");
+            // This is a presentation failure, not a fabricated or missing
+            // observation. Retain the previous genuine image and keep the
+            // playback clock alive while Cesium recovers. Bound retry pressure.
+            failedSteps = 0;
+            onError(new Error(
+              "Radar imagery is still rendering; retaining last verified frame and retrying."
+            ));
+            await new Promise(resolve => setTimeout(resolve, Math.max(1000, delay())));
+          }
         } else {
           cursor = currentIndex();
           failedSteps = 0;
