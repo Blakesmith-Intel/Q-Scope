@@ -102,23 +102,33 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
   // Obtain source-exact genuine GIS2Web-derived warning polygons only for
   // authenticated, active Bureau CAP issues, not arbitrary geographic guesses.
   // A separate WFS outage never converts a live CAP warning to "no warning".
-  const latestIssued=new Map();
+  const latestIssued=new Map(),activeIssues=new Map();
   for(const row of messageRecords){
    const n=row?.notice;
-   if(n?.status!=="issued"||!n.productCode)continue;
+   if(n?.status!=="issued"||!n.productCode||
+      !(Date.parse(n.expiresUtc)>now))continue;
+   const issues=activeIssues.get(n.productCode)??[];
+   issues.push(n);
+   activeIssues.set(n.productCode,issues);
    const prev=latestIssued.get(n.productCode);
    if(!prev||Date.parse(n.issuedUtc)>Date.parse(prev.issuedUtc))
     latestIssued.set(n.productCode,n);
   }
+  // One original GIS request per IDQ product; separately issued and still
+  // valid geographic features match their OWN independently verified CAP.
   const gisResults=await Promise.allSettled([...latestIssued.values()]
-   .map(notice=>fetchQldBomWfsGeometry(notice,{nowMs:now})));
+   .map(notice=>fetchQldBomWfsGeometry(notice,{nowMs:now,
+     relatedNotices:activeIssues.get(notice.productCode)})));
   let gisFailures=0;
   [...latestIssued.values()].forEach((notice,i)=>{
    const result=gisResults[i];
    if(result.status==="rejected"){gisFailures++;return;}
-   const row=messageRecords.find(r=>r?.notice?.productCode===notice.productCode&&
-     r.notice.issuedUtc===notice.issuedUtc);
-   if(row)row.warnings=[...(row.warnings??[]),...result.value];
+   for(const geometry of result.value){
+    const row=messageRecords.find(r=>r?.notice?.status==="issued"&&
+      r.notice.productCode===notice.productCode&&
+      Math.abs(Date.parse(r.notice.issuedUtc)-Date.parse(geometry.issuedUtc))<=120000);
+    if(row)row.warnings=[...(row.warnings??[]),geometry];
+   }
   });
   const reconciled=reconcileLatestBoMWarnings(messageRecords,{
     complete:sourceFailures===0&&!indexPossiblyTruncated,nowMs:now,
