@@ -6,7 +6,10 @@
 export function createRadarImageryHandover({
   imageryLayers, scene, setTimeoutImpl = setTimeout,
   clearTimeoutImpl = clearTimeout,
-  retireLayer = null
+  retireLayer = null,
+  // Reuse only a bounded number of PREVIOUSLY RENDERED original-source
+  // primary radar layers. Other consumers retain legacy disposal unchanged.
+  maxRetainedLayers = 0
 }) {
   if (!imageryLayers || !scene?.postRender) {
     throw new TypeError("Radar imagery handover needs Cesium imagery and render events");
@@ -14,9 +17,35 @@ export function createRadarImageryHandover({
   let activeLayer = null;
   let pending = null;
   let generation = 0;
+  // Provider identity is tied to the actual decoded BoM image, not a
+  // timestamp label. A corrected/reloaded PNG cannot reuse stale pixels.
+  const retained = new Map();
+  const retainedLimit = Math.max(0, Math.min(5, Math.trunc(Number(maxRetainedLayers)||0)));
+  function forgetRetained(layer) {
+    if(layer?.imageryProvider && retained.get(layer.imageryProvider)===layer)
+      retained.delete(layer.imageryProvider);
+  }
+  function retainOldLayer(layer) {
+    if(!retainedLimit || !layer?.imageryProvider) {
+      safeRemove(layer);
+      return;
+    }
+    // The image stays GPU-ready but invisible, retaining the exact native
+    // source pixels until that genuine frame is selected again.
+    layer.alpha=0;
+    layer.show=false;
+    retained.delete(layer.imageryProvider);
+    retained.set(layer.imageryProvider,layer);
+    while(retained.size>retainedLimit) {
+      const [provider,obsolete]=retained.entries().next().value;
+      retained.delete(provider);
+      safeRemove(obsolete);
+    }
+  }
 
   function safeRemove(layer) {
     if (!layer) return;
+    forgetRetained(layer);
     try {
       if(retireLayer && retireLayer(layer))return;
       imageryLayers.remove(layer,true);
@@ -32,6 +61,8 @@ export function createRadarImageryHandover({
   }
   function reset() {
     cancelPending();
+    for(const layer of retained.values())safeRemove(layer);
+    retained.clear();
     safeRemove(activeLayer);
     activeLayer = null;
     scene.requestRender();
@@ -55,6 +86,24 @@ export function createRadarImageryHandover({
     const myGeneration = generation;
     const targetAlpha = Math.max(0, Math.min(1, Number(alpha) || 0));
     const previous = activeLayer;
+    // A previously rendered ORIGINAL BoM image can be reused without
+    // creating and retiring a fresh WebGL texture on every six-frame loop.
+    const provider = layer.imageryProvider;
+    const reusable = retainedLimit && provider ? retained.get(provider) : null;
+    const fromCache = Boolean(reusable && imageryLayers.indexOf(reusable)>=0);
+    if(fromCache) {
+      retained.delete(provider);
+      layer=reusable;
+    } else if(reusable) {
+      retained.delete(provider);
+    }
+    // The displayed observation has not changed; do not churn GPU imagery.
+    if(retainedLimit && provider && previous?.imageryProvider===provider) {
+      if(beforeReveal)beforeReveal();
+      previous.alpha=targetAlpha;
+      scene.requestRender();
+      return true;
+    }
 
     // First frame has no outgoing image to retain. All subsequent transitions
     // preserve the complete outgoing image until the new one is ready.
@@ -83,7 +132,14 @@ export function createRadarImageryHandover({
     // Nonzero alpha ensures Cesium continues loading the staged layer. It sits
     // UNDER the currently visible weather overlay and cannot flash bare map.
     layer.alpha = 0.001;
-    imageryLayers.add(layer, imageryLayers.indexOf(previous));
+    layer.show = true;
+    if(fromCache) {
+      // A cached image remains in Cesium's collection, hidden beneath the
+      // current genuine scan. Restore it without a second layer insertion.
+      imageryLayers.raiseToTop(previous);
+    } else {
+      imageryLayers.add(layer, imageryLayers.indexOf(previous));
+    }
     scene.requestRender();
 
     const ready = await new Promise(resolve => {
@@ -129,7 +185,9 @@ export function createRadarImageryHandover({
       scene.requestRender();
     });
     if (!ready || myGeneration !== generation || !isCurrent()) {
-      safeRemove(layer);
+      if(fromCache && myGeneration===generation && activeLayer!==layer)
+        retainOldLayer(layer);
+      else safeRemove(layer);
       scene.requestRender();
       return false;
     }
@@ -151,7 +209,7 @@ export function createRadarImageryHandover({
     layer.alpha = targetAlpha;
     imageryLayers.raiseToTop(layer);
     activeLayer = layer;
-    safeRemove(previous);
+    retainOldLayer(previous);
     scene.requestRender();
     return true;
   }
