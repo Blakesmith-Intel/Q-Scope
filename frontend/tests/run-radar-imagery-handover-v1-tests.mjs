@@ -144,7 +144,7 @@ for(let cycle=0;cycle<3;cycle++){
     const next={name:"source-"+i+"-cycle-"+cycle,imageryProvider:genuineProviders[i],alpha:1,show:true};
     if(cycle===0)firstLayers.push(next);
     let beforeReveal=0;
-    const swap=warm.api.replace(next,{decodedSingleTile:true,beforeReveal:()=>beforeReveal++});
+    const swap=warm.api.replace(next,{decodedSingleTile:true,cacheEligible:true,beforeReveal:()=>beforeReveal++});
     if(cycle!==0||i!==0){warm.fire();warm.fire();warm.fire();}
     assert.equal(await swap,true);
     assert.equal(beforeReveal,1,"Atomic measured image and geometry handover retained");
@@ -157,7 +157,25 @@ assert.equal(warm.layers.length,6,"Exactly one retained image per authentic UTC"
 assert.deepEqual(warm.removed,[],"No repetitive GPU teardown during six-frame playback");
 for(const layer of firstLayers)
   assert(warm.layers.includes(layer),"Reuse original decoded source layer after repeated loops");
+// Motion/gap-fill displays may remain available as visual-only animations,
+// but their imagery must never enter the measured primary source cache.
+const syntheticProvider={displayOnly:true};
+const synthetic={name:"display-only",imageryProvider:syntheticProvider,alpha:1,show:true};
+const syntheticSwap=warm.api.replace(synthetic,{decodedSingleTile:true,cacheEligible:false});
+warm.fire();warm.fire();warm.fire();
+assert.equal(await syntheticSwap,true);
+const backToMeasured=warm.api.replace(
+  {name:"measured-again",imageryProvider:genuineProviders[5],alpha:1,show:true},
+  {decodedSingleTile:true,cacheEligible:true}
+);
+warm.fire();warm.fire();warm.fire();
+assert.equal(await backToMeasured,true);
+assert(warm.removed.includes(synthetic),
+  "Visual-only images must be retired, never preserved in measured GPU cache");
+assert(!warm.layers.includes(synthetic),
+  "No inferred display frames may survive in retained measured source imagery");
 warm.api.reset();
 assert.equal(warm.layers.length,0,"Site switch releases cached source layers");
-assert.equal(warm.removed.length,6,"No retained GPU resources after site reset");
+assert.equal(warm.removed.length,7,
+  "Five measured caches, the visible source and one visual-only layer are disposed");
 console.log("PASS original BoM 2-D and measured-frame inferred 3-D reveal atomically, with failed tile rollback and bounded six-frame GPU reuse.");
