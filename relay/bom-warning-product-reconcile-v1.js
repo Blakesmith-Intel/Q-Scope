@@ -74,23 +74,10 @@ export function reconcileLatestBoMWarnings(messages,{complete=true,nowMs=Date.no
       continue;
     }
     const latestWarnings=options.filter(x=>x.issued===latest.issued)
-      .flatMap(x=>x.warnings);
-    // A newer CAP notice does not necessarily cancel another separately
-    // issued, still-current warning area using the same regional product.
-    // Include older issues ONLY if the current official Queensland index
-    // verifies the product active and each area is government GIS source-
-    // authenticated and matches its own unexpired original CAP issue.
-    // Older standalone CAP polygons are NOT republished on revision.
-    const concurrentSourceWarnings=officialActive?.has(code)?
-      options.filter(x=>x.issued!==latest.issued&&
-        x.notice.status==="issued"&&validMs(x.notice.expiresUtc)>nowMs)
-        .flatMap(x=>x.warnings)
-        .filter(w=>w.warningGeometrySource&&w.sourceProduct):
-      [];
-    const currentWarnings=[...latestWarnings,...concurrentSourceWarnings]
+      .flatMap(x=>x.warnings)
       .filter(w=>w.productCode===code && validMs(w.expiresUtc)>nowMs &&
         validMs(w.issuedUtc)<=nowMs && w.official===true);
-    const unique=[...new Map(currentWarnings.map(w=>[w.id,w])).values()];
+    const unique=[...new Map(latestWarnings.map(w=>[w.id,w])).values()];
     if(!unique.length){
       // An explicit live warning without valid geometry is NOT a no-warning
       // response, even when the enclosing RSS request succeeded.
