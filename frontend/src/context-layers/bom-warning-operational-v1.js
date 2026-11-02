@@ -132,14 +132,18 @@ export function describeOfficialBomWarningState({products={},warnings=[],selecte
      status(code)==="geometry-unavailable"||!count?
      " — active; awaiting updated BoM polygon":
      " — active ("+count+" polygon"+(count===1?"":"s")+")";
-   return warningName(code)+spatial+compact;
+   const sourceNote=products?.[code]?.bulletinVerification==="pending-current-source"?
+     " — original GIS polygons verified; current CAP bulletin pending":"";
+   return warningName(code)+spatial+sourceNote+compact;
   });
   const message="Active BoM warnings: "+parts.join(" · ")+
     (selected==="all"&&clear.length?
      " · "+clear.map(code=>code+": none current").join(" · "):"")+
     (uncertain.length?" · Other products not verified":"");
   return {message,kind:uncertain.length||
-    active.some(code=>["geometry-unavailable","listed-active"].includes(status(code))||!countFor(code))?"warning":"normal"};
+    active.some(code=>["geometry-unavailable","listed-active"].includes(status(code))||
+      !countFor(code)||products?.[code]?.bulletinVerification==="pending-current-source")?
+      "warning":"normal"};
  }
  if(selected!=="all"&&clear.length)
   return {message:"No current warnings — "+warningName(selected),kind:"normal"};
@@ -245,13 +249,18 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   activeId=warning.id;
   title.textContent=warning.headline||warning.event;
   content.replaceChildren();
+  if(warning.capBulletinStatus==="pending-current-source")
+   textRow(content,"Source verification",
+    "Polygon coordinates and validity independently verified against the current BoM Queensland warning listing and original GIS2Web-derived data. Current CAP bulletin details not verified; check the official BoM warning.");
   textRow(content,"Official warning",warning.event);
   textRow(content,"BoM product",warning.productCode||"Not verified");
   textRow(content,"Product",warning.productType==="detailed"?
    "Detailed SEQ thunderstorm (IDQ21035)":warning.productType==="regional"?
    "Regional QLD thunderstorm (IDQ21033)":"BoM severe weather");
-  textRow(content,"Issued",fmt(warning.issuedUtc));
-  textRow(content,"Expires",fmt(warning.expiresUtc));
+  textRow(content,warning.capBulletinStatus==="pending-current-source"?
+   "GIS polygon issued":"Issued",fmt(warning.issuedUtc));
+  textRow(content,warning.capBulletinStatus==="pending-current-source"?
+   "GIS polygon expires":"Expires",fmt(warning.expiresUtc));
   textRow(content,"Severity / certainty",[warning.severity,warning.certainty].filter(Boolean).join(" · "));
   textRow(content,"Warning area",warning.areaDescription);
   if(warning.hazardAssessment?.highEnd?.length)
@@ -380,6 +389,11 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
        "Cancelled by BoM · 0 active polygons":
        result.count+" active verified polygon"+(result.count===1?"":"s");
    section.append(count);
+   if(productStatuses[code]?.bulletinVerification==="pending-current-source"){
+    const sourceNote=document.createElement("p");
+    sourceNote.textContent="Original BoM GIS warning area verified against the current Queensland warning index; current international CAP bulletin details not yet verified. Open the current BoM warning for full text.";
+    section.append(sourceNote);
+   }
    const highEnd=productStatuses[code]?.hazardAssessment?.highEnd??[];
    if(highEnd.length){
     const severity=document.createElement("p");
