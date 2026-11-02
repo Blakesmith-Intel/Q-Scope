@@ -71,6 +71,46 @@ export async function enrichWarningBoundaries(warning){
   geometryIntersectionsMethod:"esriSpatialRelIntersects — no minimum area"
  };
 }
+// Fallback is permitted ONLY when two independently authoritative live
+// sources agree: the fresh BoM Queensland current-product index and the
+// original government GIS2Web-derived feature service. It must never turn a
+// newer CAP cancellation into an old polygon, or invent bulletin text.
+export function reconcileIndexVerifiedWarningGeometry(reconciled,index,indexOnly,{nowMs=Date.now()}={}){
+ const checked=Date.parse(index?.checkedUtc??"");
+ const active=new Set(index?.verified===true&&Array.isArray(index.activeCodes)?index.activeCodes:[]);
+ if(!Number.isFinite(checked)||checked>nowMs+300000||
+    nowMs-checked>20*60000)return {...reconciled,indexOnlyCount:0};
+ const products={...reconciled.products},warnings=[...reconciled.warnings];
+ const seen=new Set(warnings.map(w=>w.id));
+ let indexOnlyCount=0;
+ for(const warning of indexOnly??[]){
+  const code=warning?.productCode,status=products[code]?.status;
+  const sourceCode=code==="IDQ21033"?"IDQ65654":code==="IDQ21035"?"IDQ65650":null;
+  if(!sourceCode||!active.has(code)||
+     !["listed-active","geometry-unavailable","active"].includes(status)||
+     warning.capBulletinStatus!=="pending-current-source"||
+     warning.official!==true||warning.issuer!=="Bureau of Meteorology"||
+     warning.sourceProduct!==sourceCode||!warning.warningGeometrySource||
+     !["Polygon","MultiPolygon"].includes(warning.geometry?.type)||
+     !(Date.parse(warning.issuedUtc)<=nowMs+300000)||
+     !(Date.parse(warning.expiresUtc)>nowMs)||
+     seen.has(warning.id))continue;
+  seen.add(warning.id);warnings.push(warning);indexOnlyCount++;
+  const p=products[code],hasCurrentCap=warnings.some(w=>w.productCode===code&&
+    w.capBulletinStatus==="source-matched");
+  products[code]={...p,status:"active",count:(p.count??0)+1,
+   bulletinVerification:"pending-current-source",
+   // An old cancelled CAP is NOT the current bulletin; never present its
+   // stale headline, expiry, description or advice as today's warning.
+   ...(!hasCurrentCap?{issuedUtc:null,expiresUtc:null,headline:"",
+     description:"",instruction:"",areaDescription:"",
+     bulletinUrl:warning.bulletinUrl,hazardAssessment:null}:{})
+  };
+ }
+ return {products,warnings,sourceComplete:reconciled.sourceComplete&&indexOnlyCount===0,
+   indexOnlyCount};
+}
+
 export async function relayBomWarningPolygons(request,origin,corsHeaders){
  const head={"Content-Type":"application/json; charset=utf-8","Cache-Control":"public,max-age=90"};
  let payload;
@@ -116,16 +156,24 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
   }
   // One original GIS request per IDQ product; separately issued and still
   // valid geographic features match their OWN independently verified CAP.
-  const gisResults=await Promise.allSettled([...latestIssued.values()]
-   .map(notice=>fetchQldBomWfsGeometry(notice,{nowMs:now,
-     relatedNotices:activeIssues.get(notice.productCode)})));
+  const gisProducts=[...new Set([...latestIssued.keys(),
+    ...(qldCurrentIndex?.activeCodes??[])])];
+  const gisResults=await Promise.allSettled(gisProducts
+   .map(code=>fetchQldBomWfsGeometry({productCode:code},{nowMs:now,
+     relatedNotices:activeIssues.get(code)??[{productCode:code}],
+     officialIndexActive:qldCurrentIndex?.verified===true&&
+      qldCurrentIndex.activeCodes.includes(code)})));
   let gisFailures=0;
-  [...latestIssued.values()].forEach((notice,i)=>{
+  const indexOnly=[];
+  gisProducts.forEach((code,i)=>{
    const result=gisResults[i];
    if(result.status==="rejected"){gisFailures++;return;}
    for(const geometry of result.value){
+    if(geometry.capBulletinStatus==="pending-current-source"){
+     indexOnly.push(geometry);continue;
+    }
     const row=messageRecords.find(r=>r?.notice?.status==="issued"&&
-      r.notice.productCode===notice.productCode&&
+      r.notice.productCode===code&&
       Math.abs(Date.parse(r.notice.issuedUtc)-Date.parse(geometry.issuedUtc))<=120000);
     if(row)row.warnings=[...(row.warnings??[]),geometry];
    }
@@ -134,11 +182,13 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
     complete:sourceFailures===0&&!indexPossiblyTruncated,nowMs:now,
     qldCurrentIndex
   });
+  const resolved=reconcileIndexVerifiedWarningGeometry(
+   reconciled,qldCurrentIndex,indexOnly,{nowMs:now});
   // NSW clipping against the TRUE installed radar coverage union is required
   // before independently publishing NSW warnings. Do not approximate it.
-  const qld=reconciled.warnings.filter(x=>x.state==="QLD");
+  const qld=resolved.warnings.filter(x=>x.state==="QLD");
   const enriched=await Promise.all(qld.slice(0,14).map(enrichWarningBoundaries));
-  const products=reconciled.products;
+  const products=resolved.products;
   // IDQ65652 is the separate detailed storm-LOCATION product. A published
   // IDQ65650 threat-area polygon must never be treated as an individual cell.
   // A source outage or no available cell geometries never implies "no storms".
@@ -154,7 +204,8 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
    }
   }
   // Never label incomplete CAP source scans as confirmed "no warnings".
-  const partial=sourceFailures>0||gisFailures>0||indexPossiblyTruncated||Object.values(products).some(p=>
+  const partial=sourceFailures>0||gisFailures>0||indexPossiblyTruncated||
+   resolved.indexOnlyCount>0||Object.values(products).some(p=>
     p.status==="unavailable"||p.status==="geometry-unavailable");
   payload={schema:NAME,checkedAt:new Date(now).toISOString(),
    status:partial?"partial-source-unavailable":
@@ -164,7 +215,8 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
    qldCurrentIndexStatus:qldCurrentIndex?"verified-current-products":"unavailable",
    qldCurrentIndexCheckedAt:qldCurrentIndex?.checkedUtc??null,
    geospatialSource:"Queensland emergency-management WFS-derived Bureau GIS2Web warnings",
-   products,sourceComplete:reconciled.sourceComplete,
+   products,sourceComplete:resolved.sourceComplete,
+   currentIndexAndGisCapPendingCount:resolved.indexOnlyCount,
    nswWithheld:reconciled.warnings.filter(x=>x.state==="NSW").length,
    stormCellSourceStatus,stormCells,warnings:enriched};
  }catch(error){
