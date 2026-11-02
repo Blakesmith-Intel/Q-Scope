@@ -351,7 +351,8 @@ with (site / "BUILD.txt").open("a", encoding="utf-8") as build:
         "during new frames, delayed app initialization and Safari tab reload 2026-11-01\n"
     )
 assert "planIncrementalRadarWindow(hybridFrames,displayFrames)" in data
-assert "if(resume && !incrementalCommit)playback.play();" in data
+assert "if(resume && !incrementalCommit && !noninterruptingBackfill)playback.play();" in data
+assert "const noninterruptingBackfill = automatic" in data
 assert "radarTileFailureSnapshot" in data
 assert (site / "src/radar-incremental-window-v1.js").exists()
 assert (site / "src/radar-lifecycle-diagnostics-v1.js").exists()
