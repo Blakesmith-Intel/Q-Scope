@@ -147,4 +147,13 @@ assert.match(source,/Date\.parse\(frames\.at\(-1\)\.observedUtc\)\s*<\s*Date\.pa
 assert.match(source,/playback\.isPlaying\(\) \|\| hybridFrames\.length === 0/);
 assert.match(packageOverlay,/A refused NEWEST scan must not discard other newly verified scans/);
 assert.match(packageOverlay,/copyfile\("frontend\/src\/radar-tile-retry-v1\.js"/);
+
+assert(source.includes("continueOnFailedCycle: true"),
+  "The running operator player must not stop on transient Cesium refusal");
+assert(packageOverlay.includes("continueOnFailedCycle: true"),
+  "The shipped Pages player must retain the same nonstopping frame recovery");
+assert(source.includes("timeoutMs:10000,"),
+  "Actual predecoded Cesium tiles need a bounded but mobile-safe handover window");
+assert(packageOverlay.includes("timeoutMs:10000,"),
+  "Production-equivalent build must carry the handover budget");
 console.log("PASS Taroom/global real-tile timeout and six-frame missing-observation recovery source + shipped overlay");
