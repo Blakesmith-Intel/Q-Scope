@@ -83,14 +83,18 @@ try{
    const point=viewer.scene.cartesianToCanvasCoordinates(edge);
    const bounds=viewer.scene.canvas.getBoundingClientRect();
    return {point:{x:point?.x,y:point?.y},
-    bounds:{width:bounds.width,height:bounds.height},
+    bounds:{width:bounds.width,height:bounds.height,
+      left:bounds.left,top:bounds.top},
     fillReady:fill.ready,lineReady:line.ready,
     primitiveType:[fill.constructor.name,line.constructor.name]};
   },rect);
-  const png=PNG.sync.read(await page.locator("#one-object-ground-qa canvas.cesium-widget-canvas")
-   .screenshot({type:"png"}));
-  const x=Math.round(info.point.x*png.width/info.bounds.width);
-  const y=Math.round(info.point.y*png.height/info.bounds.height);
+  // Browser screenshot avoids relying on Cesium's internal canvas CSS class
+  // (which changed between versions). QA map occupies a fixed top-left DOM
+  // surface; source point maps through that canvas's measured client rect.
+  const png=PNG.sync.read(await page.screenshot({type:"png"}));
+  const dpr=png.width/page.viewportSize().width;
+  const x=Math.round((info.point.x+info.bounds.left)*dpr);
+  const y=Math.round((info.point.y+info.bounds.top)*dpr);
   const pixels=[];
   for(let dy=-14;dy<=14;dy++){
    let py=y+dy;
