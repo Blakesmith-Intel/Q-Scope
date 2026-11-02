@@ -1,7 +1,8 @@
 // Isolated QA: bound simultaneous BoM relay requests and halt futile retry
 // storms without fabricating, interpolating or quietly substituting any data.
-// HTTP 400 is cached by exact (tile + source timestamp) URL. A permission/
-// service outage temporarily opens a circuit for THIS WMTS request class.
+// HTTP 400/403 are cached by exact (tile + source timestamp) URL.
+// Only an explicit 429 rate limit may temporarily pause the shared queue.
+// Denials at one radar must never freeze retrieval from another.
 export function createRadarRequestPressureGuard({
   // BoM/Cloudflare may refuse bursty multi-site tile fetches (HTTP 403).
   // Two simultaneous tiles preserve interactive throughput without bursts.
@@ -12,7 +13,6 @@ export function createRadarRequestPressureGuard({
 }={}) {
   const inflight=new Map(), negative=new Map(), queue=[];
   let active=0,blockedUntil=0,blockedStatus=0;
-  let consecutiveRefusals=0,lastRefusalAt=0;
   const metrics={started:0,joined:0,negativeHits:0,blocked:0,peakActive:0};
   const statusError=(status,reason="")=>{
     const e=new Error("Image request failed: HTTP "+status+(reason?" ("+reason+")":""));
@@ -36,9 +36,6 @@ export function createRadarRequestPressureGuard({
       Promise.resolve().then(item.fetchTile).then(
         result=>{
           active--;inflight.delete(item.url);
-          // A successful native PNG read breaks an apparent denial streak;
-          // independent radar tiles must not be mistaken for a global ban.
-          consecutiveRefusals=0;
           item.resolve(result);next();
         },
         error=>{
@@ -54,20 +51,11 @@ export function createRadarRequestPressureGuard({
             });
             if(negative.size>320)negative.delete(negative.keys().next().value);
           }
-          // A single HTTP 403 on a geographic WMTS tile may be local to
-          // that query. Do NOT block every radar on one refused tile.
-          // Three fresh refusals in 30 seconds or one explicit HTTP 429
-          // indicate wider access pressure and justify brief backoff.
-          const t=now();
-          if(status===403){
-            consecutiveRefusals=(t-lastRefusalAt<=30000)
-              ? consecutiveRefusals+1 : 1;
-            lastRefusalAt=t;
-          } else if(status!==429 && status!==400){
-            consecutiveRefusals=0;
-          }
-          if(status===429 || (status===403 && consecutiveRefusals>=3)){
-            const until=t+deniedCooldownMs;
+          // A 403 on a real tile is source/relay denial for THIS URL,
+          // not evidence of a global ban. Keep fetching other genuine UTCs.
+          // Only a literal 429 rate-limit response pauses the shared queue.
+          if(status===429){
+            const until=now()+serviceCooldownMs;
             if(until>blockedUntil){blockedUntil=until;blockedStatus=status;}
           }
           item.reject(error);

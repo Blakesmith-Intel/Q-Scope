@@ -63,12 +63,30 @@ assert.equal(independent.width,256,
 await assert.rejects(guard.run("refused-2",denied),/HTTP 403/);
 await assert.rejects(guard.run("refused-3",denied),/HTTP 403/);
 await assert.rejects(guard.run("refused-4",denied),/HTTP 403/);
-await assert.rejects(guard.run("different-source-time",denied),/relay cooldown/);
-assert.equal(deniedCalls,4,
-  "Only three fresh consecutive denials, not replays of cached URLs, open the global circuit");
+const stillReadable=await guard.run("different-source-time",
+  ()=>Promise.resolve({width:256,height:256}));
+assert.equal(stillReadable.width,256,
+  "Four distinct source 403s must not block healthy timestamps or radar sites");
+assert.equal(guard.snapshot().blockedUntil,0,
+  "HTTP 403 is not a global source-circuit trigger");
+assert.equal(deniedCalls,4);
 clock+=2100;
-const recovered=await guard.run("after-cooldown",()=>Promise.resolve({width:256,height:256}));
-assert.equal(recovered.width,256);
+const recovered=await guard.run("refused-4",()=>Promise.resolve({width:256,height:256}));
+assert.equal(recovered.width,256,
+  "A short refusal cooldown must allow later genuine source recovery");
+let limitCalls=0;
+const rateLimited=()=>{
+  limitCalls++;
+  return Promise.reject(Object.assign(Error("HTTP 429"),{status:429}));
+};
+await assert.rejects(guard.run("rate-limit-test",rateLimited),/429/);
+await assert.rejects(guard.run("rate-limit-other-tile",
+  ()=>Promise.resolve({width:256,height:256})),/relay cooldown/);
+assert.equal(limitCalls,1);
+clock+=1600;
+const resumed=await guard.run("rate-limit-after-cooldown",
+  ()=>Promise.resolve({width:256,height:256}));
+assert.equal(resumed.width,256,"Explicit 429 must use finite, recoverable global cooldown");
 const join=createRadarRequestPressureGuard({maxConcurrent:1});
 let resolveJoin;
 let joinStarts=0;
@@ -80,4 +98,4 @@ assert.equal(joinStarts,1);
 resolveJoin({width:256,height:256});
 await Promise.all([j1,j2]);
 assert.equal(join.snapshot().joined,1);
-console.log("PASS bounded WMTS concurrency, cache sharing, 400 expiry, single-tile 403 isolation and repeated-refusal cooldown.");
+console.log("PASS bounded WMTS concurrency, per-tile 400/403 isolation, continued cross-site retrieval and explicit 429 cooldown.");
