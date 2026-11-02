@@ -69,8 +69,8 @@ try{
  const canvas=await tileRequest;
  assert.equal(canvas.width,1024);
  assert.equal(canvas.height,1024);
- assert(paints.includes("fill")&&paints.includes("stroke"),
-  "Original source polygon must still be painted");
+ assert(paints.includes("fill")&&!paints.includes("stroke"),
+  "Legacy Cesium imagery interface retains fill/promise compatibility but MUST NOT paint a zoom-scaled stroke");
  const inside=provider.pickFeatures(0,0,0,149.3*radians,-27.3*radians);
  assert.equal(typeof inside?.then,"function",
   "Cesium feature picking must also return a promise");
