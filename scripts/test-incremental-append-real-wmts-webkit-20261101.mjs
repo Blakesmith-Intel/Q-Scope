@@ -59,6 +59,23 @@ await page.route("https://blakesmith-intel.github.io/StormTracker/**",async rout
       '  window.__qaRadarStage?.("supplemental-await");\n  await extraPreparation;\n  window.__qaRadarStage?.("supplemental-ready");');
     add('  const radarStart=performance.now();',
       '  window.__qaRadarStage?.("surface-call");\n  const radarStart=performance.now();');
+    // Instrument ONLY this intercepted QA module to localise long SwiftShader
+    // stalls. The production source, BoM tiles and science are not patched.
+    add('  const commitMeasuredGeometry=()=>{',
+      '  const commitMeasuredGeometry=()=>{\\n    window.__qaRadarStage?.("geometry-begin");');
+    add('    renderInferredVolume(frame);',
+      '    renderInferredVolume(frame);\\n    window.__qaRadarStage?.("inferred-volume-done");');
+    add('    updateTrackDisplayControls(liveMeasuredIndex);',
+      '    updateTrackDisplayControls(liveMeasuredIndex);\\n    window.__qaRadarStage?.("track-controls-done");');
+    add('    renderHybridTracks(liveMeasuredIndex);',
+      '    renderHybridTracks(liveMeasuredIndex);\\n    window.__qaRadarStage?.("track-geometry-done");');
+    add('    geometryCommitted=true;',
+      '    geometryCommitted=true;\\n    window.__qaRadarStage?.("geometry-committed");');
+    add('  await new Promise(resolve=>{',
+      '  window.__qaRadarStage?.("ui-postrender-wait");\\n  await new Promise(resolve=>{');
+    add('  syncFrameSlider($("hybridFrameSlider"),hybridFrames.length,hybridFrameIndex);',
+      '  window.__qaRadarStage?.("ui-postrender-ready");\\n  syncFrameSlider($("hybridFrameSlider"),hybridFrames.length,hybridFrameIndex);');
+
     add('  radarPresentationMs=performance.now()-radarStart;',
       '  radarPresentationMs=performance.now()-radarStart;\n  window.__qaRadarStage?.("surface-return",{applied:surfaceApplied});');
     add('  const provider=await prepareRadarSurfaceProvider(frame);',
