@@ -207,6 +207,24 @@ replace_once(
     "loadBomReflectivityMosaicAtTime(entry.observedUtc, selectedRadarRegion())",
     "loadBomReflectivityMosaicAtTime(entry.observedUtc, selectedRadarRegion(), discoveredTimes)"
 )
+# Match the review source's bounded per-site IndexedDB history loader in
+# the delivered pinned application. The old getAll() read ALL statewide
+# decoded image records on EVERY live check, including pruning.
+replace_once(
+    '"./storage.js?v=9.8.3"',
+    '"./storage.js?v=20261103-bounded-site-indexeddb-v1"'
+)
+replace_once(
+    "getRadarFrames(region, cacheCutoff).catch(error => {",
+    "getRadarFrames(region, cacheCutoff, cacheFrameBudget).catch(error => {"
+)
+budget_start=source.index("  // Load only a small, site-specific verified archive slice")
+budget_end=source.index("  // Startup metadata failure",budget_start)
+inject_once_cache_anchor='''  const [sourceResult, cachedFrames] = await Promise.all(['''
+assert data.count(inject_once_cache_anchor)==1
+data=data.replace(inject_once_cache_anchor,
+    source[budget_start:budget_end]+inject_once_cache_anchor,1)
+
 # The delivered sealed runtime must use the exact bounded, disk-only
 # history catch-up from the review source. Do not eagerly load the whole
 # published 180-minute state into its decoded frame cache.
@@ -266,7 +284,7 @@ replace_once(
     '''  $("hybridPlayButton").disabled = hybridFrames.length < 2;
   await showHybridFrame(hybridFrameIndex);
   if (resume) playback.play();''',
-    "  $(\"hybridPlayButton\").disabled = hybridFrames.length < 2;\n  // Never cause a second render over the active player's own in-flight render.\n  // A paused Latest operator still sees the just-accepted newest observation.\n  if((!incrementalCommit && !noninterruptingBackfill) || !playback.isPlaying())\n    await showHybridFrame(hybridFrameIndex);\n  radarLifecycle.sampleMemory({\n    region,latestUtc:frames.at(-1).observedUtc,\n    frameCount:hybridFrames.length,incremental:!!incrementalCommit\n  });\n  recordRadarAutoRefreshAudit({\n    acceptedUtc: frames.at(-1).observedUtc,\n    failure: frameFailures.detail || null,\n    outcome: frameFailures.summary\n      ? \"updated; some genuine source frames unavailable\"\n      : incrementalCommit\n        ? \"incremental: \" + incrementalCommit.appended + \" added, \" +\n          incrementalCommit.dropped + \" retired\"\n        : automatic ? \"updated by chronological rebuild\" : \"manual load complete\"\n  });\n  if(resume && !incrementalCommit && !noninterruptingBackfill)playback.play();"
+    "  $(\"hybridPlayButton\").disabled = hybridFrames.length < 2;\n  // Historical backfill has changed the COUNT, not the currently visible\n  // BoM pixels. Rebase that displayed UTC's slider label to the new length\n  // without waiting for a second Cesium draw or faking a rendered scan.\n  if(noninterruptingBackfill && latestFrame?.observedUtc===oldTime)\n    $(\"hybridFrameLabel\").textContent=`${hybridFrameIndex+1}/${hybridFrames.length}`;\n  // Never cause a second render over the active player's own in-flight render.\n  // A paused Latest operator still sees the just-accepted newest observation.\n  if((!incrementalCommit && !noninterruptingBackfill) || !playback.isPlaying())\n    await showHybridFrame(hybridFrameIndex);\n  radarLifecycle.sampleMemory({\n    region,latestUtc:frames.at(-1).observedUtc,\n    frameCount:hybridFrames.length,incremental:!!incrementalCommit\n  });\n  recordRadarAutoRefreshAudit({\n    acceptedUtc: frames.at(-1).observedUtc,\n    failure: frameFailures.detail || null,\n    outcome: frameFailures.summary\n      ? \"updated; some genuine source frames unavailable\"\n      : incrementalCommit\n        ? \"incremental: \" + incrementalCommit.appended + \" added, \" +\n          incrementalCommit.dropped + \" retired\"\n        : automatic ? \"updated by chronological rebuild\" : \"manual load complete\"\n  });\n  if(resume && !incrementalCommit && !noninterruptingBackfill)playback.play();"
 )
 
 replace_once(
@@ -404,6 +422,7 @@ copyfile("frontend/src/live-loop-refresh-v1.js", site / "src/live-loop-refresh-v
 # pressure guard from the pinned build. Copy the tested bounded PNG blob cache
 # and 45-second tile rejection policy into actual production, not QA only.
 copyfile("frontend/src/radar-source.js", site / "src/radar-source.js")
+copyfile("frontend/src/storage.js", site / "src/storage.js")
 copyfile("frontend/src/radar-request-pressure-v1.js", site / "src/radar-request-pressure-v1.js")
 # Denial-aware bounded tile loading must be deployed, not only reviewed.
 copyfile("frontend/src/radar-tile-retry-v1.js", site / "src/radar-tile-retry-v1.js")
@@ -453,6 +472,9 @@ assert (site / "src/radar-incremental-window-v1.js").exists()
 assert "maxRetainedLayers:2" in data
 assert "canvas.toBlob(blob=>blob" in data
 assert "MAX_BACKGROUND_HISTORY_ATTEMPTS = 2" in data
+assert "cacheFrameBudget=automatic?9" in data
+assert "bounded-site-indexeddb" in data
+assert "noninterruptingBackfill && latestFrame?.observedUtc===oldTime" in data
 assert "maxRetainedLayers" in (site / "src/radar-imagery-handover-v1.js").read_text()
 assert (site / "src/radar-lifecycle-diagnostics-v1.js").exists()
 with (site / "BUILD.txt").open("a", encoding="utf-8") as build:

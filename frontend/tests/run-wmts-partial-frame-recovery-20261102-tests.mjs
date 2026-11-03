@@ -160,6 +160,16 @@ assert(source.includes("maxRetainedLayers:2"),
   "Operator must retain at most two prior authentic native-resolution GPU layers on every platform");
 assert(packageOverlay.includes("maxRetainedLayers:2"),
   "Production-equivalent overlay must enforce the same three-layer GPU budget");
+assert(source.includes("cacheFrameBudget=automatic?9"),
+  "routine source checks must not reload all archived high-resolution frames");
+assert(packageOverlay.includes("cacheFrameBudget=automatic?9"),
+  "the sealed Pages overlay must preserve selected-site archival bounds");
+assert(source.includes("noninterruptingBackfill && latestFrame?.observedUtc===oldTime"),
+  "an unchanged displayed UTC must rebase its label immediately after backfill");
+assert(packageOverlay.includes("noninterruptingBackfill && latestFrame?.observedUtc===oldTime"),
+  "the shipped 5-to-6 backfill must rebase the genuine visible frame label");
+assert(packageOverlay.includes('copyfile("frontend/src/storage.js"'),
+  "the shipped application must contain the fixed IndexedDB access");
 assert(source.includes("MAX_BACKGROUND_HISTORY_ATTEMPTS = 2"),
   "Historical background cache may fetch only a tiny genuine source batch");
 assert(packageOverlay.includes("MAX_BACKGROUND_HISTORY_ATTEMPTS = 2"),

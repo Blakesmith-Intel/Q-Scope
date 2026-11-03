@@ -99,7 +99,7 @@ import {
   getRadarFrames,
   putRadarFrame,
   pruneRadarFrames
-} from "./storage.js?v=9.8.3";
+} from "./storage.js?v=20261103-bounded-site-indexeddb-v1";
 
 import { buildSharedProductTimeline, buildRadarPrimaryProductTimeline } from "./shared-product-timeline-v1.js?v=9.16-nearest-observation";
 import {
@@ -4508,6 +4508,12 @@ async function loadHybridSequence(automatic = false) {
             ? discoverBoundedBomReflectivityHistory(now,180,region)
             : discoverBomReflectivityHistory(now,180,region));
 
+  // Load only a small, site-specific verified archive slice on routine
+  // five-minute checks. Manual long-loop requests may read their own wider
+  // genuine window, but never every radar site's large decoded frames.
+  const selectedMinutes=Number(selectedLoopMinutes());
+  const cacheFrameBudget=automatic?9:Math.min(48,Math.max(9,
+    Number.isFinite(selectedMinutes)?Math.ceil(selectedMinutes/5)+6:42));
   // Startup metadata failure must not throw away authentic frames already
   // saved in this browser. Do not invent earlier tiles or backdate a newer
   // scan. Automatic poll failures leave the existing live loop untouched.
@@ -4515,7 +4521,7 @@ async function loadHybridSequence(automatic = false) {
     BOUNDED_RADAR_RECOVERY_QA
       ? sourceDiscovery.then(times=>({times}),error=>({error}))
       : sourceDiscovery.then(times=>({times})),
-    getRadarFrames(region, cacheCutoff).catch(error => {
+    getRadarFrames(region, cacheCutoff, cacheFrameBudget).catch(error => {
       console.warn("Persistent radar history cache unavailable", error);
       return [];
     })
@@ -5103,6 +5109,11 @@ async function loadHybridSequence(automatic = false) {
     hybridFrameIndex
   );
   $("hybridPlayButton").disabled = hybridFrames.length < 2;
+  // Historical backfill has changed the COUNT, not the currently visible
+  // BoM pixels. Rebase that displayed UTC's slider label to the new length
+  // without waiting for a second Cesium draw or faking a rendered scan.
+  if(noninterruptingBackfill && latestFrame?.observedUtc===oldTime)
+    $("hybridFrameLabel").textContent=`${hybridFrameIndex+1}/${hybridFrames.length}`;
   // Never cause a second render over the active player's own in-flight render.
   // A paused Latest operator still sees the just-accepted newest observation.
   if((!incrementalCommit && !noninterruptingBackfill) || !playback.isPlaying())
