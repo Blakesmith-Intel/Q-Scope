@@ -4257,49 +4257,33 @@ async function warmRadarHistoryCache(
     resolve => setTimeout(resolve, 1500)
   );
 
-  const candidates =
-    normaliseRadarHistoryTimes(
-      observedTimes
-    );
-
+  // Archive at most two additional genuine scans per manual load. Warming
+  // the entire 180-minute state eagerly competes with the selected live loop
+  // and retains unnecessary large decoded mosaics in browser memory.
+  const candidates = normaliseRadarHistoryTimes(observedTimes).reverse();
+  const MAX_BACKGROUND_HISTORY_ATTEMPTS = 2;
+  let attempted = 0;
   let warmedCount = 0;
   const pressureGuardActive =
     LABEL_GPU_QA || window.location.pathname.includes("/preview/network-guard/");
 
   for (const observedUtc of candidates) {
-    if (
-      selectedRadarRegion() !== region
-      || sequenceLoading
-    ) {
-      return;
-    }
-
-    if (radarFrameCache.has(observedUtc)) {
-      continue;
-    }
+    if (selectedRadarRegion() !== region || sequenceLoading) return;
+    if (radarFrameCache.has(observedUtc) ||
+        hybridFrames.some(frame=>frame.observedUtc===observedUtc)) continue;
+    if(attempted>=MAX_BACKGROUND_HISTORY_ATTEMPTS)break;
+    attempted++;
 
     try {
-      const frame =
-        await loadBomReflectivityMosaicAtTime(
-          observedUtc,
-          region,
-          candidates
-        );
-
-      // An old region's request may finish AFTER the user switches sites.
-      // Its pixels must never enter the new primary's timestamp-keyed cache.
+      const frame=await loadBomReflectivityMosaicAtTime(
+        observedUtc,region,candidates
+      );
+      // A late request for a previous site must not contaminate the current
+      // site's archive. Persist genuine history, but do not fill the live
+      // decoded-mosaic RAM cache with frames outside its active playback loop.
       if(selectedRadarRegion() !== region || sequenceLoading ||
-          frame?.sourceMetadata?.region !== region) return;
-      radarFrameCache.set(
-        observedUtc,
-        frame
-      );
-
-      await putRadarFrame(
-        region,
-        frame
-      );
-
+         frame?.sourceMetadata?.region !== region)return;
+      await putRadarFrame(region,frame);
       warmedCount++;
     } catch (error) {
       // A single 403/429/502/503 means background warming is now competing
