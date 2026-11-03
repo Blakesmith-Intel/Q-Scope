@@ -248,7 +248,6 @@ version_once("src/context-layers/power-outage-suburb-explorer-v1.js",
 # html entrypoint's module identity; never change radar science or tile URLs.
 outage_cache_identity="-20261104-power-provider-reconciliation-v1"
 for relative,marker in (
-    ("live3d-operational-v9.html","-jasper-alfred-archive-v1"),
     ("src/live3d-operational-v9.js",
         "power-outages-operational-v1.js?v=council-customers-20261017-v1"),
     ("src/context-layers/power-outages-operational-v1.js",
@@ -293,6 +292,16 @@ for relative,needle in (
     assert data.count(needle)==1, f"Expected one gauge source import: {relative}"
     path.write_text(data.replace(needle,needle+gauge_cache_suffix,1),
                     encoding="utf-8")
+
+# Only AFTER the pinned flood-gauge cache chain is built, give the html
+# module entrypoint a fresh identity for this outage UI. Preserves every
+# existing gauge/radar query token and immutable V10.2.51 science.
+outage_html=site/"live3d-operational-v9.html"
+outage_html_data=outage_html.read_text(encoding="utf-8")
+old_entry="-jasper-alfred-archive-v1"+suffix+gauge_cache_suffix
+assert outage_html_data.count(old_entry)==1
+outage_html.write_text(outage_html_data.replace(
+    old_entry,old_entry+outage_cache_identity,1),encoding="utf-8")
 
 # Ensure the V10 pinned HTML uses the patched operational geometry modules.
 # Both genuine closure lines and Energex outage polygons otherwise resolve to
