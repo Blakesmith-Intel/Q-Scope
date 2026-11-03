@@ -55,7 +55,7 @@ for (const site of ["66", "50", "08", "23"]) {
 assert.match(runtime, /needsChronologicalRadarRebuild/);
 assert.match(runtime, /loadBomReflectivityMosaicAtTime\(entry\.observedUtc, selectedRadarRegion\(\), discoveredTimes\)/);
 assert.match(runtime, /observedUtc,\s*region,\s*candidates/);
-assert.match(packager, /20261101-source-verified-incremental-v10-2-43/);
+assert.match(packager, /20261103-native-403-tile-recovery/);
 assert.match(runtime, /frame\?\.sourceMetadata\?\.region !== region/);
 assert.match(packager, /copyfile\("frontend\/src\/radar-source\.js"/);
 assert.match(packager, /copyfile\("frontend\/src\/radar-request-pressure-v1\.js"/);
