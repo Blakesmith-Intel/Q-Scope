@@ -183,4 +183,9 @@ assert(core.includes("firstRefusal=error"),
   "Source preflight 403 must still cache other original PNGs before retry");
 assert(core.includes("20261103-complete-original-403-mosaic-v1"),
   "Six-frame recovery must load the source-only mosaic correction");
+assert.match(source,/const visibleGenuineFrames = automatic/);
+assert.match(source,/\.\.\.visibleGenuineFrames\.map\(frame=>frame\.observedUtc\)/);
+assert.match(source,/displayFrames\.length<hybridFrames\.length/);
+assert.match(packageOverlay,/Reuse verified on-screen genuine observations/);
+assert.match(packageOverlay,/Guard the existing playing loop/);
 console.log("PASS Taroom/global real-tile timeout and six-frame missing-observation recovery source + shipped overlay");

@@ -101,6 +101,12 @@ rebuild_start=source.index("  // Discovery may advertise a missing older UTC")
 rebuild_end=source.index("  if (rebuild) {",rebuild_start)
 replace_once(old_rebuild,source[rebuild_start:rebuild_end].rstrip())
 
+# Reuse verified on-screen genuine observations if IndexedDB races a refresh.
+replace_once(
+    "  const combinedHistory =\n    normaliseRadarHistoryTimes([\n      ...cachedFrames.map(\n        frame => frame.observedUtc\n      ),\n      ...discoveredTimes\n    ]);",
+    "  // The live player holds original verified BoM observations even when\n  // IndexedDB returns late/partial history on a subsequent automatic poll.\n  // Retain the same site's already decoded genuine UTCs in the discovery\n  // window, but NEVER reuse temporally inferred/display-only observations.\n  const visibleGenuineFrames = automatic && loadedLoopSelection===selectedLoopSelection()\n    ? hybridFrames.filter(frame=>frame?.sourceMetadata?.region===region &&\n        !isTemporallyInferredRadarFrame(frame))\n    : [];\n  for(const frame of visibleGenuineFrames)\n    radarFrameCache.set(frame.observedUtc,frame);\n  const combinedHistory =\n    normaliseRadarHistoryTimes([\n      ...cachedFrames.map(\n        frame => frame.observedUtc\n      ),\n      ...visibleGenuineFrames.map(frame=>frame.observedUtc),\n      ...discoveredTimes\n    ]);"
+)
+
 # The active player can finish rendering an OLD array index after the
 # six-frame source window has shifted. Resolve 2-D/3-D/slider by actual BoM
 # UTC on the exact shipped Cesium runtime. Do not alter combined Doppler steps.
@@ -152,6 +158,13 @@ replace_once(
   const resume = automatic ? playback.isPlaying() : true;''',
     "  // This exact measured-frame window can be shifted in place when its retained\n  // observations are unchanged. Historical backfill, temporal-inference edits\n  // and selection changes retain the original chronological rebuild path.\n  const incrementalCommit = automatic && !isCombined && !rebuild &&\n    loadedLoopSelection === loopSelection &&\n    planIncrementalRadarWindow(hybridFrames,displayFrames);\n  const oldTime = hybridFrames[hybridFrameIndex]?.observedUtc;\n  // Operators parked on Latest must follow genuine newly accepted scans.\n  // Preserve a deliberately scrubbed historical position instead.\n  const wasFollowingLatest = automatic && !isCombined &&\n    !playback.isPlaying() && hybridFrames.length > 0 &&\n    hybridFrameIndex === hybridFrames.length - 1;\n  // If startup/site-switch failed completely, the next successful recovery\n  // with genuine frames must be able to restart the playback automatically.\n  const resume = automatic ? (playback.isPlaying() || hybridFrames.length === 0) : true;"
 )
+# Guard the existing playing loop from any partial automatic replacement.
+# A failed update must not change 5/5 to 4/4 on a real operator screen.
+replace_once(
+    "  // This exact measured-frame window can be shifted in place when its retained",
+    "  // Never replace a better genuine loop with a smaller partial one during\n  // automatic source recovery. Leave the player, camera, pixels, and 3-D\n  // untouched; the one-minute scheduler retries the missing original PNGs.\n  if(automatic && !isCombined && loadedLoopSelection===loopSelection &&\n     hybridFrames.length && displayFrames.length<hybridFrames.length){\n    const message=\"Partial BoM WMTS update (\"+displayFrames.length+\n      \"/\"+hybridFrames.length+\" authentic frames); retaining playing loop\";\n    recordRadarAutoRefreshAudit({\n      failure:message,outcome:\"source unavailable; retaining genuine imagery\"\n    });\n    throw new Error(message);\n  }\n  // This exact measured-frame window can be shifted in place when its retained"
+)
+
 replace_once(
     '''  hybridFrameIndex = automatic
     ? Math.max(0,hybridFrames.findIndex(frame=>frame.observedUtc===oldTime))

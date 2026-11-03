@@ -4567,11 +4567,22 @@ async function loadHybridSequence(automatic = false) {
     );
   }
 
+  // The live player holds original verified BoM observations even when
+  // IndexedDB returns late/partial history on a subsequent automatic poll.
+  // Retain the same site's already decoded genuine UTCs in the discovery
+  // window, but NEVER reuse temporally inferred/display-only observations.
+  const visibleGenuineFrames = automatic && loadedLoopSelection===selectedLoopSelection()
+    ? hybridFrames.filter(frame=>frame?.sourceMetadata?.region===region &&
+        !isTemporallyInferredRadarFrame(frame))
+    : [];
+  for(const frame of visibleGenuineFrames)
+    radarFrameCache.set(frame.observedUtc,frame);
   const combinedHistory =
     normaliseRadarHistoryTimes([
       ...cachedFrames.map(
         frame => frame.observedUtc
       ),
+      ...visibleGenuineFrames.map(frame=>frame.observedUtc),
       ...discoveredTimes
     ]);
 
@@ -4949,6 +4960,18 @@ async function loadHybridSequence(automatic = false) {
     );
   }
 
+  // Never replace a better genuine loop with a smaller partial one during
+  // automatic source recovery. Leave the player, camera, pixels, and 3-D
+  // untouched; the one-minute scheduler retries the missing original PNGs.
+  if(automatic && !isCombined && loadedLoopSelection===loopSelection &&
+     hybridFrames.length && displayFrames.length<hybridFrames.length){
+    const message="Partial BoM WMTS update ("+displayFrames.length+
+      "/"+hybridFrames.length+" authentic frames); retaining playing loop";
+    recordRadarAutoRefreshAudit({
+      failure:message,outcome:"source unavailable; retaining genuine imagery"
+    });
+    throw new Error(message);
+  }
   // This exact measured-frame window can be shifted in place when its retained
   // observations are unchanged. Historical backfill, temporal-inference edits
   // and selection changes retain the original chronological rebuild path.
