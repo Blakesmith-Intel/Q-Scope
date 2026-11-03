@@ -203,12 +203,15 @@ jobs:
           grep -Fq 'retryableWmtsMosaicFailure' _site/src/bom-wmts-loop-v2.js
           grep -Fq 'fetchWmtsPreflightTile' _site/src/bom-wmts-loop-v2.js
           grep -Fq 'officialWmtsFallbackUrl' _site/src/radar-source.js
-          grep -Fq '20261103-source-403-cache-unblock-v1' _site/src/bom-wmts-loop-v2.js
+          grep -Fq '20261103-complete-original-403-mosaic-v1' _site/src/bom-wmts-loop-v2.js
+          grep -Fq 'visibleGenuineFrames' _site/src/live3d-operational-v9.js
+          grep -Fq 'retaining playing loop' _site/src/live3d-operational-v9.js
+          grep -Fq 'A tile-specific 403 is not a global denial' _site/src/radar-tile-retry-v1.js
           grep -Fq 'refusedWmtsUrls' _site/src/radar-source.js
           python - <<'PY'
           from pathlib import Path
           root=Path("_site")
-          revision="v10.2.45-production-source-verified-20261101-v10.2.46-warning-source-catchup-20261101-v10.2.48-exact-bom-403-recovery-20261103-v10.2.49-uncached-source-refusals-20261103-"
+          revision="v10.2.45-production-source-verified-20261101-v10.2.46-warning-source-catchup-20261101-v10.2.48-exact-bom-403-recovery-20261103-v10.2.49-uncached-source-refusals-20261103-v10.2.50-complete-403-mosaics-stable-loop-20261103-"
           pairs=(
             ("index.html","live3d-operational-v9.html?v="),
             ("live3d-operational-v9.html","src/live3d-operational-v9.js?v="),
@@ -234,6 +237,11 @@ jobs:
               "cached; refused source responses never cached in relay or "
               "browser; exact-tile recovery without false frames; "
               "operator visual acceptance pending\\n"
+              "V10.2.50 AUTHENTIC 403 MOSAIC RECOVERY: preserve other "
+              "verified source PNGs after one refused tile; one-minute "
+              "source backfill; never shrink a better playing real-frame "
+              "window due to partial automatic refresh; operator visual "
+              "acceptance pending\\n"
             )
           PY
           grep -Fq 'v10.2.45-production-source-verified-20261101-' _site/index.html
@@ -242,6 +250,8 @@ jobs:
           grep -Fq 'V10.2.48 GENUINE BOM WMTS EXACT-TILE 403 RECOVERY' _site/BUILD.txt
           grep -Fq 'v10.2.49-uncached-source-refusals-20261103-' _site/index.html
           grep -Fq 'V10.2.49 UNCACHED WMTS 403 RECOVERY' _site/BUILD.txt
+          grep -Fq 'v10.2.50-complete-403-mosaics-stable-loop-20261103-' _site/index.html
+          grep -Fq 'V10.2.50 AUTHENTIC 403 MOSAIC RECOVERY' _site/BUILD.txt
           # The browser module import now has a newer cache identity. Verify
           # the actual source-qualified IDQ product controller instead of a
           # historic V10.2.46 import token, while retaining recovery tests.
@@ -815,7 +825,7 @@ jobs:
             source="$(curl -fsSL --max-time 20 "$base/src/radar-source.js$suffix" || true)"
             if grep -Fq 'v10.2.48-exact-bom-403-recovery-20261103-' <<< "$html" &&
                grep -Fq 'V10.2.48 GENUINE BOM WMTS EXACT-TILE 403 RECOVERY' <<< "$manifest" &&
-               grep -Fq '20261103-source-403-cache-unblock-v1' <<< "$wmts" &&
+               grep -Fq '20261103-complete-original-403-mosaic-v1' <<< "$wmts" &&
                grep -Fq 'officialWmtsFallbackUrl' <<< "$source" &&
                grep -Fq 'api.bom.gov.au/apikey/v1/mapping/timeseries/wmts' <<< "$source"; then
               accepted=1
@@ -850,6 +860,34 @@ jobs:
           done
           test "$accepted" = 1
           echo "PUBLIC_EXACT_BOM_SOURCE_NEGATIVE_CACHE_REPAIR_VERIFIED $GITHUB_SHA"
+
+      - name: Verify V10.2.50 exact BoM 403 mosaic recovery and stable player on production root
+        env:
+          PAGES_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          base="${PAGES_URL%/}"
+          passed=0
+          for attempt in $(seq 1 12); do
+            suffix="?release=$GITHUB_SHA&wmts-mosaic=$attempt"
+            html="$(curl -fsSL --max-time 20 "$base/index.html$suffix" || true)"
+            manifest="$(curl -fsSL --max-time 20 "$base/BUILD.txt$suffix" || true)"
+            engine="$(curl -fsSL --max-time 20 "$base/src/live3d-operational-v9.js$suffix" || true)"
+            wmts="$(curl -fsSL --max-time 20 "$base/src/bom-wmts-loop-v2.js$suffix" || true)"
+            tile="$(curl -fsSL --max-time 20 "$base/src/radar-tile-retry-v1.js$suffix" || true)"
+            if grep -Fq 'v10.2.50-complete-403-mosaics-stable-loop-20261103-' <<< "$html" &&
+               grep -Fq 'V10.2.50 AUTHENTIC 403 MOSAIC RECOVERY' <<< "$manifest" &&
+               grep -Fq 'visibleGenuineFrames' <<< "$engine" &&
+               grep -Fq 'retaining playing loop' <<< "$engine" &&
+               grep -Fq '20261103-complete-original-403-mosaic-v1' <<< "$wmts" &&
+               grep -Fq 'A tile-specific 403 is not a global denial' <<< "$tile"; then
+              passed=1
+              break
+            fi
+            sleep 3
+          done
+          test "$passed" = 1
+          echo "PUBLIC_V10_2_50_GENUINE_MOSAIC_AND_NOSHRINK_VERIFIED $GITHUB_SHA"
 
       - name: Verify published V10.2.46 authentic warning polygon catch-up on production root
         env:

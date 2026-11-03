@@ -47,8 +47,8 @@ await assert.rejects(
   loadCompleteRadarTiles(tasks,denialLoader,{stopOnPermanent:true,wait:async()=>{}}),
   /Incomplete BoM reflectivity mosaic.*403/
 );
-assert.equal(deniedAttemptCount,2,
-  "A denied source frame must stop before requesting the third tile");
+assert.equal(deniedAttemptCount,3,
+  "A refused original tile must not block other authentic source PNGs");
 let invalidTimeAttempts=0;
 await assert.rejects(loadCompleteRadarTiles(tasks,async url=>{
   invalidTimeAttempts++;
@@ -61,8 +61,8 @@ await assert.rejects(loadCompleteRadarTiles(tasks,async url=>{
 assert.equal(invalidTimeAttempts,2,
   "Published-time rejection must stop further exact-UTC tile requests");
 
-// Source throttling must not turn one denied full-size mosaic into twelve
-// futile upstream requests. Already verified tiles are still preserved.
+// Recorded BoM source audits show one HTTP 403 while other source PNGs
+// at the SAME UTC are authentic. Cache the rest, but never fake the missing tile.
 let attempted=[];
 const many=Array.from({length:12},(_,i)=>({
   url:"tile-"+i,col:30+i,row:14,x:i*256,y:0
@@ -73,9 +73,34 @@ await assert.rejects(loadCompleteRadarTiles(many,async url=>{
     Error("Image request failed: HTTP 403"),{status:403});
   return image;
 },{stopOnPermanent:true,wait:async()=>{}}),
-/remaining tiles not requested after source refusal/);
-assert.deepEqual(attempted,["tile-0","tile-1","tile-2","tile-3"],
-  "Remaining 8 tiles must never be requested after the source denial");
+/Incomplete BoM reflectivity mosaic.*403/);
+assert.deepEqual(attempted,many.map(tile=>tile.url),
+  "Other authentic tiles MUST be requested after a single 403");
+assert.equal(attempted.length,12,
+  "One refused tile must not be immediately retried during this mosaic");
+let unknown403=true,networkReads=0;
+const previouslyVerified=new Map();
+const fetchVerified=async url=>{
+  if(previouslyVerified.has(url))return previouslyVerified.get(url);
+  networkReads++;
+  if(url==="tile-5" && unknown403){
+    throw Object.assign(Error("Image request failed: HTTP 403"),{status:403});
+  }
+  previouslyVerified.set(url,image);
+  return image;
+};
+await assert.rejects(loadCompleteRadarTiles(many,fetchVerified,{
+  stopOnPermanent:true,wait:async()=>{}
+}),/403/);
+assert.equal(previouslyVerified.size,11,
+  "All source PNGs other than a refused exact tile must be retained");
+unknown403=false;
+const recovered=await loadCompleteRadarTiles(many,fetchVerified,{
+  stopOnPermanent:true,wait:async()=>{}
+});
+assert.equal(recovered.length,12,"Only real completed mosaics can display");
+assert.equal(networkReads,13,
+  "After retry, only the one missing original tile should require network");
 
-console.log("PASS hard relay 403 fails complete source scan without duplicate attempts or fabricated pixels.");
+console.log("PASS isolated 403 caches other genuine tiles and next attempt recovers only refused original");
 console.log("PASS selective WMTS tile retry; existing real tiles retained; no missing-pixel fabrication.");

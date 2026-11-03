@@ -94,4 +94,8 @@ if (existsSync(fileURLToPath(packagedEngine))) {
   assert.match(read("_site/index.html"), /v10\.2\.41-radar-camera-continuity-/);
   assert.match(read("_site/live3d-operational-v9.html"), /v10\.2\.41-radar-camera-continuity-/);
 }
+assert.match(runtime,/const visibleGenuineFrames = automatic/);
+assert.match(runtime,/displayFrames\.length<hybridFrames\.length/);
+assert.match(packager,/visibleGenuineFrames/);
+assert.match(packager,/retaining playing loop/);
 console.log("PASS radar auto refresh production contract, real published catch-up across sites, busy deferred retry, cadence, diagnostics and build overlay");
