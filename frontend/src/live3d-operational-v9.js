@@ -1735,9 +1735,20 @@ async function prepareRadarSurfaceProvider(frame) {
     const rectangle=Cesium.Rectangle.fromDegrees(
       sw.longitude,sw.latitude,ne.longitude,ne.latitude
     );
-    return Cesium.SingleTileImageryProvider.fromUrl(
-      canvas.toDataURL("image/png"),{rectangle}
-    );
+    // Compress the original-resolution lossless PNG off the main thread.
+    // The synchronous data-URL encoder can otherwise block radar playback
+    // and Cesium rendering when the canvas covers a large radar footprint.
+    // fromUrl resolves after the image loads; its provider retains the image.
+    const pngUrl=await new Promise((resolve,reject)=>{
+      canvas.toBlob(blob=>blob
+        ? resolve(URL.createObjectURL(blob))
+        : reject(new Error("Unable to encode radar surface PNG.")), "image/png");
+    });
+    try {
+      return await Cesium.SingleTileImageryProvider.fromUrl(pngUrl,{rectangle});
+    } finally {
+      URL.revokeObjectURL(pngUrl);
+    }
   })();
   // Motion previews are one-use frames. Measured and normal gap-fill frames
   // are stable and safe to cache for the current source loop.
