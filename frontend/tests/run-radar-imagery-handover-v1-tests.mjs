@@ -190,4 +190,32 @@ warm.api.reset();
 assert.equal(warm.layers.length,0,"Site switch releases cached source layers");
 assert.equal(warm.removed.length,7,
   "Five measured caches, the visible source and one visual-only layer are disposed");
-console.log("PASS original BoM 2-D and measured-frame inferred 3-D reveal atomically, with failed tile rollback and bounded six-frame GPU reuse.");
+// Mobile keeps only the visible genuine scan and two previously rendered
+// native-resolution source textures, regardless of the six-frame loop size.
+const mobile=fixture({maxRetainedLayers:2});
+for(let i=0;i<12;i++){
+  const provider=genuineProviders[i%6];
+  const swap=mobile.api.replace({imageryProvider:provider,alpha:1,show:true},{
+    decodedSingleTile:true,cacheEligible:true
+  });
+  if(i){mobile.fire();mobile.fire();mobile.fire();}
+  assert.equal(await swap,true,"mobile measured radar source must remain presentable");
+  assert(mobile.layers.length<=3,
+    "mobile must not retain all six primary scan GPU textures");
+}
+assert.equal(mobile.layers.length,3,"one live and two retained mobile sources");
+mobile.api.reset();
+assert.equal(mobile.layers.length,0,"mobile radar teardown releases the retained textures");
+assert.ok(runtime.includes('maxRetainedLayers:window.matchMedia?.("(max-width:700px)").matches?2:5'),
+  "mobile must use the reduced primary GPU texture budget");
+const warmHistoryStart=runtime.indexOf("async function warmRadarHistoryCache(");
+const warmHistoryEnd=runtime.indexOf("\nasync function ",warmHistoryStart+1);
+assert(warmHistoryStart>=0 && warmHistoryEnd>warmHistoryStart);
+const warmHistory=runtime.slice(warmHistoryStart,warmHistoryEnd);
+assert.match(warmHistory,/MAX_BACKGROUND_HISTORY_ATTEMPTS = 2/,
+  "background history must never fetch the whole state");
+assert.match(warmHistory,/attempted>=MAX_BACKGROUND_HISTORY_ATTEMPTS/,
+  "failed source requests also count towards the finite background budget");
+assert.doesNotMatch(warmHistory,/radarFrameCache\.set\(/,
+  "background archival must not fill the decoded live playback RAM cache");
+console.log("PASS native-resolution primary 2-D/3-D handover, mobile three-layer GPU bound, finite disk-only history catch-up and unchanged source quality.");
