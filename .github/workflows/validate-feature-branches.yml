@@ -46,7 +46,7 @@ jobs:
   radar-production-package:
     # Run the full pinned-site build only on this scoped radar reliability
     # branch; routine feature validation remains the existing fast job.
-    if: contains(fromJSON('["fix/radar-region-loop-20261101","fix/radar-wmts-source-acceptance-20261101","fix/radar-auto-refresh-camera-lock-20261101"]'), github.ref_name) || github.head_ref == 'fix/radar-auto-refresh-camera-lock-20261101'
+    if: contains(fromJSON('["fix/radar-region-loop-20261101","fix/radar-wmts-source-acceptance-20261101","fix/radar-auto-refresh-camera-lock-20261101","fix/taroom-radar-preflight-six-frame-recovery-20261102"]'), github.ref_name) || github.head_ref == 'fix/radar-auto-refresh-camera-lock-20261101' || github.head_ref == 'fix/taroom-radar-preflight-six-frame-recovery-20261102'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
