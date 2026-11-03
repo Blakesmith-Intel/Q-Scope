@@ -1,3 +1,13 @@
+# V10.2.51 — CURRENT OPERATOR-ACCEPTED IMMUTABLE RADAR BASELINE (3 November 2026)
+
+The operator approved freezing the successfully deployed V10.2.51 source as the official restore point after genuine six-scan playback was confirmed. **Canonical source commit:** `a641e0407287c826382bf5e47cf4dee59a97821a`, annotated tag `v10.2.51` and equal-SHA branch `restore/v10.2.51`. Public Pages source verification passed in [run 41641906435](https://github.com/Blakesmith-Intel/StormTracker/actions/runs/41641906435); the independent native WMTS/AEP release gate passed in [run 41639744038](https://github.com/Blakesmith-Intel/StormTracker/actions/runs/41639744038). No legacy tag or restore branch is modified.
+
+New changes must branch from `v10.2.51`. **Non-negotiable invariants:** only the source-real 30-minute rain loop (up to six five-minute published frames); no 60/90/120/180-minute browser archive; existing no-shrink genuine frame recovery and five-minute polling; native high-resolution BoM PNG imagery and source UTC; primary/secondary radar time alignment; separate Doppler loop, camera and operator navigation; all approved warning, rainfall, flood, outage, road, QFD, cyclone and 3-D behaviours. Refused source tiles never constitute valid observations. External data feeds and the BoM relay require separate operational verification.
+
+**Rollback:** Create a new reviewed rollback from `v10.2.51` or `restore/v10.2.51`. Never force-update `main` or move frozen refs. See [production baseline](PRODUCTION_BASELINE_V10.2.51.md) and [restore protocol](BASELINE_RESTORE.md).
+
+---
+
 # V10.2.46 — CURRENT IMMUTABLE PRODUCTION BASELINE (1 November 2026)
 
 **Operator-reported issue:** active BoM IDQ21033 and IDQ21035 lacked current verified polygons until the original GIS2Web-derived service caught up. The frontend's otherwise correct 15-minute automatic poll was too slow when an active source had no geometry. The fix uses bounded two-minute catch-up (at most nine checks per warning issue) and at most two early transport-error retries, reverts to 15-minute healthy checks, and retains fail-closed source truth. No other feed, polygon renderer, RADAR, 3-D, AEP, flood, cyclone, or UI modification.
