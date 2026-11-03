@@ -156,10 +156,16 @@ assert(source.includes("timeoutMs:10000,"),
   "Actual predecoded Cesium tiles need a bounded but mobile-safe handover window");
 assert(packageOverlay.includes("timeoutMs:10000,"),
   "Production-equivalent build must carry the handover budget");
-assert(source.includes("maxRetainedLayers:5"),
-  "Operator primary must reuse bounded authentic GPU imagery surfaces");
-assert(packageOverlay.includes("maxRetainedLayers:5"),
-  "The production-equivalent bundle must activate primary GPU reuse");
+assert(source.includes('maxRetainedLayers:window.matchMedia?.("(max-width:700px)").matches?2:5'),
+  "Operator must retain bounded authentic native-resolution GPU layers on mobile and desktop");
+assert(packageOverlay.includes('maxRetainedLayers:window.matchMedia?.("(max-width:700px)").matches?2:5'),
+  "Production-equivalent overlay must use the same mobile and desktop GPU budgets");
+assert(source.includes("MAX_BACKGROUND_HISTORY_ATTEMPTS = 2"),
+  "Historical background cache may fetch only a tiny genuine source batch");
+assert(packageOverlay.includes("MAX_BACKGROUND_HISTORY_ATTEMPTS = 2"),
+  "Delivered Pages application must not preload the whole state");
+assert(packageOverlay.includes("canvas.toBlob(blob=>blob"),
+  "Delivered Pages application must use the same nonblocking lossless radar PNG");
 assert(packageOverlay.includes('copyfile("frontend/src/radar-imagery-handover-v1.js"'),
   "The real packaged application must contain the matching GPU handover helper");
 console.log("PASS Taroom/global real-tile timeout and six-frame missing-observation recovery source + shipped overlay");
