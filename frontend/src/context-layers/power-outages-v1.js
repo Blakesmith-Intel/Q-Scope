@@ -857,6 +857,7 @@ export function powerOutageProviderCounts(features, {
   const unique=new Set();
   const rows=QUEENSLAND_POWER_PROVIDERS.map(provider=>({
     provider, outages:0, customers:0, withoutGeometry:0,
+    sourceOldestAtMs:null, sourceNewestAtMs:null,
     state:availableProviders.includes(provider)?"ok":"unavailable"
   }));
   const indexed=new Map(rows.map(row=>[row.provider,row]));
@@ -875,6 +876,13 @@ export function powerOutageProviderCounts(features, {
     unique.add(key);
     row.outages++;
     row.customers+=summary.customersAffected;
+    const extracted=parsedTime(summary.extracted);
+    if(extracted!==null){
+      row.sourceOldestAtMs=row.sourceOldestAtMs===null
+        ?extracted:Math.min(row.sourceOldestAtMs,extracted);
+      row.sourceNewestAtMs=row.sourceNewestAtMs===null
+        ?extracted:Math.max(row.sourceNewestAtMs,extracted);
+    }
     if(!feature?.geometry)row.withoutGeometry++;
   }
   return {
