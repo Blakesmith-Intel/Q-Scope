@@ -1,8 +1,8 @@
 # StormTracker — current operator guide
-**Edition:** 1 November 2026 | **Applies to:** **V10.2.46 warning polygon source-recovery baseline**, with V10.2.45 radar and all other accepted layers unchanged.
+**Edition:** 3 November 2026 | **Applies to:** **V10.2.51 officially frozen six-scan BoM rain radar source baseline**, retaining all accepted warning polygons, Doppler, flood/rainfall, 3-D and other layers.
 **Open:** https://blakesmith-intel.github.io/StormTracker/  
 **Technical handover:** [DEVELOPMENT_HANDOVER_CURRENT.md](DEVELOPMENT_HANDOVER_CURRENT.md)
-**Frozen release:** [V10.2.46 baseline](PRODUCTION_BASELINE_V10.2.46.md) · [Release notes](RELEASE_NOTES_V10.2.46.md) · [Quick reference](OPERATOR_QUICK_REFERENCE_V10.2.46.md) · [Shareable PDF](STORMTRACKER_LAYERS_INFORMATION.pdf). All future work starts from V10.2.46; earlier frozen releases remain untouched.
+**Frozen release:** [V10.2.51 official baseline](PRODUCTION_BASELINE_V10.2.51.md) · [V10.2.51 release notes](RELEASE_NOTES_V10.2.51.md) · [Restore instructions](BASELINE_RESTORE.md) · [Quick reference](OPERATOR_QUICK_REFERENCE_V10.2.46.md) · [Shareable PDF](STORMTRACKER_LAYERS_INFORMATION.pdf). All future development starts from V10.2.51; earlier frozen releases remain untouched. The quick reference PDF remains the earlier general feature overview.
 
 
 > **Purpose and safety:** StormTracker brings together official source observations and selected public incident information for situational awareness. It is **not** a Bureau of Meteorology (BoM) warning service, an incident dispatch system, or a replacement for agency procedures. For warnings, evacuation advice and operational decisions, consult the original issuing authority. Some displays (3-D clouds, storm tracks, projected cones and rapid-rise arrows) are estimates and **not official warnings**.
@@ -11,7 +11,7 @@
 
 **Public information sheet:** [StormTracker — layers and features (PDF)](STORMTRACKER_LAYERS_INFORMATION.pdf) — a concise shareable overview for new users. This is a guide to features, not a live weather bulletin.
 
-## V10.2.51 candidate — BoM-published six-scan rain playback (3 November 2026)
+## V10.2.51 frozen production — BoM-published six-scan rain playback (3 November 2026)
 
 Rain radar playback now offers **30 minutes only**, using up to six actual five-minute observations advertised by the BoM. Longer 60-, 90-, 120- and 180-minute browser-archive choices are withdrawn. The **Doppler — All available** option remains independent and unchanged.
 
@@ -19,7 +19,7 @@ StormTracker continues to check for new BoM scans every five minutes, retain a g
 
 The displayed map, original source imagery, supplementary-radar synchronisation, inferred 3-D visualisation, warning polygons, flood gauges, community impact feeds and saved operator camera remain as before. Browser console CORS rejections from the direct BoM endpoint are avoided on the Pages site; any HTTP 503 from the separate river-history feed should be assessed as a flood-history source issue, not a radar failure.
 
-**Release status:** This section describes PR #296 while final package and live acceptance checks are outstanding. Do not treat V10.2.51 as a sealed or operator-accepted baseline until public deployment and visual verification are confirmed. See [V10.2.51 release notes](RELEASE_NOTES_V10.2.51.md).
+**Release status:** V10.2.51 is the operator-approved official restore point after successful deployment, public-source verification and explicit freeze instruction. The exact frozen application source is `a641e0407287c826382bf5e47cf4dee59a97821a` with tag `v10.2.51` and `restore/v10.2.51`; see [official release notes](RELEASE_NOTES_V10.2.51.md).
 
 ## V10.2.46 — Automatic recovery when active BoM warning polygons are unavailable
 
