@@ -3,6 +3,7 @@ import {filterLgaGroups,councilOutageCustomerSummary,localityKey,
   resolveQueenslandLocalityLgas}
  from "./incident-lga-model-v1.js?v=council-customers-20261017-v1";
 import {powerOfficialUrl} from "./official-source-links-v1.js?v=9.13.2";
+import {powerOutageProviderCounts} from "./power-outages-v1.js?v=20261104-qld-provider-count-reconciliation-v1";
 import {groupOutagesByVerifiedGeometry,resolveOutageEventLgas,
   uniqueOutageEvents,outageGeometrySignature}
  from "./outage-lga-spatial-v2.js?v=outage-geometry-lga-20261020-v1";
@@ -24,7 +25,10 @@ export function createPowerOutageSuburbExplorer({
   const state=byId("outageSuburbFeedStatus");
   const more=byId("outageSuburbMore");
   const reload=byId("refreshPowerOutageExplorer");
-  if(!dialog || !opener || !close || !search || !results || !summary || !state || !more || !reload)
+  const byProvider=byId("outageByProviderReport");
+  const title=byId("powerOutageExplorerTitle");
+  const help=byId("powerOutageExplorerHelp");
+  if(!dialog || !opener || !close || !search || !results || !summary || !state || !more || !reload || !byProvider)
     throw new Error("Power outage suburb explorer controls missing");
   const create=(tag,className,text)=>{
     const item=document.createElement(tag);
@@ -54,14 +58,14 @@ export function createPowerOutageSuburbExplorer({
       sidebarCustomers.textContent="Customers: —";
       return;
     }
-    const seen=new Map();
-    for(const suburb of suburbGroups)
-      for(const item of suburb.items)if(!seen.has(item.id))seen.set(item.id,item);
-    const count=seen.size;
-    const total=[...seen.values()].reduce((sum,item)=>{
-      const value=Number(item.summary.customersAffected);
-      return sum+(Number.isFinite(value)&&value>=0?value:0);
-    },0);
+    // Same deduplicated provider snapshot used by the report, not the
+    // count of council entries, suburb names or map polygon parts.
+    const providerSummary=powerOutageProviderCounts(latestFeatures,{
+      availableProviders:status.providers,
+      failedProviders:status.failedProviders
+    });
+    const count=providerSummary.total.outages;
+    const total=providerSummary.total.customers;
     sidebarOutages.textContent=count+" outage"+(count===1?"":"s");
     sidebarCustomers.textContent=total.toLocaleString("en-AU")+" customers affected";
     opener.setAttribute("aria-label",
@@ -74,6 +78,7 @@ export function createPowerOutageSuburbExplorer({
   let status={kind:"loading",message:"Waiting for live outage feed…"};
   let openKeys=new Set(),visibleLimit=60,hasSnapshot=false;
   let loading=false,disposed=false;
+  let providerView=false;
   // Suburb name is a direct route to its published outage geometry.
   // The disclosure arrow/count remain for expanding the incident table.
   function focusPublishedOutages(items){
@@ -115,8 +120,66 @@ export function createPowerOutageSuburbExplorer({
     const dt=create("dt","",label),dd=create("dd","",text);
     grid.append(dt,dd);
   }
+  function renderProviderReport(){
+    // The statewide provider report uses the identical unique event list as
+    // the sidebar counter; no extra requests, invented locations or LGA sums.
+    results.replaceChildren();
+    more.hidden=true;
+    if(!hasSnapshot){
+      summary.textContent="Waiting for a verified power outage snapshot";
+      results.append(create("p","outage-empty",
+        "Power outage feeds have not loaded. Press Refresh to check again."));
+      return;
+    }
+    const report=powerOutageProviderCounts(latestFeatures,{
+      availableProviders:status.providers,
+      failedProviders:status.failedProviders
+    });
+    const stamp=Number(getLoadedAt());
+    summary.textContent=number(report.total.outages)+" distinct emergency outages · "+
+      number(report.total.customers)+" customers affected"+
+      (report.partial?" · PARTIAL source data":"")+
+      (stamp>0?" · checked "+formatIncidentRefreshTime(stamp):"");
+    const table=create("table","outage-suburb-table outage-provider-table");
+    const thead=create("thead"),heading=create("tr");
+    for(const column of ["Provider","Outages","Customers affected","Feed"]){
+      const th=create("th","",column);th.scope="col";heading.append(th);
+    }
+    thead.append(heading);table.append(thead);
+    const tbody=create("tbody");
+    for(const item of report.rows){
+      const tr=create("tr");
+      const provider=create("td","",item.provider);
+      const href=powerOfficialUrl(item.provider);
+      if(href){
+        const link=create("a","outage-source-link",item.provider);
+        link.href=href;link.target="_blank";link.rel="noopener noreferrer";
+        provider.replaceChildren(link);
+      }
+      const present=item.state!=="unavailable";
+      tr.append(provider,
+        create("td","outage-suburb-count",present?number(item.outages):"—"),
+        create("td","outage-customers",present?number(item.customers):"—"),
+        create("td","",item.state==="ok"?"Current":
+          item.state==="partial"?"Partial feed":"Unavailable"));
+      tbody.append(tr);
+    }
+    const footer=create("tr");
+    footer.append(create("th","","Statewide total"),
+      create("td","outage-suburb-count",number(report.total.outages)),
+      create("td","outage-customers",number(report.total.customers)),
+      create("td","",report.partial?"Partial total":"All three feeds"));
+    tbody.append(footer);table.append(tbody);results.append(table);
+    results.append(create("p","outage-suburb-note",
+      "Counts are unique live UNPLANNED incident IDs per provider; a shared outage is counted once, not once per suburb or LGA. Customers affected are a separate measure."));
+    if(report.total.withoutGeometry)results.append(create("p","outage-suburb-note",
+      number(report.total.withoutGeometry)+" provider outage records have no source-mapped geometry; included in statewide counts but not plotted or assigned to a council."));
+    if(report.partial)results.append(create("p","outage-suburb-note",
+      "PARTIAL: at least one provider or its map layer was unavailable. The statewide total is a verified subtotal, not a statewide all-clear."));
+  }
   function render(){
     if(!dialog.open || disposed)return;
+    if(providerView){renderProviderReport();return;}
     results.replaceChildren();
     const matching=filterLgaGroups(groups,search.value);
     const listed=matching.slice(0,visibleLimit);
@@ -383,6 +446,17 @@ export function createPowerOutageSuburbExplorer({
       }).finally(()=>{loading=false;});
     }
   }
+  const onProviderView=()=>{
+    providerView=!providerView;
+    byProvider.textContent=providerView?"Report by LGA":"Report by provider";
+    byProvider.setAttribute("aria-pressed",String(providerView));
+    search.disabled=providerView;
+    if(title)title.textContent=providerView?"⚡ Power outages by provider":"⚡ Power outages by LGA";
+    if(help)help.textContent=providerView?
+      "One statewide total · three providers · distinct emergency incidents":
+      "Unplanned outages · expand a council, then a suburb";
+    render();
+  };
   const onOpen=()=>{
     // Give a previously failed official lookup another chance whenever the
     // user opens this panel, without a hot-loop of automatic retries.
@@ -405,6 +479,7 @@ export function createPowerOutageSuburbExplorer({
     }).finally(()=>{loading=false;reload.disabled=false;});
   };
   opener.addEventListener("click",onOpen);
+  byProvider.addEventListener("click",onProviderView);
   close.addEventListener("click",onClose);
   search.addEventListener("input",onSearch);
   more.addEventListener("click",onMore);
@@ -412,6 +487,7 @@ export function createPowerOutageSuburbExplorer({
   const destroy=()=>{
     disposed=true;
     opener.removeEventListener("click",onOpen);
+    byProvider.removeEventListener("click",onProviderView);
     close.removeEventListener("click",onClose);
     search.removeEventListener("input",onSearch);
     more.removeEventListener("click",onMore);
