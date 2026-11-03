@@ -114,13 +114,23 @@ await page.route("https://blakesmith-intel.github.io/StormTracker/**",async rout
       '    counts.destroyed++;\n    window.__qaRadarStage?.("retirement-destroy-end");');
     inject('  const detach=scene.postRender.addEventListener(()=>{',
       '  const detach=scene.postRender.addEventListener(()=>{\n    if(window.__qaRadarPresenting)window.__qaRadarStage?.("retirement-postrender-enter");');
-    inject('    sweep();\n  // Timer requests',
-      '    sweep();\n    if(window.__qaRadarPresenting)window.__qaRadarStage?.("retirement-postrender-exit");\n  // Timer requests');
+    // The retirement sweep now deliberately runs on a grace timer rather
+    // than inside Cesium postRender. Measure the end of that callback at the
+    // stable function boundary, not an obsolete synchronous sweep() call.
+    inject('  });\n  function retire(layer){',
+      '    if(window.__qaRadarPresenting)window.__qaRadarStage?.("retirement-postrender-exit");\n  });\n  function retire(layer){');
     body=Buffer.from(code,"utf8");
   }
   await route.fulfill({status:res.status,body,
    contentType:res.headers.get("content-type")||"application/octet-stream"});
- }catch{await route.abort("failed");}
+ }catch(error){
+   // Do not turn a QA-only probe mismatch into a silent "missing Cesium"
+   // symptom. The actual browser and production modules remain untouched.
+   console.error("QA_LOCAL_ASSET_ROUTE_FAILED",JSON.stringify({
+     uri:uri.pathname,error:String(error?.stack??error)
+   }));
+   await route.abort("failed");
+ }
 });
 await page.route(/\/wmts-native-capabilities(?:\?|$)/,async route=>{
  metadataRequests++;
