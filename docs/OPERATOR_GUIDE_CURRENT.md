@@ -11,6 +11,16 @@
 
 **Public information sheet:** [StormTracker — layers and features (PDF)](STORMTRACKER_LAYERS_INFORMATION.pdf) — a concise shareable overview for new users. This is a guide to features, not a live weather bulletin.
 
+## V10.2.51 candidate — BoM-published six-scan rain playback (3 November 2026)
+
+Rain radar playback now offers **30 minutes only**, using up to six actual five-minute observations advertised by the BoM. Longer 60-, 90-, 120- and 180-minute browser-archive choices are withdrawn. The **Doppler — All available** option remains independent and unchanged.
+
+StormTracker continues to check for new BoM scans every five minutes, retain a good genuine working loop during a partial source refusal, and recover missing original tiles when the source permits. No background download is performed solely to fill the old extended rain archive. A greyed or short live loop means fewer source-verified scans are available, not an invitation to interpolate or invent observations.
+
+The displayed map, original source imagery, supplementary-radar synchronisation, inferred 3-D visualisation, warning polygons, flood gauges, community impact feeds and saved operator camera remain as before. Browser console CORS rejections from the direct BoM endpoint are avoided on the Pages site; any HTTP 503 from the separate river-history feed should be assessed as a flood-history source issue, not a radar failure.
+
+**Release status:** This section describes PR #296 while final package and live acceptance checks are outstanding. Do not treat V10.2.51 as a sealed or operator-accepted baseline until public deployment and visual verification are confirmed. See [V10.2.51 release notes](RELEASE_NOTES_V10.2.51.md).
+
 ## V10.2.46 — Automatic recovery when active BoM warning polygons are unavailable
 
 If IDQ21033/IDQ21035 or other official severe warning products are **active**, but the original published GIS polygon is not yet available, the status correctly says **“active; awaiting updated BoM polygon”**. This is NOT an all-clear. StormTracker now automatically rechecks the official warning feed after **two minutes**, up to **nine** short checks per active issue, then resumes the usual **15-minute polling interval**. It resumes normal interval immediately when genuine source polygon geometry arrives. A limited early retry is also made after temporary source failures; manual **Refresh** checks at once.

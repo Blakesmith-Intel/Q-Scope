@@ -84,13 +84,19 @@ jobs:
           ! test -e _site/src/ftp-reflectivity-operational-v1.js
           node --check _site/src/hires-radar-loop-policy-v1.js
           grep -Fq '__STORMTRACKER_NATIONAL_MOSAIC_PRIMARY=true' _site/live3d-operational-v9.html
-          grep -Fq 'measuredHiResRainWindow(availableRadarHistoryTimes, loopSelection)' _site/src/live3d-operational-v9.js
-          grep -Fq 'availableMeasuredHiResLoopMinutes(availableRadarHistoryTimes)' _site/src/live3d-operational-v9.js
-          grep -Fq 'operational-window-choices-v1.js?v=20261019-five-observed-rain-windows' _site/src/live3d-operational-v9.js
-          grep -Fq 'Object.freeze([30,60,90,120,180])' _site/src/operational-window-choices-v1.js
-          grep -Fq 'availableMeasuredHiResLoopMinutes' _site/src/hires-radar-loop-policy-v1.js
+          # The current operational Pages build is V10.2.50 plus the approved
+          # native six-scan source-only overlay, NOT the October archive UI.
+          grep -Fq 'operational-window-choices-v1.js?v=20261103-six-published-scans-only-v1' _site/src/live3d-operational-v9.js
+          grep -Fq 'Object.freeze([30])' _site/src/operational-window-choices-v1.js
+          ! grep -Fq 'browser archive' _site/src/operational-window-choices-v1.js
+          grep -Fq 'No off-window historical downloads' _site/src/live3d-operational-v9.js
+          grep -Fq 'visibleGenuineFrames' _site/src/live3d-operational-v9.js
+          grep -Fq 'retaining playing loop' _site/src/live3d-operational-v9.js
+          grep -Fq 'browserNativeCorsBlocked' _site/src/radar-source.js
+          grep -Fq '20261103-bom-native-six-scans-no-cors-v1' _site/src/bom-wmts-loop-v2.js
+          grep -Fq 'A tile-specific 403 is not a global denial' _site/src/radar-tile-retry-v1.js
           node frontend/tests/run-hires-browser-archive-90min-v1-tests.mjs
-          grep -Fq 'then(frames=>frames.filter(isVerifiedHiResRadarFrame))' _site/src/live3d-operational-v9.js
+          node frontend/tests/run-native-bom-six-scan-only-20261103-tests.mjs
           grep -Fq 'highResolutionBomMosaicFrame' _site/src/hires-radar-loop-policy-v1.js || grep -Fq 'isVerifiedHiResRadarFrame' _site/src/hires-radar-loop-policy-v1.js
           grep -Fq 'dataSource.entities.removeAll();' _site/src/context-layers/flood-road-closures-v1.js
           grep -Fq 'officialPowerOutagePolygonParts(feature).entries()' _site/src/context-layers/power-outages-v1.js
@@ -113,7 +119,8 @@ jobs:
           echo '<!doctype html><title>FTP AEP QA</title>' > _site/ftp-aep-smoke.html
           python -m http.server 8137 --bind 127.0.0.1 --directory _site >/tmp/ftp-aep-qa-http.log 2>&1 &
           node scripts/test-combined-ftp-aep-operational-browser-v1.mjs
-          node scripts/test-persisted-hires-browser-archive-90min-v1.mjs
+          # Extended browser-archive QA belongs to historical fixtures, not the
+          # operator-approved six-published-scan production release.
           node scripts/test-ftp-aep-actual-v10-viewer-browser-v1.mjs
 
       - if: always()

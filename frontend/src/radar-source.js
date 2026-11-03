@@ -141,7 +141,13 @@ export async function fetchReadableImage(url) {
     // within the existing guarded request slot and 15-second deadline.
     // If direct access is also refused or CORS-blocked, retain the original
     // 403 and normal exact-tile cooldown; never substitute another image.
-    const nativeUrl=isWmts && response.status===403
+    // GitHub Pages cannot read this native endpoint: its response lacks
+    // Access-Control-Allow-Origin. Do not repeatedly make doomed browser
+    // CORS requests after an isolated relay 403; let the existing exact-tile
+    // cooldown/recovery retry the original PNG via the approved relay.
+    const browserNativeCorsBlocked=globalThis.location?.origin===
+      "https://blakesmith-intel.github.io";
+    const nativeUrl=isWmts && response.status===403 && !browserNativeCorsBlocked
       ? officialWmtsFallbackUrl(url):null;
     if(nativeUrl){
       try{

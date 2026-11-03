@@ -8,7 +8,9 @@ const series=Array.from({length:40},(_,i)=>new Date(base-(39-i)*300000)
  .toISOString().replace(".000Z","Z"));
 const expected=new Map([["30",6],["60",12],["90",18],["120",24],["180",36]]);
 assert.deepEqual(HIRES_RAIN_WINDOWS,[30,60,90,120,180]);
-assert.deepEqual(RAIN_ONLY_LOOP_MINUTES,[30,60,90,120,180]);
+// Retain existing historical source-integrity calculations but stop exposing
+// archive durations to operators: native rain playback is six scans only.
+assert.deepEqual(RAIN_ONLY_LOOP_MINUTES,[30]);
 for(const [selection,n] of expected){
  const result=measuredHiResRainWindow(series,selection);
  assert.equal(result.requiredFrames,n);
@@ -27,8 +29,8 @@ for(const [length,available] of [[4,[]],[6,[30]],[12,[30,60]],
   rainAvailableMinutes:available,rainHasFrames:times.length>0
  });
  assert.deepEqual(choices.slice(1).filter(x=>!x.disabled).map(x=>Number(x.value)),
-  length>=6?available:[30],
-  "30-minute startup is always selectable with partial measured source; longer choices need complete history");
+  [30],
+  "Only the source-published standard 30-minute rain loop is operator-selectable");
 }
 const missing=series.filter((_,i)=>i!==series.length-14);
 const gaps=availableMeasuredHiResLoopMinutes(missing);
@@ -41,4 +43,4 @@ const frame={sourceId:"BOM-MOSAIC",width:768,height:768,
 assert(isVerifiedHiResRadarFrame(frame));
 assert(!isVerifiedHiResRadarFrame({...frame,sourceId:"BOM-FTP-MOSAIC"}));
 console.log("PASS_BOM_HIRES_BROWSER_ARCHIVE_30_60_90_120_180_COUNTS_6_12_18_24_36");
-console.log("PASS_GAPPED_SOURCE_NOT_TEMPORALLY_FABRICATED_AND_LONGER_OPTIONS_LOCKED");
+console.log("PASS_GAPPED_SOURCE_NOT_TEMPORALLY_FABRICATED_AND_ARCHIVE_UI_WITHDRAWN");

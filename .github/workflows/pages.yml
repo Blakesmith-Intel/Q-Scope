@@ -211,7 +211,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           root=Path("_site")
-          revision="v10.2.45-production-source-verified-20261101-v10.2.46-warning-source-catchup-20261101-v10.2.48-exact-bom-403-recovery-20261103-v10.2.49-uncached-source-refusals-20261103-v10.2.50-complete-403-mosaics-stable-loop-20261103-"
+          revision="v10.2.45-production-source-verified-20261101-v10.2.46-warning-source-catchup-20261101-v10.2.48-exact-bom-403-recovery-20261103-v10.2.49-uncached-source-refusals-20261103-v10.2.50-complete-403-mosaics-stable-loop-20261103-v10.2.51-bom-six-scans-only-no-archive-20261103-"
           pairs=(
             ("index.html","live3d-operational-v9.html?v="),
             ("live3d-operational-v9.html","src/live3d-operational-v9.js?v="),
@@ -242,6 +242,11 @@ jobs:
               "source backfill; never shrink a better playing real-frame "
               "window due to partial automatic refresh; operator visual "
               "acceptance pending\\n"
+              "V10.2.51 BOM SIX-SCAN ONLY: published five-minute BoM "
+              "observations; no extended browser archive or out-of-window "
+              "warmup; skip CORS-blocked direct fallback from Pages, retain "
+              "genuine WMTS relay tile retry and independent Doppler; "
+              "operator visual acceptance pending\\n"
             )
           PY
           grep -Fq 'v10.2.45-production-source-verified-20261101-' _site/index.html
@@ -252,6 +257,12 @@ jobs:
           grep -Fq 'V10.2.49 UNCACHED WMTS 403 RECOVERY' _site/BUILD.txt
           grep -Fq 'v10.2.50-complete-403-mosaics-stable-loop-20261103-' _site/index.html
           grep -Fq 'V10.2.50 AUTHENTIC 403 MOSAIC RECOVERY' _site/BUILD.txt
+          grep -Fq 'v10.2.51-bom-six-scans-only-no-archive-20261103-' _site/index.html
+          grep -Fq 'V10.2.51 BOM SIX-SCAN ONLY' _site/BUILD.txt
+          grep -Fq 'Object.freeze([30])' _site/src/operational-window-choices-v1.js
+          grep -Fq 'No off-window historical downloads' _site/src/live3d-operational-v9.js
+          grep -Fq 'browserNativeCorsBlocked' _site/src/radar-source.js
+          grep -Fq '20261103-bom-native-six-scans-no-cors-v1' _site/src/bom-wmts-loop-v2.js
           # The browser module import now has a newer cache identity. Verify
           # the actual source-qualified IDQ product controller instead of a
           # historic V10.2.46 import token, while retaining recovery tests.
@@ -852,7 +863,7 @@ jobs:
             if grep -Fq 'v10.2.49-uncached-source-refusals-20261103-' <<< "$html" &&
                grep -Fq 'V10.2.49 UNCACHED WMTS 403 RECOVERY' <<< "$manifest" &&
                grep -Fq 'refusedWmtsUrls' <<< "$reader" &&
-               grep -Fq '20261103-source-403-cache-unblock-v1' <<< "$wmts"; then
+               grep -Fq '20261103-bom-native-six-scans-no-cors-v1' <<< "$wmts"; then
               accepted=1
               break
             fi
@@ -888,6 +899,36 @@ jobs:
           done
           test "$passed" = 1
           echo "PUBLIC_V10_2_50_GENUINE_MOSAIC_AND_NOSHRINK_VERIFIED $GITHUB_SHA"
+
+      - name: Verify publicly served V10.2.51 six-scan rain playback and native CORS guard
+        env:
+          PAGES_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          base="${PAGES_URL%/}"
+          verified=0
+          for attempt in $(seq 1 12); do
+            suffix="?source-only=$GITHUB_SHA&attempt=$attempt"
+            html="$(curl -fsSL --max-time 20 "$base/index.html$suffix" || true)"
+            build="$(curl -fsSL --max-time 20 "$base/BUILD.txt$suffix" || true)"
+            engine="$(curl -fsSL --max-time 20 "$base/src/live3d-operational-v9.js$suffix" || true)"
+            menu="$(curl -fsSL --max-time 20 "$base/src/operational-window-choices-v1.js$suffix" || true)"
+            source="$(curl -fsSL --max-time 20 "$base/src/radar-source.js$suffix" || true)"
+            wmts="$(curl -fsSL --max-time 20 "$base/src/bom-wmts-loop-v2.js$suffix" || true)"
+            if grep -Fq 'v10.2.51-bom-six-scans-only-no-archive-20261103-' <<< "$html" &&
+               grep -Fq 'V10.2.51 BOM SIX-SCAN ONLY' <<< "$build" &&
+               grep -Fq 'No off-window historical downloads' <<< "$engine" &&
+               grep -Fq 'six-published-scans-only-v1' <<< "$engine" &&
+               grep -Fq 'Object.freeze([30])' <<< "$menu" &&
+               grep -Fq 'browserNativeCorsBlocked' <<< "$source" &&
+               grep -Fq '20261103-bom-native-six-scans-no-cors-v1' <<< "$wmts"; then
+              verified=1
+              break
+            fi
+            sleep 3
+          done
+          test "$verified" = 1
+          echo "PUBLIC_V10_2_51_BOM_SIX_PUBLISHED_SCAN_ONLY_AND_SOURCE_GUARD_VERIFIED $GITHUB_SHA"
 
       - name: Verify published V10.2.46 authentic warning polygon catch-up on production root
         env:

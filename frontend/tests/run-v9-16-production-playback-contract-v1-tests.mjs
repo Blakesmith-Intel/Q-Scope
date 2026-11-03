@@ -6,7 +6,8 @@ const runtime=read("frontend/src/live3d-operational-v9.js");
 const menu=read("frontend/src/operational-window-choices-v1.js");
 const index=read("frontend/index.html");
 assert.ok(index.includes("9.16-bom-native-rain30-v1"));
-assert.ok(menu.includes("RAIN_ONLY_LOOP_MINUTES = Object.freeze([30,60,90,120,180])"));
+assert.ok(menu.includes("RAIN_ONLY_LOOP_MINUTES = Object.freeze([30])"),
+  "Operator-approved BoM six-scan rain mode; no old browser archive choices");
 assert.ok(menu.includes("Doppler — All available"),"V9.16.11 replaces the unsmooth combined visual option with genuine Doppler-only playback");
 assert.ok(runtime.includes("return isDopplerSourceActive() && isCombinedDopplerWindowSelected()"));
 assert.ok(runtime.includes("hasNewDopplerWindow() && hybridCombinedSchedule.length"));

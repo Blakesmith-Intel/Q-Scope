@@ -55,7 +55,9 @@ for (const site of ["66", "50", "08", "23"]) {
 assert.match(runtime, /needsChronologicalRadarRebuild/);
 assert.match(runtime, /loadBomReflectivityMosaicAtTime\(entry\.observedUtc, selectedRadarRegion\(\), discoveredTimes\)/);
 assert.match(runtime, /observedUtc,\s*region,\s*candidates/);
-assert.match(packager, /20261103-source-403-cache-unblock-v1/);
+assert.match(packager, /20261103-bom-native-six-scans-no-cors-v1/);
+assert.match(packager, /six-published-scans-only-v1/);
+assert.match(packager, /No off-window historical downloads/);
 assert.match(runtime, /frame\?\.sourceMetadata\?\.region !== region/);
 assert.match(packager, /copyfile\("frontend\/src\/radar-source\.js"/);
 assert.match(packager, /copyfile\("frontend\/src\/radar-request-pressure-v1\.js"/);
