@@ -34,7 +34,7 @@ replace_once(old_radar_runtime, source[start:end].rstrip())
 
 replace_once(
     "bom-wmts-loop-v2.js?v=9.18.6-bounded-published-history",
-    "bom-wmts-loop-v2.js?v=20261101-source-verified-incremental-v10-2-43"
+    "bom-wmts-loop-v2.js?v=20261103-native-403-tile-recovery"
 )
 replace_once(
     "live-loop-refresh-v1.js?v=9.9.0-4",
@@ -506,6 +506,8 @@ assert "recoveredRadarView" in data
 assert "radarViewportContinuityNoOp" not in data
 assert (site / "src/radar-viewport-continuity-v1.js").exists()
 assert "verifiedWmtsBlobs" in (site / "src/radar-source.js").read_text()
+assert "officialWmtsFallbackUrl" in (site / "src/radar-source.js").read_text()
+assert "20261103-native-403-tile-recovery" in (site / "src/bom-wmts-loop-v2.js").read_text()
 assert "negativeTtlMs=45000" in (site / "src/radar-request-pressure-v1.js").read_text()
 assert "remaining tiles not requested after source refusal" in (site / "src/radar-tile-retry-v1.js").read_text()
 assert "frame?.sourceMetadata?.region !== region" in data

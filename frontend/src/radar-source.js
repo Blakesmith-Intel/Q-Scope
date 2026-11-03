@@ -12,6 +12,19 @@ const VERIFIED_WMTS_BLOB_LIMIT=96;
 export const WMTS_TILE_REQUEST_TIMEOUT_MS=15000;
 const verifiedWmtsBlobs=new Map();
 const isWmtsTile=url=>/\/wmts\?/i.test(String(url));
+// Browser-reachable native source for the EXACT SAME PUBLIC BoM WMTS PNG.
+// Use only if the relay denies this one authentic source tile.
+const NATIVE_BOM_WMTS="https://api.bom.gov.au/apikey/v1/mapping/timeseries/wmts";
+export function officialWmtsFallbackUrl(url){
+  try{
+    const target=new URL(String(url));
+    if(target.origin!=="https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev" ||
+       target.pathname!=="/wmts" ||
+       target.searchParams.get("LAYER")!=="atm_surf_air_precip_reflectivity_dbz" ||
+       !target.searchParams.get("time"))return null;
+    return NATIVE_BOM_WMTS+target.search;
+  }catch{return null;}
+}
 function cachedVerifiedWmtsBlob(url){
   const key=String(url),blob=verifiedWmtsBlobs.get(key);
   if(blob){verifiedWmtsBlobs.delete(key);verifiedWmtsBlobs.set(key,blob);}
@@ -104,7 +117,7 @@ export async function fetchReadableImage(url) {
   const controller=new AbortController();
   const timer=isWmts?setTimeout(()=>controller.abort(),WMTS_TILE_REQUEST_TIMEOUT_MS):null;
   try {
-    const response=await fetch(url, {
+    let response=await fetch(url, {
       mode: "cors",
       // Exact WMTS URLs include the immutable BoM observation UTC and tile.
       // Let the browser reuse a successful PNG instead of needlessly asking
@@ -112,6 +125,21 @@ export async function fetchReadableImage(url) {
       cache: isWmts ? "default" : "no-store",
       signal:controller.signal
     });
+    // A 403 from the relay is not proof that the original BoM tile is gone.
+    // Try one native request for the IDENTICAL UTC, coordinates and layer,
+    // within the existing guarded request slot and 15-second deadline.
+    // If direct access is also refused or CORS-blocked, retain the original
+    // 403 and normal exact-tile cooldown; never substitute another image.
+    const nativeUrl=isWmts && response.status===403
+      ? officialWmtsFallbackUrl(url):null;
+    if(nativeUrl){
+      try{
+        const official=await fetch(nativeUrl,{
+          mode:"cors",cache:"default",signal:controller.signal
+        });
+        if(official.ok)response=official;
+      }catch{/* source refusal remains retriable after the usual cooldown */}
+    }
     if (!response.ok) {
       const error=new Error(`Image request failed: HTTP ${response.status}`);
       error.status=response.status;
