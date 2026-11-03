@@ -358,7 +358,9 @@ export function initialiseOperationalPowerOutages({
         },
 
       onUpdate:
-        features => {
+        (features,mappedFeatures=features) => {
+          // Explorer sees every current QLD provider incident, even if a
+          // source did not provide map geometry; the map never fabricates it.
           explorer.updateFeatures(features);
           if (
             !panel
@@ -374,7 +376,7 @@ export function initialiseOperationalPowerOutages({
 
           if (
             selectedId
-            && !features.some(
+            && !mappedFeatures.some(
               feature =>
                 String(
                   feature.id
