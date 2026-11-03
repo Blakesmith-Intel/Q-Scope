@@ -54,9 +54,9 @@ for(const id of ["openPowerOutageExplorer","powerOutageExplorer","outageSuburbSe
 assert.match(html,/power-outage-suburb-explorer-v1\.css/);
 assert.match(view,/groupOutagesBySuburb\(features\)/);
 assert.match(view,/document\.createElement/);
-assert.match(view,/renderProviderReport\\(\\)/);
-assert.match(view,/powerOutageProviderCounts\\(latestFeatures/);
-assert.match(view,/byProvider\\.addEventListener\\("click",onProviderView\\)/);
+assert.ok(view.includes("renderProviderReport()"));
+assert.ok(view.includes("powerOutageProviderCounts(latestFeatures"));
+assert.ok(view.includes('byProvider.addEventListener("click",onProviderView)'));
 assert.ok(view.includes('providerView?"Report by LGA":"Report by provider"'));
 assert.ok(view.includes('item.state==="partial"?"Partial feed":"Unavailable"'));
 
