@@ -67,7 +67,7 @@ provider_button='<button id="outageByProviderReport" type="button" aria-pressed=
 refresh_button='<button id="refreshPowerOutageExplorer" type="button">Refresh</button>'
 assert source_page.count(provider_button)==1
 assert document.count(provider_button)==0 and document.count(refresh_button)==1
-document=document.replace(refresh_button,provider_button+"\\n    "+refresh_button,1)
+document=document.replace(refresh_button,provider_button+"\n    "+refresh_button,1)
 road_page.write_text(document,encoding="utf-8")
 
 # Opt-in official warning UI: append ONLY new controls, popup and compact styles
