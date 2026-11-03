@@ -73,6 +73,12 @@ assert.ok(runtime.includes("radarImageryHandover.replace("),"live surface must u
 assert.ok(!runtime.includes("viewer.imageryLayers.remove(\n      surfaceLayer"),"never remove outgoing radar before new imagery is ready");
 assert.ok(runtime.includes("createRadarMotionTransition(previousFrame,frame)"),"sequential radar transitions use source-measured spatial movement");
 assert.ok(runtime.includes("prepareRadarSurfaceProvider(frame)"),"native BoM raster providers are cached and reused");
+assert.ok(runtime.includes("canvas.toBlob("),"lossless native radar PNG must encode without main-thread data-URL blocking");
+assert.ok(runtime.includes("URL.revokeObjectURL(pngUrl)"),"temporary radar PNG URLs must be released");
+assert.ok(!runtime.includes('canvas.toDataURL("image/png")'),"do not regress to synchronous full-canvas PNG encoding");
+const radarSource=readFileSync(fileURLToPath(new URL("../src/radar-source.js",import.meta.url)),"utf8");
+assert.ok(radarSource.includes('cache: isWmts ? "default" : "no-store"'),
+  "exact-UTC BoM WMTS PNGs may reuse normal browser HTTP caching");
 assert.ok(!runtime.includes("frameCrossfade"),"no compositor fade remains in the live weather runtime");
 assert.ok(runtime.includes("timeoutMs:Math.min(180"),"visual-only intermediate steps have a strict render budget");
 assert.ok(runtime.includes("renderSurface(displayFrame,renderToken"),"intermediate imagery is visual-only and never fed into storm science");
