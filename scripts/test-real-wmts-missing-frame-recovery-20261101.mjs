@@ -54,7 +54,20 @@ await page.addInitScript(()=>{
 });
 let phase="initial",heldBackUtc=null,metadataRequests=0;
 let authenticCapabilitySnapshot=null;
-const navigations=[],errors=[];
+const navigations=[],errors=[],requestFailures=[],consoleErrors=[],httpFailures=[];
+page.on("requestfailed",request=>{
+  if(requestFailures.length<24)requestFailures.push({
+    url:request.url().slice(0,240),reason:request.failure()?.errorText??"unknown"
+  });
+});
+page.on("response",response=>{
+  if(response.status()>=400 && httpFailures.length<24)
+    httpFailures.push({url:response.url().slice(0,240),status:response.status()});
+});
+page.on("console",message=>{
+  if(message.type()==="error" && consoleErrors.length<24)
+    consoleErrors.push(message.text().slice(0,450));
+});
 page.on("framenavigated",frame=>navigations.push(frame.url()));
 page.on("pageerror",error=>errors.push(String(error)));
 await page.route("https://blakesmith-intel.github.io/StormTracker/**",async route=>{
@@ -217,7 +230,16 @@ try{
 }catch(error){
  console.log("REAL_SOURCE_MISSING_FRAME_RECOVERY_FAIL",
   JSON.stringify({platform:isDesktop?"desktop Chromium":"mobile WebKit",error:String(error),heldBackUtc,phase,metadataRequests,
-   navigations,errors:errors.slice(-8),state:await snapshot().catch(()=>null)}));
+   navigations,errors:errors.slice(-8),requestFailures,
+   httpFailures,consoleErrors,
+   startup:await page.evaluate(()=>({
+     readyState:document.readyState,
+     cesium:typeof window.Cesium,
+     scripts:[...document.scripts].slice(-4).map(script=>({
+       src:script.src.slice(0,220),type:script.type
+     }))
+   })).catch(()=>null),
+   state:await snapshot().catch(()=>null)}));
  await page.screenshot({path:isDesktop?"/tmp/radar-desktop-missing-frame-failure.png":"/tmp/radar-mobile-missing-frame-failure.png"}).catch(()=>{});
  throw error;
 }finally{await browser.close();}
