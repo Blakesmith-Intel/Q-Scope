@@ -7,8 +7,24 @@ const guardedRadarRequests=createRadarRequestPressureGuard();
 // not re-download identical original BoM images. URLs include exact UTC,
 // tile row/column and product, so a cached blob cannot be misdated.
 const VERIFIED_WMTS_BLOB_LIMIT=96;
+// A stalled relay/browser fetch must not hold a scarce source request slot
+// indefinitely. The timer starts only after the queued request runs.
+export const WMTS_TILE_REQUEST_TIMEOUT_MS=15000;
 const verifiedWmtsBlobs=new Map();
 const isWmtsTile=url=>/\/wmts\?/i.test(String(url));
+// Browser-reachable native source for the EXACT SAME PUBLIC BoM WMTS PNG.
+// Use only if the relay denies this one authentic source tile.
+const NATIVE_BOM_WMTS="https://api.bom.gov.au/apikey/v1/mapping/timeseries/wmts";
+export function officialWmtsFallbackUrl(url){
+  try{
+    const target=new URL(String(url));
+    if(target.origin!=="https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev" ||
+       target.pathname!=="/wmts" ||
+       target.searchParams.get("LAYER")!=="atm_surf_air_precip_reflectivity_dbz" ||
+       !target.searchParams.get("time"))return null;
+    return NATIVE_BOM_WMTS+target.search;
+  }catch{return null;}
+}
 function cachedVerifiedWmtsBlob(url){
   const key=String(url),blob=verifiedWmtsBlobs.get(key);
   if(blob){verifiedWmtsBlobs.delete(key);verifiedWmtsBlobs.set(key,blob);}
@@ -97,26 +113,51 @@ export async function fetchReadableImage(url) {
   const verifiedBlob=isWmts?cachedVerifiedWmtsBlob(url):null;
   if(verifiedBlob)return blobToImageData(verifiedBlob);
   const read=async()=>{
-  let response;
-
+  let blob;
+  const controller=new AbortController();
+  const timer=isWmts?setTimeout(()=>controller.abort(),WMTS_TILE_REQUEST_TIMEOUT_MS):null;
   try {
-    response = await fetch(url, {
+    let response=await fetch(url, {
       mode: "cors",
-      cache: "no-store"
+      // Exact WMTS URLs include the immutable BoM observation UTC and tile.
+      // Let the browser reuse a successful PNG instead of needlessly asking
+      // the relay for the same source bytes on every loop/site switch.
+      cache: isWmts ? "default" : "no-store",
+      signal:controller.signal
     });
+    // A 403 from the relay is not proof that the original BoM tile is gone.
+    // Try one native request for the IDENTICAL UTC, coordinates and layer,
+    // within the existing guarded request slot and 15-second deadline.
+    // If direct access is also refused or CORS-blocked, retain the original
+    // 403 and normal exact-tile cooldown; never substitute another image.
+    const nativeUrl=isWmts && response.status===403
+      ? officialWmtsFallbackUrl(url):null;
+    if(nativeUrl){
+      try{
+        const official=await fetch(nativeUrl,{
+          mode:"cors",cache:"default",signal:controller.signal
+        });
+        if(official.ok)response=official;
+      }catch{/* source refusal remains retriable after the usual cooldown */}
+    }
+    if (!response.ok) {
+      const error=new Error(`Image request failed: HTTP ${response.status}`);
+      error.status=response.status;
+      throw error;
+    }
+    // Keep the deadline active until every real PNG byte arrives. Receiving
+    // HTTP headers alone does not verify an authentic source image.
+    blob=await response.blob();
   } catch (error) {
+    if(Number(error?.status))throw error;
+    if(error?.name==="AbortError")
+      throw new Error(`BoM WMTS tile timed out after ${WMTS_TILE_REQUEST_TIMEOUT_MS} ms`);
     throw new Error(
-      `Browser could not fetch readable radar pixels (network/CORS): ${error.message}`
+      `Browser could not fetch readable radar pixels (network/CORS): ${error?.message??error}`
     );
+  } finally {
+    if(timer!==null)clearTimeout(timer);
   }
-
-  if (!response.ok) {
-    const error=new Error(`Image request failed: HTTP ${response.status}`);
-    error.status=response.status;
-    throw error;
-  }
-
-  const blob=await response.blob();
   const pixels=await blobToImageData(blob);
   if(isWmts)rememberVerifiedWmtsBlob(url,blob);
   return pixels;

@@ -46,18 +46,39 @@ try{
  // different radars exercise the same system-wide renderer and scheduler.
  for(const region of ["08","23","66","106","56","107","36"]){
   await page.locator("#radarSite").selectOption(region);
-  const baseline=await stable(region);
-  const baselineCount=Number((baseline.label||"").split("/")[1]);
+  let baseline=await stable(region);
+  let baselineCount=Number((baseline.label||"").split("/")[1]);
+  // A real BoM tile may temporarily return 403 despite a published UTC.
+  // Exercise the existing one-minute retry in the SAME browser session;
+  // never substitute an older tile or mark a denied source as a test pass.
+  if(["08","23"].includes(region) && baselineCount<6 &&
+     baseline.diagnostic?.tileFailures?.some(item=>/HTTP\s+403\b/i.test(item.message??""))){
+    console.log("REAL_SOURCE_TEMPORARY_DENIAL_RETRY",JSON.stringify({
+      region,initialFrames:baseline.label,
+      refusals:baseline.diagnostic.tileFailures.slice(-4)
+    }));
+    await page.waitForTimeout(65000);
+    await page.evaluate(async()=>window.__stormtrackerRadarQaCheck());
+    baseline=await stable(region);
+    baselineCount=Number((baseline.label||"").split("/")[1]);
+    console.log("REAL_SOURCE_TEMPORARY_DENIAL_RECOVERY",JSON.stringify({
+      region,frames:baseline.label,
+      refusals:baseline.diagnostic?.tileFailures?.slice(-4)
+    }));
+  }
   assert(baselineCount>=1,"No real BoM frame at "+region);
   assert(baseline.pressure?.peakActive>0 && baseline.pressure.peakActive<=2,
     "Radar WMTS source not protected by shared two-request limit in review path");
-  // The immediately preceding authoritative source audit verifies six fully
-  // readable tilesets for these sites; 5/5 in the browser is then a real
-  // application defect, not a missing BoM source observation.
-  if(["08","23","66"].includes(region))
+  // The separate complete-mosaic source check covers Gympie (08) and
+  // Gladstone (23). It does not certify Stapylton (66), and BoM publication
+  // may change between that audit and this later browser load. Always report
+  // exact source refusals rather than diagnosing every short loop as a UI bug.
+  if(["08","23"].includes(region))
     assert.equal(baselineCount,6,
-      "BoM publishes six source-complete frames but UI loaded "+baseline.label+
-      " at radar "+region);
+      "Published six-frame audit differs from live browser at radar "+region+
+      ": "+baseline.label+"; source failures="+
+      JSON.stringify(baseline.diagnostic?.tileFailures?.slice(-5)??[])+
+      "; refresh="+JSON.stringify(baseline.diagnostic?.automatic));
   assert(baseline.graphics,
     "QA subpath wrongly bypassed production radar graphics/recovery path");
   assert.equal(baseline.diagnostic?.lifecycle?.bootCount,1,

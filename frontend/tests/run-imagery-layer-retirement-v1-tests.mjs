@@ -27,6 +27,11 @@ assert.deepEqual(destroyed,[],"One postRender boundary is insufficient");
 frameCallback();
 assert.deepEqual(destroyed,[],"Even two boundaries cannot bypass grace time");
 clock+=510;
+// A later Cesium postRender MUST NOT directly free GPU layers even after
+// both safe boundaries and the grace period have elapsed.
+frameCallback();
+assert.deepEqual(destroyed,[],
+  "Old radar GPU images must not be destroyed from inside postRender");
 scheduled.shift()();
 assert.deepEqual(destroyed,["source-frame-1"],
   "After safe boundaries and grace, obsolete layer GPU resources destroyed");

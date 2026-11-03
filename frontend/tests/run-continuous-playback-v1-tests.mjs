@@ -84,4 +84,34 @@ await sixAttempts;
 await skipFailed.pause();
 assert.deepEqual(attempts,[1,2,3,4,0,1],
   "a transient failed source frame should not be retried forever");
+
+// A temporarily slow Cesium image handover must not turn Pause into Play or
+// permanently disable future original-source attempts. The existing default
+// fail-stop behaviour above remains unchanged for other playback consumers.
+let retries=0, recovered=0, slowIndex=0, warnings=0;
+const resilientStates=[];
+let resolveRecovery;
+const recoveredFrames=new Promise(resolve=>{resolveRecovery=resolve;});
+const resilient=createContinuousPlayback({
+  count:()=>3,currentIndex:()=>slowIndex,delay:()=>1,
+  continueOnFailedCycle:true,
+  showFrame:async next=>{
+    retries++;
+    if(retries<=6)return false; // two complete unsuccessful image cycles
+    slowIndex=next;
+    if(++recovered===2){resilient.pause();resolveRecovery();}
+    return true;
+  },
+  onPlayingChange:state=>resilientStates.push(state),
+  onError:()=>warnings++
+});
+resilient.play();
+await recoveredFrames;
+// The test's own successful second render has already paused the player.
+// A second test-side pause would record a redundant false notification.
+assert.equal(recovered,2,"Playback must resume real frames after delayed handovers");
+assert.equal(warnings,1,"One bounded warning per failed playback cycle");
+assert.deepEqual(resilientStates,[true,false],
+  "No intermediate Play transition during genuine-image retries");
+
 console.log('Continuous playback checks passed including skipped tile handovers and no overlapping renders.');

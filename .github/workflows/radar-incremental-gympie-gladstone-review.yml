@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   exact-tiles:
-    if: github.head_ref == 'feature/incremental-radar-frames-20261101'
+    if: github.head_ref == 'feature/incremental-radar-frames-20261101' || github.head_ref == 'fix/taroom-radar-preflight-six-frame-recovery-20261102'
     runs-on: ubuntu-24.04
     timeout-minutes: 14
     steps:
@@ -36,7 +36,7 @@ jobs:
         run: node scripts/audit-all-radar-wmts-spotcheck-20261101.mjs
 
   genuine-mobile:
-    if: github.head_ref == 'feature/incremental-radar-frames-20261101'
+    if: github.head_ref == 'feature/incremental-radar-frames-20261101' || github.head_ref == 'fix/taroom-radar-preflight-six-frame-recovery-20261102'
     needs: exact-tiles
     runs-on: ubuntu-24.04
     timeout-minutes: 24
@@ -71,6 +71,10 @@ jobs:
           mkdir -p _site/preview/radar-refresh-review
           rsync -a --exclude='/preview/' _site/ _site/preview/radar-refresh-review/
           grep -Fq 'OPERATOR_RADAR_REVIEW' _site/preview/radar-refresh-review/src/live3d-operational-v9.js
+      - name: Verify browser QA entrypoints parse before browser installation
+        run: |
+          node --check scripts/test-incremental-append-real-wmts-webkit-20261101.mjs
+          node --check scripts/test-real-wmts-missing-frame-recovery-20261101.mjs
       - name: Install mobile WebKit
         run: |
           npm install --no-save --ignore-scripts playwright@1.58.2
@@ -94,7 +98,7 @@ jobs:
           if-no-files-found: ignore
 
   genuine-desktop:
-    if: github.head_ref == 'feature/incremental-radar-frames-20261101'
+    if: github.head_ref == 'feature/incremental-radar-frames-20261101' || github.head_ref == 'fix/taroom-radar-preflight-six-frame-recovery-20261102'
     needs: exact-tiles
     runs-on: ubuntu-24.04
     timeout-minutes: 22
@@ -124,6 +128,10 @@ jobs:
           grep -Fq 'OPERATOR_RADAR_REVIEW' _site/preview/radar-refresh-review/src/live3d-operational-v9.js
           node --check _site/preview/radar-refresh-review/src/live3d-operational-v9.js
           node --check _site/preview/radar-refresh-review/src/bom-wmts-loop-v2.js
+      - name: Verify desktop browser QA entrypoints parse before installation
+        run: |
+          node --check scripts/test-incremental-append-real-wmts-webkit-20261101.mjs
+          node --check scripts/test-real-wmts-missing-frame-recovery-20261101.mjs
       - name: Install desktop Chromium independently of mobile
         run: |
           npm install --no-save --ignore-scripts playwright@1.58.2

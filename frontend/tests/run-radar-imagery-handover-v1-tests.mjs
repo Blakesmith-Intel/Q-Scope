@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createRadarImageryHandover } from "../src/radar-imagery-handover-v1.js";
 
-function fixture() {
+function fixture({maxRetainedLayers=0}={}) {
   const listeners=new Set(), layers=[], queue=[], removed=[];
   let nextId=0;
   const scene={globe:{tilesLoaded:false},requests:0,
@@ -18,7 +18,8 @@ function fixture() {
   };
   const api=createRadarImageryHandover({imageryLayers,scene,
     setTimeoutImpl:fn=>{queue.push(fn);return ++nextId},
-    clearTimeoutImpl:()=>{}});
+    clearTimeoutImpl:()=>{},
+    maxRetainedLayers});
   const fire=()=>[...listeners].forEach(fn=>fn());
   return {scene,layers,removed,api,fire,queue,listeners};
 }
@@ -72,15 +73,27 @@ assert.ok(runtime.includes("radarImageryHandover.replace("),"live surface must u
 assert.ok(!runtime.includes("viewer.imageryLayers.remove(\n      surfaceLayer"),"never remove outgoing radar before new imagery is ready");
 assert.ok(runtime.includes("createRadarMotionTransition(previousFrame,frame)"),"sequential radar transitions use source-measured spatial movement");
 assert.ok(runtime.includes("prepareRadarSurfaceProvider(frame)"),"native BoM raster providers are cached and reused");
+assert.ok(runtime.includes("canvas.toBlob("),"lossless native radar PNG must encode without main-thread data-URL blocking");
+assert.ok(runtime.includes("URL.revokeObjectURL(pngUrl)"),"temporary radar PNG URLs must be released");
+const radarSurfaceStart=runtime.indexOf("async function prepareRadarSurfaceProvider(frame)");
+const radarSurfaceEnd=runtime.indexOf("\nasync function renderSurface(",radarSurfaceStart);
+assert.ok(radarSurfaceStart>=0 && radarSurfaceEnd>radarSurfaceStart,
+  "test must inspect the actual native radar surface preparation");
+const radarSurface=runtime.slice(radarSurfaceStart,radarSurfaceEnd);
+assert.ok(!radarSurface.includes('canvas.toDataURL("image/png")'),
+  "the native radar surface must not use synchronous full-canvas PNG encoding");
+const radarSource=readFileSync(fileURLToPath(new URL("../src/radar-source.js",import.meta.url)),"utf8");
+assert.ok(radarSource.includes('cache: isWmts ? "default" : "no-store"'),
+  "exact-UTC BoM WMTS PNGs may reuse normal browser HTTP caching");
 assert.ok(!runtime.includes("frameCrossfade"),"no compositor fade remains in the live weather runtime");
 assert.ok(runtime.includes("timeoutMs:Math.min(180"),"visual-only intermediate steps have a strict render budget");
 assert.ok(runtime.includes("renderSurface(displayFrame,renderToken"),"intermediate imagery is visual-only and never fed into storm science");
 assert.ok(!runtime.includes("frameCrossfade.play("),"whole-scene opacity fade must never be used");
 assert.ok(runtime.includes("previousVisibleIndex"),"failed Cesium loads cannot falsely advance the frame indicator");
 assert.ok(!runtime.includes('"pointerdown", "pointermove", "wheel", "keydown"'),"hover must not interrupt radar transitions");
-// A native SingleTile image already decoded from BoM must not await every
-// unrelated map/terrain tile. Its outgoing image is still retained until
-// Cesium has had three render boundaries to composite the new source.
+// An already decoded native BoM image needs two rendered boundaries, not a
+// third render delayed by unrelated map tiles. The outgoing image stays until
+// the measured 2-D and inferred 3-D can reveal together.
 const native=fixture();
 const oldNative={name:"old-native"};
 await native.api.replace(oldNative);
@@ -88,8 +101,7 @@ native.scene.globe.tilesLoaded=false;
 const newNative={name:"decoded-native"};
 const nativeSwap=native.api.replace(newNative,{decodedSingleTile:true});
 native.fire();
-native.fire();
-assert.equal(native.api.currentLayer,oldNative,"do not unveil immediately");
+assert.equal(native.api.currentLayer,oldNative,"do not unveil on first boundary");
 native.fire();
 assert.equal(await nativeSwap,true,
   "decoded SingleTile image advances despite independently loading basemap");
@@ -113,8 +125,8 @@ const waiting=synced.api.replace(next2d,{
     geometryFrame="t1";
   }
 });
-synced.fire();synced.fire();
-assert.equal(geometryFrame,"t0","waiting for radar texture must not change 3-D data");
+synced.fire();
+assert.equal(geometryFrame,"t0","staging radar must not change 3-D data");
 synced.fire();
 assert.equal(await waiting,true);
 assert.equal(geometryFrame,"t1");
@@ -131,4 +143,78 @@ assert.equal(await cancelled,false);
 assert.equal(geometryFrame,oldGeometry,
   "failed radar tile must not advance volume to an unrenderable observation");
 synced.api.reset();
-console.log("PASS original BoM 2-D and measured-frame inferred 3-D reveal atomically, with failed tile rollback.");
+
+// One real 30-minute BoM six-frame loop must reuse the same six GPU-ready
+// raster layers on every subsequent cycle. The original PNG/provider is
+// identified by object identity, never a fabricated image or guessed UTC.
+const warm=fixture({maxRetainedLayers:5});
+const genuineProviders=Array.from({length:6},(_,i)=>({utc:"2026-11-03T00:"+String(i*5).padStart(2,"0")+":00Z"}));
+const firstLayers=[];
+for(let cycle=0;cycle<3;cycle++){
+  for(let i=0;i<6;i++){
+    const next={name:"source-"+i+"-cycle-"+cycle,imageryProvider:genuineProviders[i],alpha:1,show:true};
+    if(cycle===0)firstLayers.push(next);
+    let beforeReveal=0;
+    const swap=warm.api.replace(next,{decodedSingleTile:true,cacheEligible:true,beforeReveal:()=>beforeReveal++});
+    if(cycle!==0||i!==0){warm.fire();warm.fire();}
+    assert.equal(await swap,true);
+    assert.equal(beforeReveal,1,"Atomic measured image and geometry handover retained");
+    assert.equal(warm.api.currentLayer.imageryProvider,genuineProviders[i]);
+    assert.equal(warm.api.currentLayer.show,true);
+    assert(warm.layers.length<=6,"Six source frames have a hard GPU-layer bound");
+  }
+}
+assert.equal(warm.layers.length,6,"Exactly one retained image per authentic UTC");
+assert.deepEqual(warm.removed,[],"No repetitive GPU teardown during six-frame playback");
+for(const layer of firstLayers)
+  assert(warm.layers.includes(layer),"Reuse original decoded source layer after repeated loops");
+// Motion/gap-fill displays may remain available as visual-only animations,
+// but their imagery must never enter the measured primary source cache.
+const syntheticProvider={displayOnly:true};
+const synthetic={name:"display-only",imageryProvider:syntheticProvider,alpha:1,show:true};
+const syntheticSwap=warm.api.replace(synthetic,{decodedSingleTile:true,cacheEligible:false});
+warm.fire();warm.fire();
+assert.equal(await syntheticSwap,true);
+const backToMeasured=warm.api.replace(
+  {name:"measured-again",imageryProvider:genuineProviders[5],alpha:1,show:true},
+  {decodedSingleTile:true,cacheEligible:true}
+);
+warm.fire();warm.fire();
+assert.equal(await backToMeasured,true);
+assert(warm.removed.includes(synthetic),
+  "Visual-only images must be retired, never preserved in measured GPU cache");
+assert(!warm.layers.includes(synthetic),
+  "No inferred display frames may survive in retained measured source imagery");
+warm.api.reset();
+assert.equal(warm.layers.length,0,"Site switch releases cached source layers");
+assert.equal(warm.removed.length,7,
+  "Five measured caches, the visible source and one visual-only layer are disposed");
+// Mobile keeps only the visible genuine scan and two previously rendered
+// native-resolution source textures, regardless of the six-frame loop size.
+const mobile=fixture({maxRetainedLayers:2});
+for(let i=0;i<12;i++){
+  const provider=genuineProviders[i%6];
+  const swap=mobile.api.replace({imageryProvider:provider,alpha:1,show:true},{
+    decodedSingleTile:true,cacheEligible:true
+  });
+  if(i){mobile.fire();mobile.fire();}
+  assert.equal(await swap,true,"mobile measured radar source must remain presentable");
+  assert(mobile.layers.length<=3,
+    "mobile must not retain all six primary scan GPU textures");
+}
+assert.equal(mobile.layers.length,3,"one live and two retained mobile sources");
+mobile.api.reset();
+assert.equal(mobile.layers.length,0,"mobile radar teardown releases the retained textures");
+assert.ok(runtime.includes('maxRetainedLayers:window.matchMedia?.("(max-width:700px)").matches?2:5'),
+  "Desktop reuses all six genuine images while mobile stays bounded to three");
+const warmHistoryStart=runtime.indexOf("async function warmRadarHistoryCache(");
+const warmHistoryEnd=runtime.indexOf("\nasync function ",warmHistoryStart+1);
+assert(warmHistoryStart>=0 && warmHistoryEnd>warmHistoryStart);
+const warmHistory=runtime.slice(warmHistoryStart,warmHistoryEnd);
+assert.match(warmHistory,/MAX_BACKGROUND_HISTORY_ATTEMPTS = 2/,
+  "background history must never fetch the whole state");
+assert.match(warmHistory,/attempted>=MAX_BACKGROUND_HISTORY_ATTEMPTS/,
+  "failed source requests also count towards the finite background budget");
+assert.doesNotMatch(warmHistory,/radarFrameCache\.set\(/,
+  "background archival must not fill the decoded live playback RAM cache");
+console.log("PASS native-resolution primary 2-D/3-D handover, six-frame desktop GPU reuse, three-layer mobile bound, finite disk-only history catch-up and unchanged source quality.");

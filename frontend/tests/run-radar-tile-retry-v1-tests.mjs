@@ -47,7 +47,8 @@ await assert.rejects(
   loadCompleteRadarTiles(tasks,denialLoader,{stopOnPermanent:true,wait:async()=>{}}),
   /Incomplete BoM reflectivity mosaic.*403/
 );
-assert.equal(deniedAttemptCount,3,"permanent failed tile is not refetched under QA guard");
+assert.equal(deniedAttemptCount,2,
+  "A denied source frame must stop before requesting the third tile");
 let invalidTimeAttempts=0;
 await assert.rejects(loadCompleteRadarTiles(tasks,async url=>{
   invalidTimeAttempts++;
@@ -57,8 +58,24 @@ await assert.rejects(loadCompleteRadarTiles(tasks,async url=>{
   return image;
 },{stopOnPermanent:true,wait:async()=>{}}),
 /Incomplete BoM reflectivity mosaic.*400/);
-assert.equal(invalidTimeAttempts,3,
-  "Published-time race with BoM retirement must not retry HTTP 400");
+assert.equal(invalidTimeAttempts,2,
+  "Published-time rejection must stop further exact-UTC tile requests");
+
+// Source throttling must not turn one denied full-size mosaic into twelve
+// futile upstream requests. Already verified tiles are still preserved.
+let attempted=[];
+const many=Array.from({length:12},(_,i)=>({
+  url:"tile-"+i,col:30+i,row:14,x:i*256,y:0
+}));
+await assert.rejects(loadCompleteRadarTiles(many,async url=>{
+  attempted.push(url);
+  if(url==="tile-2")throw Object.assign(
+    Error("Image request failed: HTTP 403"),{status:403});
+  return image;
+},{stopOnPermanent:true,wait:async()=>{}}),
+/remaining tiles not requested after source refusal/);
+assert.deepEqual(attempted,["tile-0","tile-1","tile-2","tile-3"],
+  "Remaining 8 tiles must never be requested after the source denial");
 
 console.log("PASS hard relay 403 fails complete source scan without duplicate attempts or fabricated pixels.");
 console.log("PASS selective WMTS tile retry; existing real tiles retained; no missing-pixel fabrication.");

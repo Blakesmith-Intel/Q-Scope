@@ -55,7 +55,7 @@ for (const site of ["66", "50", "08", "23"]) {
 assert.match(runtime, /needsChronologicalRadarRebuild/);
 assert.match(runtime, /loadBomReflectivityMosaicAtTime\(entry\.observedUtc, selectedRadarRegion\(\), discoveredTimes\)/);
 assert.match(runtime, /observedUtc,\s*region,\s*candidates/);
-assert.match(packager, /20261101-source-verified-incremental-v10-2-43/);
+assert.match(packager, /20261103-native-403-tile-recovery/);
 assert.match(runtime, /frame\?\.sourceMetadata\?\.region !== region/);
 assert.match(packager, /copyfile\("frontend\/src\/radar-source\.js"/);
 assert.match(packager, /copyfile\("frontend\/src\/radar-request-pressure-v1\.js"/);
@@ -68,7 +68,7 @@ assert.match(packager, /frontend\/src\/radar-viewport-continuity-v1\.js/);
 assert.match(packager, /V10\.2\.41 OPERATOR CAMERA CONTINUITY/);
 
 assert.match(runtime, /radarFrameCache\.has\(entry\.observedUtc\)/);
-assert.match(runtime, /getRadarFrames\(region, cacheCutoff\)/);
+assert.match(runtime, /getRadarFrames\(region, cacheCutoff, cacheFrameBudget\)/);
 assert.match(packager, /copyfile\("frontend\/src\/live-loop-refresh-v1\.js"/);
 assert.match(workflow, /python scripts\/apply-radar-auto-refresh-v1\.py/);
 

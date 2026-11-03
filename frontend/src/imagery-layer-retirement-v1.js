@@ -38,8 +38,18 @@ export function createDeferredImageryRetirement({
   }
   const detach=scene.postRender.addEventListener(()=>{
     renderCount++;
-    sweep();
-  // Timer requests the next scene boundary if necessary; no continuous frames.
+    // Never synchronously destroy WebGL textures from within Cesium's own
+    // postRender dispatch. Do that from the already-bounded grace timer,
+    // outside the active scene render, after two completed render boundaries.
+    // Destroying detached layers inside postRender can contend with the
+    // next native-resolution radar texture upload on software/slow GPUs.
+    if(retired.size && timer===null){
+      timer=schedule(()=>{
+        timer=null;
+        scene.requestRender?.();
+        sweep();
+      },graceMs);
+    }
   });
   function retire(layer){
     if(!layer||retired.has(layer)||disposed)return false;

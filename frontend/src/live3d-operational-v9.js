@@ -12,7 +12,7 @@ import {
   loadBomReflectivityMosaicAtTime,
   reflectivityWindowForRegion,
   radarTileFailureSnapshot
-} from "./bom-wmts-loop-v2.js?v=20261101-source-verified-incremental-v10-2-43";
+} from "./bom-wmts-loop-v2.js?v=20261103-native-403-tile-recovery";
 
 import {
   RadarWorkerClient
@@ -99,13 +99,13 @@ import {
   getRadarFrames,
   putRadarFrame,
   pruneRadarFrames
-} from "./storage.js?v=9.8.3";
+} from "./storage.js?v=20261103-bounded-site-indexeddb-v1";
 
 import { buildSharedProductTimeline, buildRadarPrimaryProductTimeline } from "./shared-product-timeline-v1.js?v=9.16-nearest-observation";
 import {
   canMotionInterpolateRadar,createRadarMotionTransition,radarMotionStepsForSpeed
 } from "./radar-motion-interpolation-v1.js?v=9.16.7-motion";
-import { createRadarImageryHandover } from "./radar-imagery-handover-v1.js?v=9.18.5-deferred-retire";
+import { createRadarImageryHandover } from "./radar-imagery-handover-v1.js?v=20261103-decoded-two-boundary-v1";
 import {MAX_DISPLAY_RADAR_SITES,chooseSupplementalRadarSites,
   fitSelectedRadarSites,createSupplementalRadarDisplay
 } from "./multi-radar-display-v9.js?v=render-provider-cache-20261016-v1";
@@ -215,7 +215,7 @@ import {
   createDopplerLayerTransition
 } from "./doppler-layer-transition-v1.js?v=9.18.5-deferred-retire";
 import {createDeferredImageryRetirement}
-  from "./imagery-layer-retirement-v1.js?v=9.18.5-gpu-lifetime";
+  from "./imagery-layer-retirement-v1.js?v=20261103-postrender-cleanup-v1";
 import {createSupplementalRadarVolumes}
   from "./supplemental-radar-volume-v1.js?v=secondary-coverage-fix-20261016-v1";
 
@@ -357,7 +357,13 @@ let visualMotionGeneration=0;
 const motionTransition={cancel(){visualMotionGeneration++;}};
 const radarImageryHandover = createRadarImageryHandover({
   imageryLayers: viewer.imageryLayers, scene,
-  retireLayer:deferredImageryRetirement?.retire
+  retireLayer:deferredImageryRetirement?.retire,
+  // Six measured frames reuse their already rendered native-resolution GPU
+  // images on desktop. Evicting after only three layers forced expensive
+  // texture teardown and re-upload on EVERY six-frame playback cycle.
+  // Mobile retains its established three-layer memory ceiling. Longer loops
+  // remain bounded; the genuine source PNGs and UTCs are never modified.
+  maxRetainedLayers:window.matchMedia?.("(max-width:700px)").matches?2:5
 });
 let additionalRadarSiteIds=[];
 let previousPrimaryRadarId=null;
@@ -927,6 +933,7 @@ const playback = createContinuousPlayback({
   currentIndex: () => isNativeDopplerPlayback() ? independentDopplerIndexValue : hybridFrameIndex,
   showFrame: index => isNativeDopplerPlayback() ? showDopplerOnlyFrame(index) : showHybridFrame(index),
   delay: () => effectivePlaybackDelayMs(),
+  continueOnFailedCycle: true,
   onPlayingChange: playing => {
     $("hybridPlayButton").textContent = playing ? "Pause" : "Play";
     $("hybridPlayButton").setAttribute("aria-pressed", String(playing));
@@ -1730,9 +1737,20 @@ async function prepareRadarSurfaceProvider(frame) {
     const rectangle=Cesium.Rectangle.fromDegrees(
       sw.longitude,sw.latitude,ne.longitude,ne.latitude
     );
-    return Cesium.SingleTileImageryProvider.fromUrl(
-      canvas.toDataURL("image/png"),{rectangle}
-    );
+    // Compress the original-resolution lossless PNG off the main thread.
+    // The synchronous data-URL encoder can otherwise block radar playback
+    // and Cesium rendering when the canvas covers a large radar footprint.
+    // fromUrl resolves after the image loads; its provider retains the image.
+    const pngUrl=await new Promise((resolve,reject)=>{
+      canvas.toBlob(blob=>blob
+        ? resolve(URL.createObjectURL(blob))
+        : reject(new Error("Unable to encode radar surface PNG.")), "image/png");
+    });
+    try {
+      return await Cesium.SingleTileImageryProvider.fromUrl(pngUrl,{rectangle});
+    } finally {
+      URL.revokeObjectURL(pngUrl);
+    }
   })();
   // Motion previews are one-use frames. Measured and normal gap-fill frames
   // are stable and safe to cache for the current source loop.
@@ -1764,6 +1782,10 @@ async function renderSurface(frame,renderToken=null,{timeoutMs=2200,onBeforeReve
       // prepareRadarSurfaceProvider only returns after source image decode.
       // Global terrain/basemap tile requests must not stall this handover.
       decodedSingleTile: true,
+      // Cache only genuine measured BoM observations. The existing
+      // display-only temporal/motion intermediates are never retained as
+      // measured scans or silently promoted to the GPU source cache.
+      cacheEligible: !frame?.sourceMetadata?.temporalInference,
       beforeReveal:onBeforeReveal,
       isCurrent: () => renderToken == null ||
         renderToken === hybridSceneRenderToken
@@ -4056,11 +4078,21 @@ async function showHybridFrame(index) {
     // Synchronously create/show the measured-frame inference and tracks
     // BEFORE the newly decoded 2-D BoM surface becomes visible. Cesium then
     // renders both together, never offset by a source observation.
+    // An automatic genuine-scan append/backfill may replace hybridFrames
+    // while this render is waiting on Cesium. Resolve by immutable BoM UTC,
+    // never by an array index captured BEFORE the live window was shifted.
+    // Combined radar/Doppler schedules may intentionally reuse one rain UTC;
+    // keep their established step index and atomic synchronisation untouched.
+    const liveMeasuredIndex=hybridCombinedSchedule.length
+      ? requestedIndex
+      : hybridFrames.findIndex(item=>item.observedUtc===frame.observedUtc);
+    if(liveMeasuredIndex<0)
+      throw Error("Radar observation retired before its measured image handover");
     renderInferredVolume(frame);
-    updateTrackDisplayControls(requestedIndex);
-    applyHybridVolumeMode(requestedIndex);
-    renderHybridTracks(requestedIndex);
-    syncSevereStormAlerts(requestedIndex);
+    updateTrackDisplayControls(liveMeasuredIndex);
+    applyHybridVolumeMode(liveMeasuredIndex);
+    renderHybridTracks(liveMeasuredIndex);
+    syncSevereStormAlerts(liveMeasuredIndex);
     if(supplementalMeasurable){
       if(supplementalAnchor.held &&
          supplementalRadarDisplay.targetTime!==supplementalAnchor.observedUtc){
@@ -4084,7 +4116,11 @@ async function showHybridFrame(index) {
   };
   try {
     surfaceApplied=windOnlyStep ? true : await renderSurface(frame,renderToken,{
-      timeoutMs:playback.isPlaying() ? 1100 : 2200,
+      // This source tile is already decoded. Slow Cesium/WebKit postRender
+      // boundaries need a finite render budget, not a 1.1-second refusal.
+      // Handover still requires the existing three render boundaries and
+      // atomically reveals the unchanged BoM pixels with matching 3-D.
+      timeoutMs:10000,
       onBeforeReveal:commitMeasuredGeometry
     });
   } catch(error) {
@@ -4113,7 +4149,14 @@ async function showHybridFrame(index) {
   }
   // All requested imagery is now staged/committed. The UI cursor and source
   // clocks finally advance together, never at the beginning of a render.
-  hybridFrameIndex=requestedIndex;
+  const liveDisplayedIndex=hybridCombinedSchedule.length
+    ? requestedIndex
+    : hybridFrames.findIndex(item=>item.observedUtc===frame.observedUtc);
+  if(liveDisplayedIndex<0){
+    setStatus("Radar frame retired during playback; advancing on the verified current timeline.", "warning");
+    return false;
+  }
+  hybridFrameIndex=liveDisplayedIndex;
   latestFrame=frame;
   // Supplemental image+volume reveal already happened synchronously inside
   // primary beforeReveal; never run a second asynchronous show/hide here.
@@ -4216,49 +4259,33 @@ async function warmRadarHistoryCache(
     resolve => setTimeout(resolve, 1500)
   );
 
-  const candidates =
-    normaliseRadarHistoryTimes(
-      observedTimes
-    );
-
+  // Archive at most two additional genuine scans per manual load. Warming
+  // the entire 180-minute state eagerly competes with the selected live loop
+  // and retains unnecessary large decoded mosaics in browser memory.
+  const candidates = normaliseRadarHistoryTimes(observedTimes).reverse();
+  const MAX_BACKGROUND_HISTORY_ATTEMPTS = 2;
+  let attempted = 0;
   let warmedCount = 0;
   const pressureGuardActive =
     LABEL_GPU_QA || window.location.pathname.includes("/preview/network-guard/");
 
   for (const observedUtc of candidates) {
-    if (
-      selectedRadarRegion() !== region
-      || sequenceLoading
-    ) {
-      return;
-    }
-
-    if (radarFrameCache.has(observedUtc)) {
-      continue;
-    }
+    if (selectedRadarRegion() !== region || sequenceLoading) return;
+    if (radarFrameCache.has(observedUtc) ||
+        hybridFrames.some(frame=>frame.observedUtc===observedUtc)) continue;
+    if(attempted>=MAX_BACKGROUND_HISTORY_ATTEMPTS)break;
+    attempted++;
 
     try {
-      const frame =
-        await loadBomReflectivityMosaicAtTime(
-          observedUtc,
-          region,
-          candidates
-        );
-
-      // An old region's request may finish AFTER the user switches sites.
-      // Its pixels must never enter the new primary's timestamp-keyed cache.
+      const frame=await loadBomReflectivityMosaicAtTime(
+        observedUtc,region,candidates
+      );
+      // A late request for a previous site must not contaminate the current
+      // site's archive. Persist genuine history, but do not fill the live
+      // decoded-mosaic RAM cache with frames outside its active playback loop.
       if(selectedRadarRegion() !== region || sequenceLoading ||
-          frame?.sourceMetadata?.region !== region) return;
-      radarFrameCache.set(
-        observedUtc,
-        frame
-      );
-
-      await putRadarFrame(
-        region,
-        frame
-      );
-
+         frame?.sourceMetadata?.region !== region)return;
+      await putRadarFrame(region,frame);
       warmedCount++;
     } catch (error) {
       // A single 403/429/502/503 means background warming is now competing
@@ -4481,6 +4508,12 @@ async function loadHybridSequence(automatic = false) {
             ? discoverBoundedBomReflectivityHistory(now,180,region)
             : discoverBomReflectivityHistory(now,180,region));
 
+  // Load only a small, site-specific verified archive slice on routine
+  // five-minute checks. Manual long-loop requests may read their own wider
+  // genuine window, but never every radar site's large decoded frames.
+  const selectedMinutes=Number(selectedLoopMinutes());
+  const cacheFrameBudget=automatic?9:Math.min(48,Math.max(9,
+    Number.isFinite(selectedMinutes)?Math.ceil(selectedMinutes/5)+6:42));
   // Startup metadata failure must not throw away authentic frames already
   // saved in this browser. Do not invent earlier tiles or backdate a newer
   // scan. Automatic poll failures leave the existing live loop untouched.
@@ -4488,7 +4521,7 @@ async function loadHybridSequence(automatic = false) {
     BOUNDED_RADAR_RECOVERY_QA
       ? sourceDiscovery.then(times=>({times}),error=>({error}))
       : sourceDiscovery.then(times=>({times})),
-    getRadarFrames(region, cacheCutoff).catch(error => {
+    getRadarFrames(region, cacheCutoff, cacheFrameBudget).catch(error => {
       console.warn("Persistent radar history cache unavailable", error);
       return [];
     })
@@ -4747,18 +4780,54 @@ async function loadHybridSequence(automatic = false) {
     frames.push(radarLoad.value);
     states.push(availability.state);
   }
-  if (!frames.length || (automatic && !isCombined && frames.at(-1).observedUtc !== availableEndUtc)) {
-    throw new Error(newestFailure || "Newest matching images could not be loaded; keeping the current loop and retrying automatically.");
+  if (!frames.length) {
+    // No genuine observations survived: leave the previous loop untouched.
+    // The scheduler retries without promoting an empty or synthetic frame.
+    throw new Error(newestFailure ||
+      "No verified BoM radar images could be loaded; keeping the current loop and retrying automatically.");
   }
+  if(automatic && !isCombined && hybridFrames.length &&
+     Date.parse(frames.at(-1).observedUtc) <
+       Date.parse(hybridFrames.at(-1).observedUtc)){
+    // Never replace a currently playing newer observation with an older
+    // one if the source now refuses the latest tile.
+    throw new Error(newestFailure ||
+      "BoM source returned only older imagery; retaining newer verified loop.");
+  }
+  // A refused NEWEST scan must not discard other newly verified scans.
+  // Commit the available real window and let the existing one-minute
+  // source-recovery timer retry the missing UTC while playback continues.
   // Reuse observations across normal forward refreshes so the worker sees each
   // scan once and retains storm IDs/history. Manual backfill and detected
   // browser-cache backfill rebuild chronologically before continuing forward.
-  const rebuild =
-    trackedThrough == null
-    || needsHistoricalRebuild
-    || frames.some(frame =>
-      !radarResultCache.has(frame.observedUtc)
-      && Date.parse(frame.observedUtc) <= Date.parse(trackedThrough));
+  // Discovery may advertise a missing older UTC whose WMTS pixels are
+  // still unavailable. Do not reset the worker merely for that hint:
+  // chronological replay is necessary only after a REAL older frame loads.
+  const recoveredHistoricalObservation =
+    needsChronologicalRadarRebuild(
+      frames.map(frame => frame.observedUtc),
+      trackedThrough,
+      radarResultCache.keys()
+    );
+  const rebuild = trackedThrough == null || recoveredHistoricalObservation;
+  if(automatic && !isCombined && hybridFrames.length &&
+     loadedLoopSelection === loopSelection && !rebuild &&
+     frames.at(-1).observedUtc === hybridFrames.at(-1).observedUtc &&
+     frames.every(frame => hybridFrames.some(
+       displayed => displayed.observedUtc === frame.observedUtc))) {
+    // No new genuine frame was accepted. Keep the measured display, tracks,
+    // player and Cesium layers entirely untouched, and let the existing
+    // scheduler retry any refused older UTC after its source cooldown.
+    const skipped=summariseSkippedObservedFrames(failureDiagnostics);
+    recordRadarAutoRefreshAudit({
+      acceptedUtc:hybridFrames.at(-1).observedUtc,
+      failure:skipped.detail||null,
+      outcome:skipped.summary
+        ? "updated; some genuine source frames unavailable"
+        : "waiting for new published scan"
+    });
+    return;
+  }
   if (rebuild) {
     await hybridWorker.reset();
     radarResultCache.clear();
@@ -4883,7 +4952,7 @@ async function loadHybridSequence(automatic = false) {
   // This exact measured-frame window can be shifted in place when its retained
   // observations are unchanged. Historical backfill, temporal-inference edits
   // and selection changes retain the original chronological rebuild path.
-  const incrementalCommit = automatic && !isCombined && !needsHistoricalRebuild &&
+  const incrementalCommit = automatic && !isCombined && !rebuild &&
     loadedLoopSelection === loopSelection &&
     planIncrementalRadarWindow(hybridFrames,displayFrames);
   const oldTime = hybridFrames[hybridFrameIndex]?.observedUtc;
@@ -4892,10 +4961,21 @@ async function loadHybridSequence(automatic = false) {
   const wasFollowingLatest = automatic && !isCombined &&
     !playback.isPlaying() && hybridFrames.length > 0 &&
     hybridFrameIndex === hybridFrames.length - 1;
-  const resume = automatic ? playback.isPlaying() : true;
-  // On an ordinary new scan the live player owns its existing timer.
-  // Do not pause it, reset its worker, or recreate old track volumes.
-  if(!incrementalCommit){
+  // If startup/site-switch failed completely, the next successful recovery
+  // with genuine frames must be able to restart the playback automatically.
+  const resume = automatic ? (playback.isPlaying() || hybridFrames.length === 0) : true;
+  // Historical backfill can insert an older genuine observation into a live
+  // loop. When the currently displayed UTC survives, remap its index without
+  // stopping the playback worker or interrupting its in-flight render.
+  // Selection changes and incompatible timelines retain the guarded
+  // pause/rebuild path. The actual measured frames/tracks are still rebuilt.
+  const noninterruptingBackfill = automatic && !incrementalCommit &&
+    !isCombined && loadedLoopSelection === loopSelection &&
+    playback.isPlaying() && Boolean(oldTime) &&
+    displayFrames.some(frame=>frame.observedUtc===oldTime);
+  // On an ordinary new scan or compatible historical backfill the live
+  // player owns its existing timer.
+  if(!incrementalCommit && !noninterruptingBackfill){
     $("hybridFrameSlider").disabled = true;
     $("hybridPlayButton").disabled = true;
     await playback.pause();
@@ -5029,9 +5109,14 @@ async function loadHybridSequence(automatic = false) {
     hybridFrameIndex
   );
   $("hybridPlayButton").disabled = hybridFrames.length < 2;
+  // Historical backfill has changed the COUNT, not the currently visible
+  // BoM pixels. Rebase that displayed UTC's slider label to the new length
+  // without waiting for a second Cesium draw or faking a rendered scan.
+  if(noninterruptingBackfill && latestFrame?.observedUtc===oldTime)
+    $("hybridFrameLabel").textContent=`${hybridFrameIndex+1}/${hybridFrames.length}`;
   // Never cause a second render over the active player's own in-flight render.
   // A paused Latest operator still sees the just-accepted newest observation.
-  if(!incrementalCommit || !playback.isPlaying())
+  if((!incrementalCommit && !noninterruptingBackfill) || !playback.isPlaying())
     await showHybridFrame(hybridFrameIndex);
   radarLifecycle.sampleMemory({
     region,latestUtc:frames.at(-1).observedUtc,
@@ -5047,7 +5132,7 @@ async function loadHybridSequence(automatic = false) {
           incrementalCommit.dropped + " retired"
         : automatic ? "updated by chronological rebuild" : "manual load complete"
   });
-  if(resume && !incrementalCommit)playback.play();
+  if(resume && !incrementalCommit && !noninterruptingBackfill)playback.play();
   // Bound decoded imagery and per-frame results while retaining worker tracks.
   // Playback references remain in hybridFrames and hybridResults. The extra
   // archive cache can release old decoded source data beyond that window.
@@ -5104,7 +5189,22 @@ async function runSourceLoad(loader, background = false) {
   }
   try {
     await loader();
-    if(manualRadarRecoveryTimer!==null){
+    // A partial but usable loop is not a completed source check. Keep the
+    // genuine images on screen, but arrange a bounded follow-up for the
+    // missing published UTCs without disturbing the five-minute poll.
+    if(radarAutoRefreshAudit.lastOutcome ===
+        "updated; some genuine source frames unavailable"){
+      if(background)throw new Error(
+        "Incomplete BoM radar history; retrying missing genuine observations: "+
+        (radarAutoRefreshAudit.lastFailure||"source tile unavailable"));
+      if(manualRadarRecoveryTimer!==null)clearTimeout(manualRadarRecoveryTimer);
+      manualRadarRecoveryTimer=setTimeout(()=>{
+        manualRadarRecoveryTimer=null;
+        if(!document.hidden)void autoRefresh.check();
+      },60000);
+      $("autoRefreshNote").textContent =
+        "BoM radar frames incomplete; retrying missing genuine observations automatically.";
+    }else if(manualRadarRecoveryTimer!==null){
       clearTimeout(manualRadarRecoveryTimer);
       manualRadarRecoveryTimer=null;
     }

@@ -81,7 +81,8 @@ globalThis.fetch=async()=>{
  return {ok:true,status:200,blob:async()=>new Blob(["real-source-bytes"],{type:"image/png"})};
 };
 // Import only AFTER installing our mock browser globals.
-const {fetchReadableImage,networkPressureDiagnostics}=await import("../src/radar-source.js?qa-universal-guard");
+const {fetchReadableImage,networkPressureDiagnostics,officialWmtsFallbackUrl}
+ =await import("../src/radar-source.js?qa-universal-guard");
 const urls=Array.from({length:12},(_,i)=>
  "https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev/wmts?"+
  "SERVICE=WMTS&REQUEST=GetTile&TILECOL="+i+"&TILEROW=14&time=2026-11-01T04:45:00Z");
@@ -95,6 +96,50 @@ assert.equal(globalThis.__stormtrackerRelayPressureDiagnostics?.().peakActive,2)
 const cached=await Promise.all(urls.map(fetchReadableImage));
 assert.equal(cached.length,12);
 assert.equal(actualRequests,12,"Genuine PNG cache missed same-source-timestamp URLs");
+// Authentic-source failover: relay 403, native BoM 200 for exactly the
+// same reflectivity layer, tile coordinates and original observed UTC.
+const relayDenied="https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev/wmts?"+
+ "SERVICE=WMTS&REQUEST=GetTile&LAYER=atm_surf_air_precip_reflectivity_dbz"+
+ "&TILECOL=33&TILEROW=16&time=2026-11-03T06%3A20%3A00Z";
+const officialUrl=officialWmtsFallbackUrl(relayDenied);
+assert(officialUrl?.startsWith("https://api.bom.gov.au/apikey/v1/mapping/timeseries/wmts?"));
+assert.equal(new URL(officialUrl).search,new URL(relayDenied).search,
+  "Recovered tile must use IDENTICAL UTC, coordinates, layer and source request");
+assert.equal(officialWmtsFallbackUrl("https://untrusted.invalid/wmts?time=2026"),null);
+let relay403=0,native200=0;
+globalThis.fetch=async target=>{
+ const url=String(target);
+ if(url===relayDenied){relay403++;return {ok:false,status:403};}
+ if(url===officialUrl){
+  native200++;
+  return {ok:true,status:200,
+   blob:async()=>new Blob(["original-boM-png"],{type:"image/png"})};
+ }
+ throw Error("Unexpected WMTS source URL "+url);
+};
+const restored=await fetchReadableImage(relayDenied);
+assert.equal(restored.width,256);
+assert.equal(relay403,1);
+assert.equal(native200,1);
+await fetchReadableImage(relayDenied);
+assert.equal(relay403,1,"Verified original-source PNG remains cached by exact UTC URL");
+assert.equal(native200,1,"Never refetch an already verified source tile");
+const stillDenied=relayDenied.replace("TILECOL=33","TILECOL=34");
+let nativeRefusals=0;
+globalThis.fetch=async target=>{
+ if(String(target)===stillDenied)return {ok:false,status:403};
+ if(String(target)===officialWmtsFallbackUrl(stillDenied)){
+  nativeRefusals++;return {ok:false,status:403};
+ }
+ throw Error("Unexpected source URL");
+};
+await assert.rejects(()=>fetchReadableImage(stillDenied),/HTTP 403/);
+assert.equal(nativeRefusals,1,"At most one exact native fallback after relay refusal");
+await assert.rejects(()=>fetchReadableImage(stillDenied),/source refusal cooldown/);
+assert.equal(nativeRefusals,1,"The ordinary 403 cooldown prevents retry storms");
+console.log("PASS_EXACT_BOM_403_NATIVE_ORIGINAL_SOURCE_RECOVERY",JSON.stringify({
+ relay403,native200,sourceUtcUnchanged:true,refusalRetained:true
+}));
 console.log("PASS_GLOBAL_RADAR_WMTS_GUARD_AND_PREFLIGHT_RECOVERY",JSON.stringify({
  previewRoute:globalThis.location.pathname,peak,requests:actualRequests,
  verifiedTileBlobs:networkPressureDiagnostics().verifiedTileBlobs

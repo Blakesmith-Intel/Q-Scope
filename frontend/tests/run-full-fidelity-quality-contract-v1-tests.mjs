@@ -24,7 +24,10 @@ for(const invariant of [
  /for\(let p=0,j=0;p<categories\.length;p\+\+,j\+=4\)/,
  /reprojectWebMercatorRgbaToGeographic\(frame,rgba\)/,
  /output\.data\.set\(projected\)/,
- /canvas\.toDataURL\("image\/png"\)/
+ /canvas\.toBlob\(blob=>blob/,
+ /"image\/png"/,
+ /SingleTileImageryProvider\.fromUrl\(pngUrl,\{rectangle\}\)/,
+ /URL\.revokeObjectURL\(pngUrl\)/
 ])assert.match(raster,invariant,"Original BoM native-grid raster must remain intact");
 assert.doesNotMatch(raster,/canvas\.(?:width|height)\s*=\s*(?:Math\.floor|Math\.ceil|Math\.round)\(/,
   "Never downsize the measured raster for performance");

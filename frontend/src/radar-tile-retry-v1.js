@@ -12,38 +12,48 @@ export async function loadCompleteRadarTiles(tasks, fetchTile, {
   const results = new Array(tasks.length);
   let pending = tasks.map((task, i) => ({ task, i }));
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const loaded = await Promise.allSettled(
-      pending.map(({ task }) => fetchTile(task.url))
-    );
     const failures = [];
-    loaded.forEach((record, i) => {
-      const { task, i: index } = pending[i];
-      if (record.status === "fulfilled" &&
-          record.value?.width > 0 && record.value?.height > 0) {
-        results[index] = { ...task, image: record.value };
-      } else {
-        failures.push({
-          task,
-          i: index,
-          error: record.status === "rejected"
-            ? record.reason?.message ?? String(record.reason)
-            : "empty radar tile"
-        });
-      }
-    });
+    // A source-denied mosaic cannot be used. With the production permanent-
+    // refusal guard enabled, stop requesting further tiles after the first
+    // refused pair rather than draining the remaining WMTS queue pointlessly.
+    // Two at a time matches the existing global two-request pressure limit.
+    const batchSize = stopOnPermanent ? 2 : pending.length;
+    let permanent = false;
+    for (let offset = 0; offset < pending.length; offset += batchSize) {
+      const batch = pending.slice(offset, offset + batchSize);
+      const loaded = await Promise.allSettled(
+        batch.map(({ task }) => fetchTile(task.url))
+      );
+      loaded.forEach((record, i) => {
+        const { task, i: index } = batch[i];
+        if (record.status === "fulfilled" &&
+            record.value?.width > 0 && record.value?.height > 0) {
+          results[index] = { ...task, image: record.value };
+        } else {
+          failures.push({
+            task,
+            i: index,
+            error: record.status === "rejected"
+              ? record.reason?.message ?? String(record.reason)
+              : "empty radar tile"
+          });
+        }
+      });
+      // A 400 means BoM rejected the UTC/tile; 403/429 means access denied.
+      // Neither can be repaired by fetching more tiles for this SAME frame.
+      permanent = stopOnPermanent && failures.some(({error}) =>
+        /(?:HTTP\s+(?:400|403|429)\b|relay cooldown|queue full)/i.test(error));
+      if (permanent) break;
+    }
     if (!failures.length) return results;
-    // HTTP 400 is a permanently unavailable source tile for that exact
-    // timestamp, and HTTP 403 is a refusal; retrying the same URL immediately
-    // cannot make a complete, authentic BoM frame and may amplify a relay ban.
-    const permanent = stopOnPermanent && failures.some(({error}) =>
-      /(?:HTTP\s+(?:400|403|429)\b|relay cooldown|queue full)/i.test(error));
     if (attempt === retries || permanent) {
       const details = failures.slice(0, 6).map(({ task, error }) =>
         "tile " + task.col + "/" + task.row + ": " + error
       ).join("; ");
       throw new Error("Incomplete BoM reflectivity mosaic: " +
         failures.length + "/" + tasks.length + " tiles unavailable after " +
-        (attempt + 1) + " attempt(s); " + details);
+        (attempt + 1) + " attempt(s); " + details +
+        (permanent ? "; remaining tiles not requested after source refusal" : ""));
     }
     pending = failures.map(({ task, i }) => ({ task, i }));
     await wait(250);

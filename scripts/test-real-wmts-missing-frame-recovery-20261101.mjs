@@ -21,9 +21,53 @@ const page=await browser.newPage(isDesktop
  ? {viewport:{width:1440,height:900},deviceScaleFactor:1,isMobile:false,hasTouch:false}
  : {viewport:{width:390,height:780},deviceScaleFactor:2,isMobile:true,hasTouch:true});
 page.setDefaultTimeout(180000);
+// QA-only playback transition trace: the source-verified 5->6 backfill is
+// currently successful, but WebKit sometimes exits Play unexpectedly.
+// Capture the ACTUAL call stack changing the button, not a guessed cause.
+// No modification to the packaged radar code or production behaviour.
+await page.addInitScript(()=>{
+  window.__qaPlaybackTransitions=[];
+  // Browser-only evidence: identify where a genuine recovered frame stalls,
+  // without changing any BoM pixels, radar science or production application.
+  window.__qaRadarStages=[];
+  window.__qaRadarStage=(stage,details={})=>{
+    window.__qaRadarStages.push({at:Math.round(performance.now()),stage,...details});
+    if(window.__qaRadarStages.length>100)window.__qaRadarStages.shift();
+  };
+  const descriptor=Object.getOwnPropertyDescriptor(Node.prototype,"textContent");
+  if(!descriptor?.set || !descriptor?.get)return;
+  Object.defineProperty(Node.prototype,"textContent",{
+    configurable:true,enumerable:descriptor.enumerable,
+    get(){return descriptor.get.call(this);},
+    set(value){
+      if(this?.id==="hybridPlayButton"){
+        window.__qaPlaybackTransitions.push({
+          time:Date.now(),value:String(value),
+          stack:(new Error("playback state transition")).stack?.slice(0,1700)
+        });
+        if(window.__qaPlaybackTransitions.length>20)
+          window.__qaPlaybackTransitions.shift();
+      }
+      return descriptor.set.call(this,value);
+    }
+  });
+});
 let phase="initial",heldBackUtc=null,metadataRequests=0;
 let authenticCapabilitySnapshot=null;
-const navigations=[],errors=[];
+const navigations=[],errors=[],requestFailures=[],consoleErrors=[],httpFailures=[];
+page.on("requestfailed",request=>{
+  if(requestFailures.length<24)requestFailures.push({
+    url:request.url().slice(0,240),reason:request.failure()?.errorText??"unknown"
+  });
+});
+page.on("response",response=>{
+  if(response.status()>=400 && httpFailures.length<24)
+    httpFailures.push({url:response.url().slice(0,240),status:response.status()});
+});
+page.on("console",message=>{
+  if(message.type()==="error" && consoleErrors.length<24)
+    consoleErrors.push(message.text().slice(0,450));
+});
 page.on("framenavigated",frame=>navigations.push(frame.url()));
 page.on("pageerror",error=>errors.push(String(error)));
 await page.route("https://blakesmith-intel.github.io/StormTracker/**",async route=>{
@@ -31,7 +75,33 @@ await page.route("https://blakesmith-intel.github.io/StormTracker/**",async rout
  const local="http://127.0.0.1:8137"+uri.pathname.replace("/StormTracker","")+uri.search;
  try{
   const res=await fetch(local);
-  await route.fulfill({status:res.status,body:Buffer.from(await res.arrayBuffer()),
+  let body=Buffer.from(await res.arrayBuffer());
+  if(uri.pathname.endsWith("/src/live3d-operational-v9.js")){
+    let code=body.toString("utf8");
+    const add=(needle,replacement)=>{
+      assert.equal(code.split(needle).length,2,
+        "QA-only missing-frame rendering probe drift: "+needle.slice(0,80));
+      code=code.replace(needle,replacement);
+    };
+    add('async function showHybridFrame(index) {',
+      'async function showHybridFrame(index) {\n  window.__qaRadarStage?.("present-start",{index});');
+    add('  const frame=hybridFrames[requestedIndex];',
+      '  const frame=hybridFrames[requestedIndex];\n  window.__qaRadarStage?.("present-frame",{utc:frame?.observedUtc,index:requestedIndex});');
+    add('  await extraPreparation;',
+      '  window.__qaRadarStage?.("supplemental-await");\n  await extraPreparation;\n  window.__qaRadarStage?.("supplemental-ready");');
+    add('  const provider=await prepareRadarSurfaceProvider(frame);',
+      '  window.__qaRadarStage?.("provider-await",{utc:frame?.observedUtc});\n  const provider=await prepareRadarSurfaceProvider(frame);\n  window.__qaRadarStage?.("provider-ready",{utc:frame?.observedUtc});');
+    add('  const committed = await radarImageryHandover.replace(',
+      '  window.__qaRadarStage?.("cesium-handover-await",{utc:frame?.observedUtc});\n  const committed = await radarImageryHandover.replace(');
+    add('  if (!committed) return false;',
+      '  window.__qaRadarStage?.("cesium-handover-result",{committed});\n  if (!committed) return false;');
+    add('    renderInferredVolume(frame);',
+      '    window.__qaRadarStage?.("geometry-begin");\n    renderInferredVolume(frame);\n    window.__qaRadarStage?.("geometry-done");');
+    add('  syncFrameSlider($("hybridFrameSlider"),hybridFrames.length,hybridFrameIndex);',
+      '  window.__qaRadarStage?.("playback-label-commit",{count:hybridFrames.length});\n  syncFrameSlider($("hybridFrameSlider"),hybridFrames.length,hybridFrameIndex);');
+    body=Buffer.from(code,"utf8");
+  }
+  await route.fulfill({status:res.status,body,
    contentType:res.headers.get("content-type")||"application/octet-stream"});
  }catch{await route.abort("failed");}
 });
@@ -76,7 +146,9 @@ async function snapshot(){
   diagnostics:window.__stormtrackerRadarDiagnostics?.(),
   canvases:document.querySelectorAll("#cesiumContainer canvas").length,
   qaHook:typeof window.__stormtrackerRadarQaCheck,
-  status:document.querySelector("#status")?.textContent?.trim()
+  status:document.querySelector("#status")?.textContent?.trim(),
+  playbackTransitions:window.__qaPlaybackTransitions?.slice(-12),
+  renderStages:window.__qaRadarStages?.slice(-80)
  }));
 }
 try{
@@ -135,6 +207,20 @@ try{
  assert.equal(navigations.length,1,"Unexpected navigation");
  assert(metadataRequests>=2,"New genuine metadata was not fetched");
  assert.equal(after.label.split("/")[1],"6");
+ // Completion of a source backfill is not the same as a healthy playback
+ // loop. Prove the actual displayed index advances without operator input,
+ // page restart, inferred replacement pixels or playback timer reset.
+ await page.waitForFunction(previous=>{
+  const displayed=document.querySelector("#hybridFrameLabel")?.textContent?.trim();
+  return document.querySelector("#hybridPlayButton")?.textContent?.trim()==="Pause" &&
+    String(displayed??"").includes("/6") && displayed!==previous;
+ },after.label,{timeout:90000,polling:250});
+ const progressed=await snapshot();
+ assert.equal(progressed.button,"Pause","Visible frame advanced but playback stopped");
+ console.log("REAL_SOURCE_VISIBLE_BACKFILL_PLAYBACK_PASS",JSON.stringify({
+  platform:isDesktop?"desktop Chromium":"mobile WebKit",
+  previousFrame:after.label,displayedFrame:progressed.label
+ }));
  console.log("REAL_SOURCE_MISSING_FRAME_RECOVERY_PASS",JSON.stringify({platform:isDesktop?"desktop Chromium":"mobile WebKit",
   beforeUtc:before.diagnostics.automatic.newestAcceptedUtc,
   afterUtc:after.diagnostics.automatic.newestAcceptedUtc,heldBackUtc,
@@ -144,7 +230,16 @@ try{
 }catch(error){
  console.log("REAL_SOURCE_MISSING_FRAME_RECOVERY_FAIL",
   JSON.stringify({platform:isDesktop?"desktop Chromium":"mobile WebKit",error:String(error),heldBackUtc,phase,metadataRequests,
-   navigations,errors:errors.slice(-8),state:await snapshot().catch(()=>null)}));
+   navigations,errors:errors.slice(-8),requestFailures,
+   httpFailures,consoleErrors,
+   startup:await page.evaluate(()=>({
+     readyState:document.readyState,
+     cesium:typeof window.Cesium,
+     scripts:[...document.scripts].slice(-4).map(script=>({
+       src:script.src.slice(0,220),type:script.type
+     }))
+   })).catch(()=>null),
+   state:await snapshot().catch(()=>null)}));
  await page.screenshot({path:isDesktop?"/tmp/radar-desktop-missing-frame-failure.png":"/tmp/radar-mobile-missing-frame-failure.png"}).catch(()=>{});
  throw error;
 }finally{await browser.close();}
