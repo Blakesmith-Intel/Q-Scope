@@ -61,6 +61,13 @@ assert document.count(old_button)==1 and document.count(ending)==1
 assert 'id="roadTypeReport"' not in document
 document=document.replace(old_button,old_button+"\n    "+button,1)
 document=document.replace(ending,fragment+ending,1)
+# Ship the new provider reporting button into the REAL pinned Pages HTML,
+# not only the mutable frontend template. All other controls remain pinned.
+provider_button='<button id="outageByProviderReport" type="button" aria-pressed="false">Report by provider</button>'
+refresh_button='<button id="refreshPowerOutageExplorer" type="button">Refresh</button>'
+assert source_page.count(provider_button)==1
+assert document.count(provider_button)==0 and document.count(refresh_button)==1
+document=document.replace(refresh_button,provider_button+"\\n    "+refresh_button,1)
 road_page.write_text(document,encoding="utf-8")
 
 # Opt-in official warning UI: append ONLY new controls, popup and compact styles
@@ -232,6 +239,8 @@ version_once("src/context-layers/power-outages-operational-v1.js",
     "power-outages-v1.js?v=background-incident-refresh-20261017-v1")
 version_once("src/context-layers/power-outages-operational-v1.js",
     "power-outage-suburb-explorer-v1.js?v=council-customers-20261017-v1")
+version_once("src/context-layers/power-outage-suburb-explorer-v1.js",
+    "power-outages-v1.js?v=20261104-qld-provider-count-reconciliation-v1")
 version_once("src/context-layers/power-outage-suburb-explorer-v1.js",
     "outage-lga-spatial-v2.js?v=outage-geometry-lga-20261020-v1")
 # Invalidate ONLY the published flood-gauge module import chain after the
@@ -649,6 +658,9 @@ node --check _site/src/context-layers/river-gauge-observations-v1.js
 node --check _site/src/context-layers/bom-recent-river-history-v1.js
 node --check _site/src/context-layers/power-outages-v1.js
 node --check _site/src/context-layers/power-outages-operational-v1.js
+grep -Fq 'id="outageByProviderReport"' _site/live3d-operational-v9.html
+grep -Fq 'powerOutageProviderCounts' _site/src/context-layers/power-outages-v1.js
+grep -Fq 'renderProviderReport' _site/src/context-layers/power-outage-suburb-explorer-v1.js
 
 # Identical recipe to the previously accepted QA preview:
 # main frontend supplies path-activated rescue guards, accepted SHA
