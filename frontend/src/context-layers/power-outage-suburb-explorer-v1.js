@@ -79,6 +79,7 @@ export function createPowerOutageSuburbExplorer({
   let openKeys=new Set(),visibleLimit=60,hasSnapshot=false;
   let loading=false,disposed=false;
   let providerView=false;
+  dialog.dataset.reportView="lga";
   // Suburb name is a direct route to its published outage geometry.
   // The disclosure arrow/count remain for expanding the incident table.
   function focusPublishedOutages(items){
@@ -140,7 +141,7 @@ export function createPowerOutageSuburbExplorer({
       number(report.total.customers)+" customers affected"+
       (report.partial?" · PARTIAL source data":"")+
       (stamp>0?" · checked "+formatIncidentRefreshTime(stamp):"");
-    const table=create("table","outage-suburb-table outage-provider-table");
+    const table=create("table","outage-provider-table");
     const thead=create("thead"),heading=create("tr");
     for(const column of ["Provider","Outages","Customers affected","Feed"]){
       const th=create("th","",column);th.scope="col";heading.append(th);
@@ -158,16 +159,16 @@ export function createPowerOutageSuburbExplorer({
       }
       const present=item.state!=="unavailable";
       tr.append(provider,
-        create("td","outage-suburb-count",present?number(item.outages):"—"),
-        create("td","outage-customers",present?number(item.customers):"—"),
+        create("td","outage-provider-number",present?number(item.outages):"—"),
+        create("td","outage-provider-number",present?number(item.customers):"—"),
         create("td","",item.state==="ok"?"Current":
           item.state==="partial"?"Partial feed":"Unavailable"));
       tbody.append(tr);
     }
     const footer=create("tr");
     footer.append(create("th","","Statewide total"),
-      create("td","outage-suburb-count",number(report.total.outages)),
-      create("td","outage-customers",number(report.total.customers)),
+      create("td","outage-provider-number",number(report.total.outages)),
+      create("td","outage-provider-number",number(report.total.customers)),
       create("td","",report.partial?"Partial total":"All three feeds"));
     tbody.append(footer);table.append(tbody);results.append(table);
     results.append(create("p","outage-suburb-note",
@@ -448,6 +449,7 @@ export function createPowerOutageSuburbExplorer({
   }
   const onProviderView=()=>{
     providerView=!providerView;
+    dialog.dataset.reportView=providerView?"provider":"lga";
     byProvider.textContent=providerView?"Report by LGA":"Report by provider";
     byProvider.setAttribute("aria-pressed",String(providerView));
     search.disabled=providerView;
@@ -455,6 +457,10 @@ export function createPowerOutageSuburbExplorer({
     if(help)help.textContent=providerView?
       "One statewide total · three providers · distinct emergency incidents":
       "Unplanned outages · expand a council, then a suburb";
+    // The council lookup summary is relevant only when browsing LGAs.
+    state.textContent=providerView?(status.message||"Current unplanned outage sources"):
+      (status.message||"Current unplanned outage sources")+
+      (hasSnapshot?" · "+groups.length+" verified council areas":"");
     render();
   };
   const onOpen=()=>{
