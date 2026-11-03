@@ -9,6 +9,9 @@ on:
       - "scripts/test-bom-crisp-warning-tiles-browser-20261102.mjs"
       - "scripts/test-bom-one-object-terrain-20km-browser-20261102.mjs"
       - "scripts/build-current-site.sh"
+      - "frontend/src/power-outage-suburb-explorer-v1.css"
+      - "frontend/src/context-layers/power-outage-suburb-explorer-v1.js"
+      - "scripts/test-qld-power-provider-report-layout-browser-20261104.mjs"
       - ".github/workflows/bom-crisp-warning-pixels-v10-2-47.yml"
   workflow_dispatch:
 
@@ -74,5 +77,6 @@ jobs:
           set -euo pipefail
           python -m http.server 8137 --bind 127.0.0.1 --directory _site > /tmp/st-bom-pixel-test.log 2>&1 &
           sleep 2
+          node scripts/test-qld-power-provider-report-layout-browser-20261104.mjs
           node scripts/test-bom-crisp-warning-tiles-browser-20261102.mjs
           node scripts/test-bom-one-object-terrain-20km-browser-20261102.mjs

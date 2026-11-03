@@ -43,6 +43,7 @@ source = Path("frontend/src/context-layers")
 layers = site / "src/context-layers"
 for filename in ("significant-rainfall-source-v1.js", "significant-rainfall-operational-v1.js", "significant-rainfall-report-v1.js", "river-gauge-notable-report-v1.js", "river-crossing-state-v1.js", "agency-source-time-v1.js", "severity-marker-layer-v1.js", "bom-recent-river-history-v1.js", "river-gauge-layer-v1.js", "river-gauge-latest-v1.js", "river-flood-thresholds-v1.js", "river-flood-stages-2026-full-v1.js", "river-gauges-operational-v1.js", "river-flood-signals-v1.js", "river-gauge-coastal-screen-v1.js", "river-official-flood-persistence-v1.js", "river-flood-events-v1.js", "river-gauges-v1.js", "river-gauge-observations-v1.js", "power-outages-v1.js", "power-outages-operational-v1.js", "power-outage-suburb-explorer-v1.js", "power-outage-suburb-model-v1.js", "outage-lga-spatial-v2.js", "outage-lga-geographic-fallback-v1.js", "incident-lga-model-v1.js", "flood-road-closures-v1.js", "flood-road-closure-filter-v1.js", "road-closure-lga-explorer-v1.js", "road-ownership-report-v1.js", "bom-qld-warning-product-catalogue-v1.js", "bom-warning-cap-source-v1.js", "bom-warning-terrain-imagery-v1.js", "bom-warning-operational-v1.js"):
     copyfile(source / filename, layers / filename)
+copyfile(source.parent / "power-outage-suburb-explorer-v1.css", site / "src/power-outage-suburb-explorer-v1.css")
 # Hotfix ONLY the Doppler source transport module, not the sealed playback
 # engine, 3-D renderer, site catalogue, timeline or Doppler science.
 # Extend ONLY the existing road explorer with a separate ownership report.
@@ -143,6 +144,8 @@ version_once("index.html", "-jasper-alfred-v1")
 version_once("live3d-operational-v9.html", "-jasper-alfred-archive-v1")
 version_once("live3d-operational-v9.html",
     "single-interface-v1.css?v=jasper-alfred-20261017-qa-v1")
+version_once("live3d-operational-v9.html",
+    "power-outage-suburb-explorer-v1.css?v=council-customers-20261017-v1")
 version_once("src/live3d-operational-v9.js",
     "river-gauges-operational-v1.js?v=9.18.11-gauge-green-yellow-red-v2")
 version_once("src/live3d-operational-v9.js",
@@ -688,6 +691,9 @@ node --check _site/src/context-layers/power-outages-operational-v1.js
 grep -Fq 'id="outageByProviderReport"' _site/live3d-operational-v9.html
 grep -Fq 'powerOutageProviderCounts' _site/src/context-layers/power-outages-v1.js
 grep -Fq 'renderProviderReport' _site/src/context-layers/power-outage-suburb-explorer-v1.js
+grep -Fq '#powerOutageExplorer .outage-provider-table' _site/src/power-outage-suburb-explorer-v1.css
+grep -Fq 'outage-provider-number' _site/src/context-layers/power-outage-suburb-explorer-v1.js
+grep -Fq 'power-outage-suburb-explorer-v1.css?v=council-customers-20261017-v1' _site/live3d-operational-v9.html
 grep -Fq '20261104-power-provider-reconciliation-v1' _site/live3d-operational-v9.html
 grep -Fq '20261104-power-provider-reconciliation-v1' _site/src/live3d-operational-v9.js
 grep -Fq '20261104-power-provider-reconciliation-v1' _site/src/context-layers/power-outages-operational-v1.js

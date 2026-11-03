@@ -929,6 +929,10 @@ assert.equal(summaryByProvider.total.outages,3);
 assert.equal(summaryByProvider.total.customers,60);
 assert.deepEqual(summaryByProvider.rows.map(row=>row.outages),[1,1,1]);
 assert.deepEqual(summaryByProvider.rows.map(row=>row.customers),[10,20,30]);
+assert.ok(summaryByProvider.rows.every(row=>row.sourceNewestAtMs!==null),
+  "Each source-reported customer count must retain the official EXTRACTED time");
+assert.ok(summaryByProvider.rows.every(row=>row.sourceOldestAtMs<=row.sourceNewestAtMs),
+  "Provider source refresh times must be ordered independently from retrieval time");
 assert.equal(powerOutageProviderCounts([
   ...merged.reportFeatures,...merged.reportFeatures,
   {...merged.reportFeatures[0],id:"energex:SAME-ID",geometry:null}
