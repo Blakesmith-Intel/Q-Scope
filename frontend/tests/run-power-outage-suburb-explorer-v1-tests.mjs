@@ -77,6 +77,19 @@ assert.ok(view.includes("if(!points.length)return false;"));
 assert.ok(view.includes('13000'));
 assert.ok(view.includes('spanMetres'));
 assert.ok(css.includes("outage-row-locate"));
+assert.ok(view.includes('create("table","outage-provider-table")'),
+  "Provider table must not inherit the three-column locality table layout");
+assert.ok(view.includes('create("td","outage-provider-number"'),
+  "Numeric provider cells must never reuse circular count badges");
+assert.ok(!view.includes('create("td","outage-suburb-count"'),
+  "Circular badge class must not be attached to a table cell");
+assert.ok(css.includes('#powerOutageExplorer .outage-provider-table'),
+  "Isolated four-column CSS must exist for the report");
+assert.ok(css.includes('grid-template-columns:minmax(0,1fr) auto auto;'),
+  "Outage toolbar must fit three buttons/fields on desktop");
+assert.ok(css.includes('#powerOutageExplorer[data-report-view="provider"]'),
+  "Search must collapse when the report is grouped by provider");
+
 assert.ok(!view.includes("scene.drillPick"));
 assert.ok(!view.includes("powerOutageIdFromPick"));
 assert.match(view,/getLoadedAt\(\)/);
