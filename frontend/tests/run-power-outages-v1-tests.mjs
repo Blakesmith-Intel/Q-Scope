@@ -937,7 +937,7 @@ assert.equal(powerOutageProviderCounts([
 // Geometry is required for the MAP, but NOT to count a genuine provider
 // incident in the statewide report, provider report or pending-location list.
 const unmapped=outage({
-  eventId:"QLD-NO-GEOMETRY",customers:75,suburbs:"BUNDABERG"
+  eventId:"QLD-NO-GEOMETRY",customers:37,suburbs:"BUNDABERG"
 });
 unmapped.geometry=null;
 const unlocatedSource=await loadPowerOutages({
@@ -961,7 +961,7 @@ const unlocatedReport=powerOutageProviderCounts(unlocatedSource.reportFeatures,{
   failedProviders:unlocatedSource.failedProviders
 });
 assert.equal(unlocatedReport.total.outages,4);
-assert.equal(unlocatedReport.total.customers,135);
+assert.equal(unlocatedReport.total.customers,97);
 assert.equal(unlocatedReport.total.withoutGeometry,1);
 assert.deepEqual(unlocatedReport.rows.map(r=>r.outages),[2,1,1]);
 
