@@ -255,6 +255,11 @@ export function isCurrentPowerOutage(
     status === "cancelled"
     || status === "completed"
     || status === "complete"
+    || status === "restored"
+    || status === "resolved"
+    || status === "closed"
+    || status === "inactive"
+    || status === "withdrawn"
   ) {
     return false;
   }
@@ -377,7 +382,8 @@ export function powerOutageSummary(
 
 export function filterCurrentPowerOutages(
   payload,
-  nowMs = Date.now()
+  nowMs = Date.now(),
+  {requireGeometry = true} = {}
 ) {
   const features =
     Array.isArray(
@@ -386,7 +392,7 @@ export function filterCurrentPowerOutages(
       ? payload.features
           .filter(
             feature =>
-              feature?.geometry
+              (!requireGeometry || feature?.geometry)
               && isCurrentPowerOutage(
                 feature,
                 nowMs
@@ -590,15 +596,22 @@ async function loadProvider({
   // Prefer a surveyed affected-area polygon where both layers publish the
   // same incident. The point remains as a fallback when there is no polygon.
   const unique = new Map();
+  // Keep QLD incident records without provider geometry in the STATEWIDE
+  // count/report; do not invent a map point or LGA for those incidents.
   const filtered = filterCurrentPowerOutages(annotateProvider({
     type: "FeatureCollection", features: all
-  }, provider), nowMs);
+  }, provider), nowMs, {requireGeometry:false});
   for (const feature of filtered.features) {
-    if (!unique.has(String(feature.id))) unique.set(String(feature.id), feature);
+    const key=String(feature.id);
+    const prior=unique.get(key);
+    // Prefer provider polygon, then provider point, then no geometry.
+    if (!prior || (!prior.geometry && feature.geometry)) unique.set(key,feature);
   }
-  return {provider, layerErrors, payload: {
-    type: "FeatureCollection", features: [...unique.values()]
-  }};
+  const reportFeatures=[...unique.values()];
+  return {provider, layerErrors,
+    payload: {type:"FeatureCollection",features:reportFeatures.filter(f=>f.geometry)},
+    reportPayload: {type:"FeatureCollection",features:reportFeatures}
+  };
 }
 
 async function loadEssentialProvider({
@@ -641,6 +654,11 @@ async function loadEssentialProvider({
       "Essential Energy",
 
     payload:
+      filterCurrentPowerOutages(
+        queenslandOnly,
+        nowMs
+      ),
+    reportPayload:
       filterCurrentPowerOutages(
         queenslandOnly,
         nowMs
@@ -742,6 +760,7 @@ export async function loadPowerOutages({
   const available = [];
   const failed = [];
   const features = [];
+  const reportFeatures = [];
 
   settled.forEach(
     (
@@ -769,6 +788,9 @@ export async function loadPowerOutages({
             ?? []
           )
         );
+        reportFeatures.push(...(
+          result.value.reportPayload?.features ?? result.value.payload?.features ?? []
+        ));
       } else {
         failed.push({
           provider,
@@ -802,6 +824,10 @@ export async function loadPowerOutages({
       features
     },
 
+    // Same incident snapshot as mapped features. Unlocated QLD records
+    // remain reportable, but are deliberately not rendered as map entities.
+    reportFeatures,
+
     providers:
       available,
 
@@ -813,6 +839,52 @@ export async function loadPowerOutages({
 
     transport:
       "Queensland-only unplanned Energex/Ergon ArcGIS GeoJSON + Essential Energy KML clipped by Queensland Government mainland boundary"
+  };
+}
+
+
+export const QUEENSLAND_POWER_PROVIDERS = Object.freeze([
+  "Energex", "Ergon", "Essential Energy"
+]);
+
+// The statewide figure is the sum of distinct SOURCE INCIDENT IDs, never
+// affected customer totals, polygon rings, map entities or repeated suburbs.
+// Every row comes from the same 15-minute provider snapshot as the map.
+export function powerOutageProviderCounts(features, {
+  availableProviders=QUEENSLAND_POWER_PROVIDERS,
+  failedProviders=[]
+}={}) {
+  const unique=new Set();
+  const rows=QUEENSLAND_POWER_PROVIDERS.map(provider=>({
+    provider, outages:0, customers:0, withoutGeometry:0,
+    state:availableProviders.includes(provider)?"ok":"unavailable"
+  }));
+  const indexed=new Map(rows.map(row=>[row.provider,row]));
+  for(const failure of failedProviders){
+    const name=String(failure?.provider??"");
+    const row=rows.find(r=>name===r.provider||name.startsWith(r.provider+" "));
+    if(row && row.state!=="unavailable") row.state="partial";
+  }
+  for(const feature of Array.isArray(features)?features:[]){
+    const summary=powerOutageSummary(feature);
+    if(summary.type!=="UNPLANNED")continue;
+    const row=indexed.get(summary.provider);
+    if(!row || row.state==="unavailable")continue;
+    const key=String(summary.id);
+    if(!key || unique.has(key))continue;
+    unique.add(key);
+    row.outages++;
+    row.customers+=summary.customersAffected;
+    if(!feature?.geometry)row.withoutGeometry++;
+  }
+  return {
+    rows,
+    total:{
+      outages:rows.reduce((sum,r)=>sum+r.outages,0),
+      customers:rows.reduce((sum,r)=>sum+r.customers,0),
+      withoutGeometry:rows.reduce((sum,r)=>sum+r.withoutGeometry,0)
+    },
+    partial:rows.some(row=>row.state!=="ok")
   };
 }
 
@@ -965,7 +1037,8 @@ export function createPowerOutageLayer({
 
 
   async function render(
-    payload
+    payload,
+    reportFeatures = payload.features ?? []
   ) {
     currentFeatures =
       payload.features
@@ -1100,7 +1173,7 @@ export function createPowerOutageLayer({
       }
     }
     viewer.scene.requestRender();
-    onUpdate(currentFeatures.slice());
+    onUpdate(reportFeatures.slice(), currentFeatures.slice());
   }
 
   async function refresh({
@@ -1138,7 +1211,8 @@ export function createPowerOutageLayer({
           });
 
         await render(
-          result.payload
+          result.payload,
+          result.reportFeatures
         );
 
         lastLoadedAt =
@@ -1146,7 +1220,7 @@ export function createPowerOutageLayer({
         snapshotExpired = false;
 
         const summaries =
-          currentFeatures
+          result.reportFeatures
             .map(
               powerOutageSummary
             );
@@ -1163,6 +1237,7 @@ export function createPowerOutageLayer({
             0
           );
 
+        const unlocatedCount = result.reportFeatures.length - currentFeatures.length;
         const providerText =
           result.providers
             .join(" + ");
@@ -1179,10 +1254,12 @@ export function createPowerOutageLayer({
               : "ok",
 
           message:
-            `${summaries.length} unplanned outage${summaries.length === 1 ? "" : "s"} | ${customers.toLocaleString("en-AU")} customers | ${providerText}${partialText} | checked ${checkedAtAest(lastLoadedAt)}`,
+            `${summaries.length} unplanned outage${summaries.length === 1 ? "" : "s"} | ${customers.toLocaleString("en-AU")} customers | ${providerText}${unlocatedCount ? " | "+unlocatedCount+" without a mapped position" : ""}${partialText} | checked ${checkedAtAest(lastLoadedAt)}`,
 
           count:
             summaries.length,
+
+          unlocatedCount,
 
           customers,
 

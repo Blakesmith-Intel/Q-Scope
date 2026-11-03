@@ -61,6 +61,13 @@ assert document.count(old_button)==1 and document.count(ending)==1
 assert 'id="roadTypeReport"' not in document
 document=document.replace(old_button,old_button+"\n    "+button,1)
 document=document.replace(ending,fragment+ending,1)
+# Ship the new provider reporting button into the REAL pinned Pages HTML,
+# not only the mutable frontend template. All other controls remain pinned.
+provider_button='<button id="outageByProviderReport" type="button" aria-pressed="false">Report by provider</button>'
+refresh_button='<button id="refreshPowerOutageExplorer" type="button">Refresh</button>'
+assert source_page.count(provider_button)==1
+assert document.count(provider_button)==0 and document.count(refresh_button)==1
+document=document.replace(refresh_button,provider_button+"\n    "+refresh_button,1)
 road_page.write_text(document,encoding="utf-8")
 
 # Opt-in official warning UI: append ONLY new controls, popup and compact styles
@@ -233,7 +240,26 @@ version_once("src/context-layers/power-outages-operational-v1.js",
 version_once("src/context-layers/power-outages-operational-v1.js",
     "power-outage-suburb-explorer-v1.js?v=council-customers-20261017-v1")
 version_once("src/context-layers/power-outage-suburb-explorer-v1.js",
+    "power-outages-v1.js?v=20261104-qld-provider-count-reconciliation-v1")
+version_once("src/context-layers/power-outage-suburb-explorer-v1.js",
     "outage-lga-spatial-v2.js?v=outage-geometry-lga-20261020-v1")
+# A new incident/report presentation must not silently reuse a browser-cached
+# V10.2.51 outage module. Bust ONLY the small outage import chain and the
+# html entrypoint's module identity; never change radar science or tile URLs.
+outage_cache_identity="-20261104-power-provider-reconciliation-v1"
+for relative,marker in (
+    ("src/live3d-operational-v9.js",
+        "power-outages-operational-v1.js?v=council-customers-20261017-v1"),
+    ("src/context-layers/power-outages-operational-v1.js",
+        "power-outages-v1.js?v=background-incident-refresh-20261017-v1"),
+    ("src/context-layers/power-outages-operational-v1.js",
+        "power-outage-suburb-explorer-v1.js?v=council-customers-20261017-v1")
+):
+    resource=site/relative
+    data=resource.read_text(encoding="utf-8")
+    assert data.count(marker)==1, (relative,marker)
+    resource.write_text(data.replace(marker,marker+outage_cache_identity,1),
+                        encoding="utf-8")
 # Invalidate ONLY the published flood-gauge module import chain after the
 # measured history/rate fix. All other assets retain their approved cache keys.
 gauge_cache_suffix="-bom-gauge-history-30to120-20261026-station-table-current-height-v2-informational-stale-rate-v1-source-evidence-expiry-v1-approaches-crossing-indicators-20261027-v1-approaches-info-depth-20261027-v1-stale-road-depth-observation-20261027-v1-agency-time-formats-20261027-v1"
@@ -266,6 +292,16 @@ for relative,needle in (
     assert data.count(needle)==1, f"Expected one gauge source import: {relative}"
     path.write_text(data.replace(needle,needle+gauge_cache_suffix,1),
                     encoding="utf-8")
+
+# Only AFTER the pinned flood-gauge cache chain is built, give the html
+# module entrypoint a fresh identity for this outage UI. Preserves every
+# existing gauge/radar query token and immutable V10.2.51 science.
+outage_html=site/"live3d-operational-v9.html"
+outage_html_data=outage_html.read_text(encoding="utf-8")
+old_entry="-jasper-alfred-archive-v1"+suffix+gauge_cache_suffix
+assert outage_html_data.count(old_entry)==1
+outage_html.write_text(outage_html_data.replace(
+    old_entry,old_entry+outage_cache_identity,1),encoding="utf-8")
 
 # Ensure the V10 pinned HTML uses the patched operational geometry modules.
 # Both genuine closure lines and Energex outage polygons otherwise resolve to
@@ -649,6 +685,12 @@ node --check _site/src/context-layers/river-gauge-observations-v1.js
 node --check _site/src/context-layers/bom-recent-river-history-v1.js
 node --check _site/src/context-layers/power-outages-v1.js
 node --check _site/src/context-layers/power-outages-operational-v1.js
+grep -Fq 'id="outageByProviderReport"' _site/live3d-operational-v9.html
+grep -Fq 'powerOutageProviderCounts' _site/src/context-layers/power-outages-v1.js
+grep -Fq 'renderProviderReport' _site/src/context-layers/power-outage-suburb-explorer-v1.js
+grep -Fq '20261104-power-provider-reconciliation-v1' _site/live3d-operational-v9.html
+grep -Fq '20261104-power-provider-reconciliation-v1' _site/src/live3d-operational-v9.js
+grep -Fq '20261104-power-provider-reconciliation-v1' _site/src/context-layers/power-outages-operational-v1.js
 
 # Identical recipe to the previously accepted QA preview:
 # main frontend supplies path-activated rescue guards, accepted SHA

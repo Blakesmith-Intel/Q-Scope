@@ -21,6 +21,16 @@ The displayed map, original source imagery, supplementary-radar synchronisation,
 
 **Release status:** V10.2.51 is the operator-approved official restore point after successful deployment, public-source verification and explicit freeze instruction. The exact frozen application source is `a641e0407287c826382bf5e47cf4dee59a97821a` with tag `v10.2.51` and `restore/v10.2.51`; see [official release notes](RELEASE_NOTES_V10.2.51.md).
 
+## 4 November 2026 — Queensland power outages by provider (incremental enhancement)
+
+**Open the Power outages report** from its existing incident shortcut. The **Report by provider** button toggles between the normal *by LGA* list and a statewide table with **Energex, Ergon and Essential Energy (Queensland only)**. Select **Report by LGA** to return.
+
+Two numbers have different meanings: **outages** means *unique, current unplanned provider incident IDs*; **customers affected** is the separately summed provider-supplied customer estimate for those unique events. A single outage may affect many customers and may cross several suburbs or councils. The statewide table, incident shortcut, and map use one accepted provider snapshot, not separate totals fetched at different times.
+
+Incident records with no original provider coordinates still count in the statewide table and appear in the unlocated list, **but are not plotted or assigned a guessed council**. Planned, cancelled and confirmed restored/closed events do not count. If any provider feed or individual area/point layer fails, its row and the statewide subtotal are marked **unavailable/partial**, not zero and not a verified statewide all-clear. Use the displayed source check time when comparing against provider websites, which normally refresh at different moments.
+
+This power-outage enhancement does **not** alter the previously frozen `v10.2.51` radar restore tag, the five-minute BoM radar polling, warning polygons, river gauges, road closures, Doppler, 3-D or other approved interfaces.
+
 ## V10.2.46 — Automatic recovery when active BoM warning polygons are unavailable
 
 If IDQ21033/IDQ21035 or other official severe warning products are **active**, but the original published GIS polygon is not yet available, the status correctly says **“active; awaiting updated BoM polygon”**. This is NOT an all-clear. StormTracker now automatically rechecks the official warning feed after **two minutes**, up to **nine** short checks per active issue, then resumes the usual **15-minute polling interval**. It resumes normal interval immediately when genuine source polygon geometry arrives. A limited early retry is also made after temporary source failures; manual **Refresh** checks at once.

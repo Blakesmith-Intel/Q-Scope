@@ -1,0 +1,24 @@
+name: Audit live Queensland emergency power outages by provider (read-only)
+on:
+  pull_request:
+    paths:
+      - frontend/src/context-layers/power-outages-v1.js
+      - frontend/src/context-layers/power-outages-operational-v1.js
+      - frontend/src/context-layers/power-outage-suburb-explorer-v1.js
+      - scripts/audit-live-qld-power-outage-providers-20261104.mjs
+      - .github/workflows/qa-live-qld-power-outage-providers-20261104.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "24"}
+      - name: Audit actual three Queensland provider feeds at one snapshot time
+        run: |
+          node --check scripts/audit-live-qld-power-outage-providers-20261104.mjs
+          node scripts/audit-live-qld-power-outage-providers-20261104.mjs
