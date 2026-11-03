@@ -144,6 +144,8 @@ version_once("index.html", "-jasper-alfred-v1")
 version_once("live3d-operational-v9.html", "-jasper-alfred-archive-v1")
 version_once("live3d-operational-v9.html",
     "single-interface-v1.css?v=jasper-alfred-20261017-qa-v1")
+version_once("live3d-operational-v9.html",
+    "power-outage-suburb-explorer-v1.css?v=council-customers-20261017-v1")
 version_once("src/live3d-operational-v9.js",
     "river-gauges-operational-v1.js?v=9.18.11-gauge-green-yellow-red-v2")
 version_once("src/live3d-operational-v9.js",
