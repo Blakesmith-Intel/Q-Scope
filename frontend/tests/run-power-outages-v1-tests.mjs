@@ -18,6 +18,7 @@ import {
   isCurrentPowerOutage,
   loadPowerOutages,
   powerOutageSummary,
+  powerOutageProviderCounts,
   styleTerrainClampedPowerOutagePolygon
 } from "../src/context-layers/power-outages-v1.js";
 
@@ -913,6 +914,65 @@ await assert.rejects(
     }),
   /Energex.*outage feed HTTP 503.*Ergon.*outage feed HTTP 503.*Essential Energy outage feed HTTP 503/
 );
+
+// Reconciliation: count distinct emergency INCIDENTS, not polygon parts,
+// customers or repeated suburbs, and never count closed/restored cases.
+for(const finishedStatus of ["RESTORED","Resolved","Closed","Inactive","Withdrawn"]){
+  assert.equal(isCurrentPowerOutage(outage({
+    eventId:"CLOSED-"+finishedStatus,status:finishedStatus
+  }),now),false,finishedStatus+" must not inflate emergency totals");
+}
+const summaryByProvider=powerOutageProviderCounts(merged.reportFeatures,{
+  availableProviders:merged.providers,failedProviders:merged.failedProviders
+});
+assert.equal(summaryByProvider.total.outages,3);
+assert.equal(summaryByProvider.total.customers,60);
+assert.deepEqual(summaryByProvider.rows.map(row=>row.outages),[1,1,1]);
+assert.deepEqual(summaryByProvider.rows.map(row=>row.customers),[10,20,30]);
+assert.equal(powerOutageProviderCounts([
+  ...merged.reportFeatures,...merged.reportFeatures,
+  {...merged.reportFeatures[0],id:"energex:SAME-ID",geometry:null}
+]).total.outages,3,"Source area, point and shared council must not inflate totals");
+
+// Geometry is required for the MAP, but NOT to count a genuine provider
+// incident in the statewide report, provider report or pending-location list.
+const unmapped=outage({
+  eventId:"QLD-NO-GEOMETRY",customers:75,suburbs:"BUNDABERG"
+});
+unmapped.geometry=null;
+const unlocatedSource=await loadPowerOutages({
+  nowMs:now,
+  fetchImpl:async url=>{
+    const target=String(url);
+    if(target.includes("VwErgonOutages"))return okResponse(ergonPayload);
+    if(target.includes("essential-energy-outages"))return textResponse(essentialKml);
+    if(target.includes("Locality/FeatureServer/5/query"))
+      return okResponse(queenslandBoundary);
+    return okResponse({type:"FeatureCollection",
+      features:[...energexPayload.features,unmapped]});
+  }
+});
+assert.equal(unlocatedSource.payload.features.length,3,
+  "No synthetic map geometry for a source outage without coordinates");
+assert.equal(unlocatedSource.reportFeatures.length,4,
+  "Statewide records include source-confirmed but unplottable QLD outages");
+const unlocatedReport=powerOutageProviderCounts(unlocatedSource.reportFeatures,{
+  availableProviders:unlocatedSource.providers,
+  failedProviders:unlocatedSource.failedProviders
+});
+assert.equal(unlocatedReport.total.outages,4);
+assert.equal(unlocatedReport.total.customers,135);
+assert.equal(unlocatedReport.total.withoutGeometry,1);
+assert.deepEqual(unlocatedReport.rows.map(r=>r.outages),[2,1,1]);
+
+const partialReport=powerOutageProviderCounts(partial.reportFeatures,{
+  availableProviders:partial.providers,failedProviders:partial.failedProviders
+});
+assert.deepEqual(partialReport.rows.map(row=>row.state),
+  ["ok","unavailable","ok"]);
+assert.equal(partialReport.total.outages,2);
+assert.equal(partialReport.partial,true,
+  "An unavailable provider makes the statewide figure a PARTIAL subtotal");
 
 console.log(
   "Power outage checks passed: no planned/unknown events from Energex, Ergon or Essential Energy, Queensland-only Essential Energy keeps Goondiwindi, provider-qualified IDs, partial feeds and 15-minute refresh."
