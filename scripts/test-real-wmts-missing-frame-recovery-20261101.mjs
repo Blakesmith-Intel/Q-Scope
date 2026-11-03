@@ -27,6 +27,13 @@ page.setDefaultTimeout(180000);
 // No modification to the packaged radar code or production behaviour.
 await page.addInitScript(()=>{
   window.__qaPlaybackTransitions=[];
+  // Browser-only evidence: identify where a genuine recovered frame stalls,
+  // without changing any BoM pixels, radar science or production application.
+  window.__qaRadarStages=[];
+  window.__qaRadarStage=(stage,details={})=>{
+    window.__qaRadarStages.push({at:Math.round(performance.now()),stage,...details});
+    if(window.__qaRadarStages.length>100)window.__qaRadarStages.shift();
+  };
   const descriptor=Object.getOwnPropertyDescriptor(Node.prototype,"textContent");
   if(!descriptor?.set || !descriptor?.get)return;
   Object.defineProperty(Node.prototype,"textContent",{
@@ -55,7 +62,33 @@ await page.route("https://blakesmith-intel.github.io/StormTracker/**",async rout
  const local="http://127.0.0.1:8137"+uri.pathname.replace("/StormTracker","")+uri.search;
  try{
   const res=await fetch(local);
-  await route.fulfill({status:res.status,body:Buffer.from(await res.arrayBuffer()),
+  let body=Buffer.from(await res.arrayBuffer());
+  if(uri.pathname.endsWith("/src/live3d-operational-v9.js")){
+    let code=body.toString("utf8");
+    const add=(needle,replacement)=>{
+      assert.equal(code.split(needle).length,2,
+        "QA-only missing-frame rendering probe drift: "+needle.slice(0,80));
+      code=code.replace(needle,replacement);
+    };
+    add('async function showHybridFrame(index) {',
+      'async function showHybridFrame(index) {\n  window.__qaRadarStage?.("present-start",{index});');
+    add('  const frame=hybridFrames[requestedIndex];',
+      '  const frame=hybridFrames[requestedIndex];\n  window.__qaRadarStage?.("present-frame",{utc:frame?.observedUtc,index:requestedIndex});');
+    add('  await extraPreparation;',
+      '  window.__qaRadarStage?.("supplemental-await");\n  await extraPreparation;\n  window.__qaRadarStage?.("supplemental-ready");');
+    add('  const provider=await prepareRadarSurfaceProvider(frame);',
+      '  window.__qaRadarStage?.("provider-await",{utc:frame?.observedUtc});\n  const provider=await prepareRadarSurfaceProvider(frame);\n  window.__qaRadarStage?.("provider-ready",{utc:frame?.observedUtc});');
+    add('  const committed = await radarImageryHandover.replace(',
+      '  window.__qaRadarStage?.("cesium-handover-await",{utc:frame?.observedUtc});\n  const committed = await radarImageryHandover.replace(');
+    add('  if (!committed) return false;',
+      '  window.__qaRadarStage?.("cesium-handover-result",{committed});\n  if (!committed) return false;');
+    add('    renderInferredVolume(frame);',
+      '    window.__qaRadarStage?.("geometry-begin");\n    renderInferredVolume(frame);\n    window.__qaRadarStage?.("geometry-done");');
+    add('  syncFrameSlider($("hybridFrameSlider"),hybridFrames.length,hybridFrameIndex);',
+      '  window.__qaRadarStage?.("playback-label-commit",{count:hybridFrames.length});\n  syncFrameSlider($("hybridFrameSlider"),hybridFrames.length,hybridFrameIndex);');
+    body=Buffer.from(code,"utf8");
+  }
+  await route.fulfill({status:res.status,body,
    contentType:res.headers.get("content-type")||"application/octet-stream"});
  }catch{await route.abort("failed");}
 });
@@ -101,7 +134,8 @@ async function snapshot(){
   canvases:document.querySelectorAll("#cesiumContainer canvas").length,
   qaHook:typeof window.__stormtrackerRadarQaCheck,
   status:document.querySelector("#status")?.textContent?.trim(),
-  playbackTransitions:window.__qaPlaybackTransitions?.slice(-12)
+  playbackTransitions:window.__qaPlaybackTransitions?.slice(-12),
+  renderStages:window.__qaRadarStages?.slice(-80)
  }));
 }
 try{
