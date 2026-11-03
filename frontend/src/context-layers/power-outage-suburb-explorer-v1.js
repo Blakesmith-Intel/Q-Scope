@@ -167,8 +167,8 @@ export function createPowerOutageSuburbExplorer({
           hour:"2-digit",minute:"2-digit",hourCycle:"h23"
         }).format(date);
         const timestamp=create("small","outage-provider-source-time",
-          "Source "+sourceClock+" AEST");
-        timestamp.title="Latest provider-published record time, not the app's last refresh time";
+          "Record "+sourceClock+" AEST");
+        timestamp.title="Latest EXTRACTED timestamp on an active source record, not an independently verified provider feed refresh time";
         sourceState.append(timestamp);
       }
       tr.append(provider,
@@ -184,7 +184,7 @@ export function createPowerOutageSuburbExplorer({
       create("td","",report.partial?"Partial total":"All three feeds"));
     tbody.append(footer);table.append(tbody);results.append(table);
     results.append(create("p","outage-suburb-note",
-      "Counts are unique UNPLANNED incidents per provider. Customers affected is a separate estimate. Source time shows the latest provider-published record; checked time shows when StormTracker retrieved it. Shared councils are not double-counted."));
+      "Counts are unique UNPLANNED incidents per provider. Customers affected is a separate estimate. Record time is the latest source EXTRACTED stamp; checked time is when StormTracker fetched the feed. Neither establishes that provider web totals have refreshed at the same moment. Shared councils are not double-counted."));
     if(report.total.withoutGeometry)results.append(create("p","outage-suburb-note",
       number(report.total.withoutGeometry)+" provider outage records have no source-mapped geometry; included in statewide counts but not plotted or assigned to a council."));
     if(report.partial)results.append(create("p","outage-suburb-note",
