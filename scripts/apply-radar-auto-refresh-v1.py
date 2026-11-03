@@ -448,7 +448,7 @@ replace_once(
 # Operator decision: rain radar plays only the currently published BoM
 # 30-minute / six-observation loop. The existing independent Doppler loop,
 # multi-site synchronisation and 3-D overlays are not modified.
-old_options='operational-window-choices-v1.js?v=9.16-four-windows'
+old_options='operational-window-choices-v1.js?v=20261019-five-observed-rain-windows'
 assert data.count(old_options)==1
 new_options='operational-window-choices-v1.js?v=20261103-six-published-scans-only-v1'
 data=data.replace(old_options,new_options,1)
