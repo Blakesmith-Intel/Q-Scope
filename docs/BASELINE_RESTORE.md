@@ -1,3 +1,26 @@
+# StormTracker — official immutable V10.2.51 restore point (3 November 2026)
+
+**Exact verified production commit:** `a641e0407287c826382bf5e47cf4dee59a97821a`.  
+**Frozen references:** annotated tag `v10.2.51` and same-commit `restore/v10.2.51`. Both must peel to the exact SHA above; never force-push or repoint either reference.  
+**Evidence:** [successful Pages deployment and public-source verification](https://github.com/Blakesmith-Intel/StormTracker/actions/runs/41641906435) and [native high-resolution BoM/AEP release gate](https://github.com/Blakesmith-Intel/StormTracker/actions/runs/41639744038).
+
+To verify the restored source locally:
+
+```bash
+git fetch origin --tags
+git rev-parse 'v10.2.51^{}'
+git rev-parse origin/restore/v10.2.51
+# Both must print a641e0407287c826382bf5e47cf4dee59a97821a
+```
+
+Start further enhancements from `v10.2.51`. If a rollback is required, submit a **new reviewed change** constructed from the frozen source and publish it after source, browser, and operator verification; do **not** reset `main`, modify historical tags, or force-update restore refs.
+
+The source snapshot preserves original BoM WMTS imagery, the 30-minute genuine six-observation rain window, automatic fresh/missed-frame recovery, source-denial isolation, multi-radar synchronisation, 3-D, the camera, Doppler, warning polygons, flood/rainfall/AEP and all other previously approved layers. Live agency feeds and the Cloudflare relay are independent services, not frozen by this tag.
+
+[Official frozen baseline](PRODUCTION_BASELINE_V10.2.51.md) · [Release notes](RELEASE_NOTES_V10.2.51.md).
+
+---
+
 # StormTracker — V10.2.46 immutable recovery baseline (1 November 2026)
 
 **Authoritative production refs:** annotated `v10.2.46` and identical-commit `restore/v10.2.46`; verify their peeled and branch SHAs are identical after production Pages release-gate success. No old refs may ever be moved; V10.2.45 tag/restore remain at `3051662e4ad124dcdfee5c19e955b6172c70fef7` and older seals remain unchanged.
