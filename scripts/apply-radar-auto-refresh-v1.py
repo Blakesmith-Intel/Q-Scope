@@ -445,12 +445,30 @@ replace_once(
     "imagery-layer-retirement-v1.js?v=20261103-postrender-cleanup-v1"
 )
 
+# Operator decision: rain radar plays only the currently published BoM
+# 30-minute / six-observation loop. The existing independent Doppler loop,
+# multi-site synchronisation and 3-D overlays are not modified.
+old_options='operational-window-choices-v1.js?v=9.16-four-windows'
+assert data.count(old_options)==1
+new_options='operational-window-choices-v1.js?v=20261103-six-published-scans-only-v1'
+data=data.replace(old_options,new_options,1)
+# The optional archive warmer used to fetch two extra historical mosaics even
+# after six genuine current frames had loaded. In this source-only mode that
+# causes avoidable old-tile 403s, so do not schedule it for 30-minute rain.
+warm_anchor='async function warmRadarHistoryCache(\\n  region,\\n  observedTimes\\n) {\\n'
+assert data.count(warm_anchor)==1
+data=data.replace(warm_anchor,warm_anchor+
+    '  // No off-window historical downloads in normal BoM rain playback.\\n'+
+    '  if (selectedLoopSelection() === "30") return;\\n',1)
+assert 'six-published-scans-only-v1' in data
+assert 'No off-window historical downloads' in data
 app.write_text(data, encoding="utf-8")
 copyfile("frontend/src/live-loop-refresh-v1.js", site / "src/live-loop-refresh-v1.js")
 # The sealed production bundle historically used an older radar-source and
 # pressure guard from the pinned build. Copy the tested bounded PNG blob cache
 # and 45-second tile rejection policy into actual production, not QA only.
 copyfile("frontend/src/radar-source.js", site / "src/radar-source.js")
+copyfile("frontend/src/operational-window-choices-v1.js", site / "src/operational-window-choices-v1.js")
 copyfile("frontend/src/storage.js", site / "src/storage.js")
 copyfile("frontend/src/radar-request-pressure-v1.js", site / "src/radar-request-pressure-v1.js")
 # Denial-aware bounded tile loading must be deployed, not only reviewed.
@@ -520,10 +538,11 @@ assert "radarViewportContinuityNoOp" not in data
 assert (site / "src/radar-viewport-continuity-v1.js").exists()
 assert "verifiedWmtsBlobs" in (site / "src/radar-source.js").read_text()
 assert "officialWmtsFallbackUrl" in (site / "src/radar-source.js").read_text()
-assert "20261103-source-403-cache-unblock-v1" in (site / "src/bom-wmts-loop-v2.js").read_text()
+assert "20261103-bom-native-six-scans-no-cors-v1" in (site / "src/bom-wmts-loop-v2.js").read_text()
+assert "Object.freeze([30])" in (site / "src/operational-window-choices-v1.js").read_text()
 assert "refusedWmtsUrls" in (site / "src/radar-source.js").read_text()
 assert "negativeTtlMs=45000" in (site / "src/radar-request-pressure-v1.js").read_text()
-assert "remaining tiles not requested after source refusal" in (site / "src/radar-tile-retry-v1.js").read_text()
+assert "A tile-specific 403 is not a global denial" in (site / "src/radar-tile-retry-v1.js").read_text()
 assert "frame?.sourceMetadata?.region !== region" in data
 assert "manual site load failed; automatic retry queued" in data
 print("RADAR_OPERATOR_CAMERA_V10_2_41_PACKAGED")
