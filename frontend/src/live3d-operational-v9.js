@@ -358,10 +358,11 @@ const motionTransition={cancel(){visualMotionGeneration++;}};
 const radarImageryHandover = createRadarImageryHandover({
   imageryLayers: viewer.imageryLayers, scene,
   retireLayer:deferredImageryRetirement?.retire,
-  // Five hidden + one visible authentic primary scan. Avoid repeated GPU
-  // texture allocation and teardown during the normal six-frame loop.
-  // All supplemental radar/Doppler handovers retain their existing logic.
-  maxRetainedLayers:5
+  // The desktop keeps five prior real scans GPU-ready for fast replay.
+  // Mobile retains only two previous textures (plus the visible scan), so
+  // multi-site selection cannot keep a full six-frame GPU loop per site.
+  // Source UTC, PNG resolution and supplemental synchronisation are unchanged.
+  maxRetainedLayers:window.matchMedia?.("(max-width:700px)").matches?2:5
 });
 let additionalRadarSiteIds=[];
 let previousPrimaryRadarId=null;
