@@ -358,11 +358,12 @@ const motionTransition={cancel(){visualMotionGeneration++;}};
 const radarImageryHandover = createRadarImageryHandover({
   imageryLayers: viewer.imageryLayers, scene,
   retireLayer:deferredImageryRetirement?.retire,
-  // The desktop keeps five prior real scans GPU-ready for fast replay.
-  // Mobile retains only two previous textures (plus the visible scan), so
-  // multi-site selection cannot keep a full six-frame GPU loop per site.
-  // Source UTC, PNG resolution and supplemental synchronisation are unchanged.
-  maxRetainedLayers:window.matchMedia?.("(max-width:700px)").matches?2:5
+  // Retain at most two previous native-resolution GPU layers, on desktop
+  // AND mobile. Keeping all six textures on software-rendered Chromium caused
+  // Cesium to stall for over two minutes during active source handover.
+  // The genuine six-frame timeline is unchanged; evicted surfaces render
+  // again on demand from their verified source, never at reduced resolution.
+  maxRetainedLayers:2
 });
 let additionalRadarSiteIds=[];
 let previousPrimaryRadarId=null;

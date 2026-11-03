@@ -206,8 +206,8 @@ for(let i=0;i<12;i++){
 assert.equal(mobile.layers.length,3,"one live and two retained mobile sources");
 mobile.api.reset();
 assert.equal(mobile.layers.length,0,"mobile radar teardown releases the retained textures");
-assert.ok(runtime.includes('maxRetainedLayers:window.matchMedia?.("(max-width:700px)").matches?2:5'),
-  "mobile must use the reduced primary GPU texture budget");
+assert.ok(runtime.includes("maxRetainedLayers:2"),
+  "desktop and mobile must share the bounded three-texture primary GPU budget");
 const warmHistoryStart=runtime.indexOf("async function warmRadarHistoryCache(");
 const warmHistoryEnd=runtime.indexOf("\nasync function ",warmHistoryStart+1);
 assert(warmHistoryStart>=0 && warmHistoryEnd>warmHistoryStart);
@@ -218,4 +218,4 @@ assert.match(warmHistory,/attempted>=MAX_BACKGROUND_HISTORY_ATTEMPTS/,
   "failed source requests also count towards the finite background budget");
 assert.doesNotMatch(warmHistory,/radarFrameCache\.set\(/,
   "background archival must not fill the decoded live playback RAM cache");
-console.log("PASS native-resolution primary 2-D/3-D handover, mobile three-layer GPU bound, finite disk-only history catch-up and unchanged source quality.");
+console.log("PASS native-resolution primary 2-D/3-D handover, universal three-layer GPU bound, finite disk-only history catch-up and unchanged source quality.");

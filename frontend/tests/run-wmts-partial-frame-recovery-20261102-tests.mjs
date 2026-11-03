@@ -156,10 +156,10 @@ assert(source.includes("timeoutMs:10000,"),
   "Actual predecoded Cesium tiles need a bounded but mobile-safe handover window");
 assert(packageOverlay.includes("timeoutMs:10000,"),
   "Production-equivalent build must carry the handover budget");
-assert(source.includes('maxRetainedLayers:window.matchMedia?.("(max-width:700px)").matches?2:5'),
-  "Operator must retain bounded authentic native-resolution GPU layers on mobile and desktop");
-assert(packageOverlay.includes('maxRetainedLayers:window.matchMedia?.("(max-width:700px)").matches?2:5'),
-  "Production-equivalent overlay must use the same mobile and desktop GPU budgets");
+assert(source.includes("maxRetainedLayers:2"),
+  "Operator must retain at most two prior authentic native-resolution GPU layers on every platform");
+assert(packageOverlay.includes("maxRetainedLayers:2"),
+  "Production-equivalent overlay must enforce the same three-layer GPU budget");
 assert(source.includes("MAX_BACKGROUND_HISTORY_ATTEMPTS = 2"),
   "Historical background cache may fetch only a tiny genuine source batch");
 assert(packageOverlay.includes("MAX_BACKGROUND_HISTORY_ATTEMPTS = 2"),
