@@ -207,47 +207,17 @@ replace_once(
     "loadBomReflectivityMosaicAtTime(entry.observedUtc, selectedRadarRegion())",
     "loadBomReflectivityMosaicAtTime(entry.observedUtc, selectedRadarRegion(), discoveredTimes)"
 )
-replace_once(
-    """await loadBomReflectivityMosaicAtTime(
-          observedUtc,
-          region
-        );""",
-    """await loadBomReflectivityMosaicAtTime(
-          observedUtc,
-          region,
-          candidates
-        );"""
-)
-# Keep background cache warming from writing into the wrong primary radar
-# if the user switches sites while an old source tile request is in flight.
-replace_once(
-    '''      const frame =
-        await loadBomReflectivityMosaicAtTime(
-          observedUtc,
-          region,
-          candidates
-        );
+# The delivered sealed runtime must use the exact bounded, disk-only
+# history catch-up from the review source. Do not eagerly load the whole
+# published 180-minute state into its decoded frame cache.
+warm_start=source.index("async function warmRadarHistoryCache(")
+warm_end=source.index("\nasync function ",warm_start+1)
+warm_begin=data.index("async function warmRadarHistoryCache(")
+warm_finish=data.index("\nasync function ",warm_begin+1)
+assert "MAX_BACKGROUND_HISTORY_ATTEMPTS = 2" in source[warm_start:warm_end]
+assert "radarFrameCache.set(" not in source[warm_start:warm_end]
+data=data[:warm_begin]+source[warm_start:warm_end]+data[warm_finish:]
 
-      radarFrameCache.set(
-        observedUtc,
-        frame
-      );''',
-    '''      const frame =
-        await loadBomReflectivityMosaicAtTime(
-          observedUtc,
-          region,
-          candidates
-        );
-
-      // An old region's request may finish AFTER the user switches sites.
-      // Its pixels must never enter the new primary's timestamp-keyed cache.
-      if(selectedRadarRegion() !== region || sequenceLoading ||
-          frame?.sourceMetadata?.region !== region) return;
-      radarFrameCache.set(
-        observedUtc,
-        frame
-      );'''
-)
 replace_once(
     '''async function runSourceLoad(loader, background = false) {''',
     '''let manualRadarRecoveryTimer=null;
@@ -391,6 +361,18 @@ inject_once(
     '  delay: () => effectivePlaybackDelayMs(),\n  continueOnFailedCycle: true,\n  onPlayingChange:'
 )
 
+# The original-resolution Cesium surface still contains the identical
+# reprojected pixels and lossless PNG. Encode asynchronously to prevent
+# full-canvas synchronous PNG work from blocking active playback.
+png_source_start=source.index("    // Compress the original-resolution lossless PNG off the main thread.")
+png_source_end=source.index("\n  })();",png_source_start)
+replace_once(
+    '''    return Cesium.SingleTileImageryProvider.fromUrl(
+      canvas.toDataURL("image/png"),{rectangle}
+    );''',
+    source[png_source_start:png_source_end].rstrip()
+)
+
 # The six measured scans reuse their OWN decoded/GPU-ready source raster
 # layers, rather than re-uploading identical original BoM pixels every cycle.
 # This affects only the primary radar imagery handover. The full timeline,
@@ -403,10 +385,11 @@ inject_once(
     '''const radarImageryHandover = createRadarImageryHandover({
   imageryLayers: viewer.imageryLayers, scene,
   retireLayer:deferredImageryRetirement?.retire,
-  // Five hidden + one visible authentic primary scan. Avoid repeated GPU
-  // texture allocation and teardown during the normal six-frame loop.
-  // All supplemental radar/Doppler handovers retain their existing logic.
-  maxRetainedLayers:5
+  // The desktop keeps five prior real scans GPU-ready for fast replay.
+  // Mobile retains only two previous textures (plus the visible scan), so
+  // multi-site selection cannot keep a full six-frame GPU loop per site.
+  // Source UTC, PNG resolution and supplemental synchronisation are unchanged.
+  maxRetainedLayers:window.matchMedia?.("(max-width:700px)").matches?2:5
 });'''
 )
 replace_once(
@@ -466,7 +449,9 @@ assert "if(resume && !incrementalCommit && !noninterruptingBackfill)playback.pla
 assert "const noninterruptingBackfill = automatic" in data
 assert "radarTileFailureSnapshot" in data
 assert (site / "src/radar-incremental-window-v1.js").exists()
-assert "maxRetainedLayers:5" in data
+assert 'maxRetainedLayers:window.matchMedia?.("(max-width:700px)").matches?2:5' in data
+assert "canvas.toBlob(blob=>blob" in data
+assert "MAX_BACKGROUND_HISTORY_ATTEMPTS = 2" in data
 assert "maxRetainedLayers" in (site / "src/radar-imagery-handover-v1.js").read_text()
 assert (site / "src/radar-lifecycle-diagnostics-v1.js").exists()
 with (site / "BUILD.txt").open("a", encoding="utf-8") as build:
