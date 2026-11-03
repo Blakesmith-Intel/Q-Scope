@@ -1,0 +1,106 @@
+name: Seal official V10.2.51 six-scan radar restore point (one-time)
+
+# One-time, source-immutable seal of the exact operator-accepted and
+# independently publicly verified release. Never repoint this tag or branch.
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/seal-v10-2-51-radar-restore.yml
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  seal:
+    name: Verify deployed exact SHA and create annotated restore tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact accepted source and completed live production release
+        env:
+          GH_TOKEN: ${{ secrets.STORMTRACKER_RELEASE_TOKEN || github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_sha="a641e0407287c826382bf5e47cf4dee59a97821a"
+          git fetch --no-tags origin "$release_sha"
+          test "$(git cat-file -t "$release_sha")" = "commit"
+          test "$(git ls-remote origin refs/heads/restore/v10.2.51 | cut -f1)" = "$release_sha"
+
+          # The exact deployed and publicly checked source must be the tag target.
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/41641906435" --jq '.head_sha')" = "$release_sha"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/41641906435" --jq '.conclusion')" = "success"
+          # The preceding six-scan candidate passed the independent radar/AEP
+          # gate and its source changes are included in this deployed commit.
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/41639744038" --jq '.head_sha')" = "6380eb9134be95b81b280ab9ec75bb02ea32906b"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/41639744038" --jq '.conclusion')" = "success"
+          git merge-base --is-ancestor 6380eb9134be95b81b280ab9ec75bb02ea32906b "$release_sha"
+
+          git grep -Fq 'Object.freeze([30])' "$release_sha" -- frontend/src/operational-window-choices-v1.js
+          git grep -Fq '20261103-bom-native-six-scans-no-cors-v1' "$release_sha" -- frontend/src/bom-wmts-loop-v2.js
+          git grep -Fq 'browserNativeCorsBlocked' "$release_sha" -- frontend/src/radar-source.js
+          git grep -Fq 'No off-window historical downloads' "$release_sha" -- scripts/apply-radar-auto-refresh-v1.py
+          git grep -Fq 'v10.2.51-bom-six-scans-only-no-archive-20261103-' "$release_sha" -- .github/workflows/pages.yml
+          echo "VERIFIED EXACT DEPLOYED V10.2.51 SOURCE $release_sha"
+
+      - name: Confirm public Pages serves the frozen genuine six-scan release
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://blakesmith-intel.github.io/StormTracker"
+          verified=0
+          for attempt in $(seq 1 12); do
+            suffix="?v1051-freeze=$GITHUB_SHA-$attempt"
+            html="$(curl -fsSL --max-time 20 "$base/index.html$suffix" || true)"
+            build="$(curl -fsSL --max-time 20 "$base/BUILD.txt$suffix" || true)"
+            menu="$(curl -fsSL --max-time 20 "$base/src/operational-window-choices-v1.js$suffix" || true)"
+            engine="$(curl -fsSL --max-time 20 "$base/src/live3d-operational-v9.js$suffix" || true)"
+            source="$(curl -fsSL --max-time 20 "$base/src/radar-source.js$suffix" || true)"
+            if grep -Fq 'v10.2.51-bom-six-scans-only-no-archive-20261103-' <<< "$html" &&
+               grep -Fq 'V10.2.51 BOM SIX-SCAN ONLY' <<< "$build" &&
+               grep -Fq 'Object.freeze([30])' <<< "$menu" &&
+               grep -Fq 'No off-window historical downloads' <<< "$engine" &&
+               grep -Fq 'browserNativeCorsBlocked' <<< "$source"; then
+              verified=1
+              break
+            fi
+            sleep 5
+          done
+          test "$verified" = 1 || { echo "REFUSING TAG: public six-scan release cannot be verified"; exit 1; }
+          echo "PUBLIC V10.2.51 RESTORE SOURCE VERIFIED"
+
+      - name: Seal annotated v10.2.51 tag at the exact existing restore commit
+        env:
+          GH_TOKEN: ${{ secrets.STORMTRACKER_RELEASE_TOKEN || github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_sha="a641e0407287c826382bf5e47cf4dee59a97821a"
+          tag="v10.2.51"
+          restore="restore/v10.2.51"
+          # Never move an existing reference. Existing mismatches fail closed.
+          test "$(git ls-remote origin "refs/heads/$restore" | cut -f1)" = "$release_sha"
+          existing="$(git ls-remote origin "refs/tags/$tag^{}" | cut -f1)"
+          test -z "$existing" || test "$existing" = "$release_sha"
+          if [ -z "$existing" ]; then
+            tag_object="$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/tags" \
+              -f tag="$tag" \
+              -f message="StormTracker V10.2.51 — 3 Nov 2026 official operator-accepted six published BoM rain radar observations, original high-res source pixels, multi-site UTC sync, Doppler and situational awareness unchanged. Production run 41641906435; restore SHA $release_sha." \
+              -f object="$release_sha" \
+              -f type=commit --jq '.sha')"
+            test -n "$tag_object"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/tags/$tag" -f sha="$tag_object" >/dev/null
+          fi
+          git fetch --no-tags origin "refs/tags/$tag:refs/tags/$tag"
+          test "$(git cat-file -t "refs/tags/$tag")" = "tag"
+          test "$(git rev-list -n 1 "$tag")" = "$release_sha"
+          test "$(git ls-remote origin "refs/heads/$restore" | cut -f1)" = "$release_sha"
+          echo "OFFICIAL V10.2.51 FROZEN: annotated $tag and $restore -> $release_sha"
