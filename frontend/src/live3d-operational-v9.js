@@ -12,7 +12,7 @@ import {
   loadBomReflectivityMosaicAtTime,
   reflectivityWindowForRegion,
   radarTileFailureSnapshot
-} from "./bom-wmts-loop-v2.js?v=20261103-native-403-tile-recovery";
+} from "./bom-wmts-loop-v2.js?v=20261103-source-403-cache-unblock-v1";
 
 import {
   RadarWorkerClient

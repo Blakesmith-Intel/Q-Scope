@@ -11,7 +11,15 @@ const VERIFIED_WMTS_BLOB_LIMIT=96;
 // indefinitely. The timer starts only after the queued request runs.
 export const WMTS_TILE_REQUEST_TIMEOUT_MS=15000;
 const verifiedWmtsBlobs=new Map();
+const refusedWmtsUrls=new Set();
 const isWmtsTile=url=>/\/wmts\?/i.test(String(url));
+function noteRefusedWmtsUrl(url){
+  const key=String(url);
+  refusedWmtsUrls.delete(key);
+  refusedWmtsUrls.add(key);
+  while(refusedWmtsUrls.size>120)
+    refusedWmtsUrls.delete(refusedWmtsUrls.values().next().value);
+}
 // Browser-reachable native source for the EXACT SAME PUBLIC BoM WMTS PNG.
 // Use only if the relay denies this one authentic source tile.
 const NATIVE_BOM_WMTS="https://api.bom.gov.au/apikey/v1/mapping/timeseries/wmts";
@@ -122,9 +130,12 @@ export async function fetchReadableImage(url) {
       // Exact WMTS URLs include the immutable BoM observation UTC and tile.
       // Let the browser reuse a successful PNG instead of needlessly asking
       // the relay for the same source bytes on every loop/site switch.
-      cache: isWmts ? "default" : "no-store",
+      // On retry, bypass an older cached 403 without changing the exact BoM
+      // tile URL. Successful source PNGs retain normal browser caching.
+      cache: isWmts && !refusedWmtsUrls.has(String(url)) ? "default" : "no-store",
       signal:controller.signal
     });
+    if(isWmts && response.status===403)noteRefusedWmtsUrl(url);
     // A 403 from the relay is not proof that the original BoM tile is gone.
     // Try one native request for the IDENTICAL UTC, coordinates and layer,
     // within the existing guarded request slot and 15-second deadline.
@@ -140,6 +151,7 @@ export async function fetchReadableImage(url) {
         if(official.ok)response=official;
       }catch{/* source refusal remains retriable after the usual cooldown */}
     }
+    if(response.ok && isWmts)refusedWmtsUrls.delete(String(url));
     if (!response.ok) {
       const error=new Error(`Image request failed: HTTP ${response.status}`);
       error.status=response.status;

@@ -1243,7 +1243,8 @@ async function relayWmts(request, incoming, origin) {
 
         cf: {
           cacheEverything: true,
-          cacheTtl: 300
+          // Cache authentic PNGs, NEVER a temporarily refused source tile.
+          cacheTtlByStatus: {"200-299":300,"300-599":0}
         }
       }
     );
@@ -1266,9 +1267,10 @@ async function relayWmts(request, incoming, origin) {
     "cross-origin"
   );
 
+  // A previous 300-second cached 403 made the 60-second source retry futile.
   headers.set(
     "Cache-Control",
-    "public, max-age=300"
+    upstream.ok ? "public, max-age=300" : "no-store"
   );
 
   return new Response(

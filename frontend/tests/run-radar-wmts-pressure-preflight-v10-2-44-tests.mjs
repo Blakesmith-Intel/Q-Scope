@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
 import {fetchWmtsPreflightTile,loadBomReflectivityMosaicAtTime,
   retryableWmtsMosaicFailure} from "../src/bom-wmts-loop-v2.js";
 
@@ -137,6 +138,31 @@ await assert.rejects(()=>fetchReadableImage(stillDenied),/HTTP 403/);
 assert.equal(nativeRefusals,1,"At most one exact native fallback after relay refusal");
 await assert.rejects(()=>fetchReadableImage(stillDenied),/source refusal cooldown/);
 assert.equal(nativeRefusals,1,"The ordinary 403 cooldown prevents retry storms");
+// A previously refused exact URL must bypass its old HTTP cache after cooldown,
+// while preserving the source URL and accepting only actual decoded BoM PNGs.
+const originalNow=Date.now,clock=Date.now();
+let freshCacheMode=null,freshRequests=0;
+try{
+  Date.now=()=>clock+31000;
+  globalThis.fetch=async(target,options={})=>{
+    assert.equal(String(target),stillDenied);
+    freshCacheMode=options.cache;freshRequests++;
+    return {ok:true,status:200,
+      blob:async()=>new Blob(["recovered-original-png"],{type:"image/png"})};
+  };
+  const repaired=await fetchReadableImage(stillDenied);
+  assert.equal(repaired.width,256);
+  assert.equal(freshRequests,1);
+  assert.equal(freshCacheMode,"no-store","A browser-cached 403 cannot block original source recovery");
+}finally{Date.now=originalNow;}
+const relay=readFileSync(new URL("../../relay/worker.js",import.meta.url),"utf8")
+  .split("async function relayWmts(")[1]?.split("async function fetchDopplerObservedUtc")[0];
+assert(relay,"Original relay WMTS handler missing");
+assert.match(relay,/cacheTtlByStatus:\s*\{"200-299":300,"300-599":0\}/,
+  "Cloudflare must not cache refused/source-error BoM PNG responses");
+assert.match(relay,/upstream\.ok\s*\?\s*"public, max-age=300"\s*:\s*"no-store"/,
+  "Browser must not cache refused original-source BoM PNG responses");
+console.log("PASS_BOM_403_NEGATIVE_CACHE_EXPIRES_AND_ORIGINAL_PNG_RECOVERS");
 console.log("PASS_EXACT_BOM_403_NATIVE_ORIGINAL_SOURCE_RECOVERY",JSON.stringify({
  relay403,native200,sourceUtcUnchanged:true,refusalRetained:true
 }));
