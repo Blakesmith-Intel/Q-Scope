@@ -5,7 +5,7 @@ export const NATIONAL_MOSAIC_PRIMARY=true;
 export const HIGH_RESOLUTION_FRAMES_ONLY=true;
 import { BORDER_RADAR_SITES } from "./border-radar-sites-v1.js";
 import { decodeReflectivityImageData, SOURCE_PALETTES, REFLECTIVITY_CLASSES } from "./palette.js?v=diagnostics-v1";
-import { fetchReadableImage } from "./radar-source.js?v=20261103-source-403-cache-unblock-v1";
+import { fetchReadableImage } from "./radar-source.js?v=20261103-bom-native-six-scans-no-cors-v1";
 import { loadCompleteRadarTiles } from "./radar-tile-retry-v1.js?v=20261103-complete-original-403-mosaic-v1";
 import {publishedReflectivityTimes} from "./bom-wmts-published-times-v1.js?v=20261019-native-bom-hires-current";
 
