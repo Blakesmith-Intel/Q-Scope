@@ -105,7 +105,7 @@ import { buildSharedProductTimeline, buildRadarPrimaryProductTimeline } from "./
 import {
   canMotionInterpolateRadar,createRadarMotionTransition,radarMotionStepsForSpeed
 } from "./radar-motion-interpolation-v1.js?v=9.16.7-motion";
-import { createRadarImageryHandover } from "./radar-imagery-handover-v1.js?v=20261103-primary-measured-layer-reuse-v1";
+import { createRadarImageryHandover } from "./radar-imagery-handover-v1.js?v=20261103-decoded-two-boundary-v1";
 import {MAX_DISPLAY_RADAR_SITES,chooseSupplementalRadarSites,
   fitSelectedRadarSites,createSupplementalRadarDisplay
 } from "./multi-radar-display-v9.js?v=render-provider-cache-20261016-v1";

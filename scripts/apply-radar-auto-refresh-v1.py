@@ -422,7 +422,7 @@ inject_once(
 )
 replace_once(
     "radar-imagery-handover-v1.js?v=9.18.5-deferred-retire",
-    "radar-imagery-handover-v1.js?v=20261103-primary-measured-layer-reuse-v1"
+    "radar-imagery-handover-v1.js?v=20261103-decoded-two-boundary-v1"
 )
 # Render safety: the accepted helper remains the same except that obsolete
 # high-resolution radar GPU layers are no longer destroyed synchronously
