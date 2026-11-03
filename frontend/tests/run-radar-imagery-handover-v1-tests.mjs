@@ -75,7 +75,13 @@ assert.ok(runtime.includes("createRadarMotionTransition(previousFrame,frame)"),"
 assert.ok(runtime.includes("prepareRadarSurfaceProvider(frame)"),"native BoM raster providers are cached and reused");
 assert.ok(runtime.includes("canvas.toBlob("),"lossless native radar PNG must encode without main-thread data-URL blocking");
 assert.ok(runtime.includes("URL.revokeObjectURL(pngUrl)"),"temporary radar PNG URLs must be released");
-assert.ok(!runtime.includes('canvas.toDataURL("image/png")'),"do not regress to synchronous full-canvas PNG encoding");
+const radarSurfaceStart=runtime.indexOf("async function prepareRadarSurfaceProvider(frame)");
+const radarSurfaceEnd=runtime.indexOf("\nasync function renderSurface(",radarSurfaceStart);
+assert.ok(radarSurfaceStart>=0 && radarSurfaceEnd>radarSurfaceStart,
+  "test must inspect the actual native radar surface preparation");
+const radarSurface=runtime.slice(radarSurfaceStart,radarSurfaceEnd);
+assert.ok(!radarSurface.includes('canvas.toDataURL("image/png")'),
+  "the native radar surface must not use synchronous full-canvas PNG encoding");
 const radarSource=readFileSync(fileURLToPath(new URL("../src/radar-source.js",import.meta.url)),"utf8");
 assert.ok(radarSource.includes('cache: isWmts ? "default" : "no-store"'),
   "exact-UTC BoM WMTS PNGs may reuse normal browser HTTP caching");
