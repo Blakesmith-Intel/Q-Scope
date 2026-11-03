@@ -691,6 +691,9 @@ node --check _site/src/context-layers/power-outages-operational-v1.js
 grep -Fq 'id="outageByProviderReport"' _site/live3d-operational-v9.html
 grep -Fq 'powerOutageProviderCounts' _site/src/context-layers/power-outages-v1.js
 grep -Fq 'renderProviderReport' _site/src/context-layers/power-outage-suburb-explorer-v1.js
+grep -Fq '#powerOutageExplorer .outage-provider-table' _site/src/power-outage-suburb-explorer-v1.css
+grep -Fq 'outage-provider-number' _site/src/context-layers/power-outage-suburb-explorer-v1.js
+grep -Fq 'power-outage-suburb-explorer-v1.css?v=council-customers-20261017-v1' _site/live3d-operational-v9.html
 grep -Fq '20261104-power-provider-reconciliation-v1' _site/live3d-operational-v9.html
 grep -Fq '20261104-power-provider-reconciliation-v1' _site/src/live3d-operational-v9.js
 grep -Fq '20261104-power-provider-reconciliation-v1' _site/src/context-layers/power-outages-operational-v1.js
