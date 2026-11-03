@@ -83,8 +83,8 @@ const radarSurface=runtime.slice(radarSurfaceStart,radarSurfaceEnd);
 assert.ok(!radarSurface.includes('canvas.toDataURL("image/png")'),
   "the native radar surface must not use synchronous full-canvas PNG encoding");
 const radarSource=readFileSync(fileURLToPath(new URL("../src/radar-source.js",import.meta.url)),"utf8");
-assert.ok(radarSource.includes('cache: isWmts ? "default" : "no-store"'),
-  "exact-UTC BoM WMTS PNGs may reuse normal browser HTTP caching");
+assert.ok(radarSource.includes('cache: isWmts && !refusedWmtsUrls.has(String(url)) ? "default" : "no-store"'),
+  "verified original PNGs may use browser cache but a previously refused exact tile must bypass stale 403 caching");
 assert.ok(!runtime.includes("frameCrossfade"),"no compositor fade remains in the live weather runtime");
 assert.ok(runtime.includes("timeoutMs:Math.min(180"),"visual-only intermediate steps have a strict render budget");
 assert.ok(runtime.includes("renderSurface(displayFrame,renderToken"),"intermediate imagery is visual-only and never fed into storm science");
