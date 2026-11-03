@@ -424,6 +424,13 @@ replace_once(
     "radar-imagery-handover-v1.js?v=9.18.5-deferred-retire",
     "radar-imagery-handover-v1.js?v=20261103-primary-measured-layer-reuse-v1"
 )
+# Render safety: the accepted helper remains the same except that obsolete
+# high-resolution radar GPU layers are no longer destroyed synchronously
+# from Cesium's own postRender event.
+replace_once(
+    "imagery-layer-retirement-v1.js?v=9.18.5-gpu-lifetime",
+    "imagery-layer-retirement-v1.js?v=20261103-postrender-cleanup-v1"
+)
 
 app.write_text(data, encoding="utf-8")
 copyfile("frontend/src/live-loop-refresh-v1.js", site / "src/live-loop-refresh-v1.js")
@@ -439,6 +446,7 @@ copyfile("frontend/src/radar-viewport-continuity-v1.js", site / "src/radar-viewp
 copyfile("frontend/src/bom-wmts-loop-v2.js", site / "src/bom-wmts-loop-v2.js")
 copyfile("frontend/src/continuous-playback-v1.js", site / "src/continuous-playback-v1.js")
 copyfile("frontend/src/radar-imagery-handover-v1.js", site / "src/radar-imagery-handover-v1.js")
+copyfile("frontend/src/imagery-layer-retirement-v1.js", site / "src/imagery-layer-retirement-v1.js")
 copyfile("frontend/src/radar-incremental-window-v1.js", site / "src/radar-incremental-window-v1.js")
 copyfile("frontend/src/radar-lifecycle-diagnostics-v1.js", site / "src/radar-lifecycle-diagnostics-v1.js")
 
@@ -479,6 +487,8 @@ assert "const noninterruptingBackfill = automatic" in data
 assert "radarTileFailureSnapshot" in data
 assert (site / "src/radar-incremental-window-v1.js").exists()
 assert "maxRetainedLayers:2" in data
+assert "20261103-postrender-cleanup-v1" in data
+assert "Never synchronously destroy WebGL textures" in (site / "src/imagery-layer-retirement-v1.js").read_text()
 assert "canvas.toBlob(blob=>blob" in data
 assert "MAX_BACKGROUND_HISTORY_ATTEMPTS = 2" in data
 assert "cacheFrameBudget=automatic?9" in data

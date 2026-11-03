@@ -215,7 +215,7 @@ import {
   createDopplerLayerTransition
 } from "./doppler-layer-transition-v1.js?v=9.18.5-deferred-retire";
 import {createDeferredImageryRetirement}
-  from "./imagery-layer-retirement-v1.js?v=9.18.5-gpu-lifetime";
+  from "./imagery-layer-retirement-v1.js?v=20261103-postrender-cleanup-v1";
 import {createSupplementalRadarVolumes}
   from "./supplemental-radar-volume-v1.js?v=secondary-coverage-fix-20261016-v1";
 
