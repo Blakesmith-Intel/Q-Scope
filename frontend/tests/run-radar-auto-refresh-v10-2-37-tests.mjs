@@ -68,7 +68,7 @@ assert.match(packager, /frontend\/src\/radar-viewport-continuity-v1\.js/);
 assert.match(packager, /V10\.2\.41 OPERATOR CAMERA CONTINUITY/);
 
 assert.match(runtime, /radarFrameCache\.has\(entry\.observedUtc\)/);
-assert.match(runtime, /getRadarFrames\(region, cacheCutoff\)/);
+assert.match(runtime, /getRadarFrames\(region, cacheCutoff, cacheFrameBudget\)/);
 assert.match(packager, /copyfile\("frontend\/src\/live-loop-refresh-v1\.js"/);
 assert.match(workflow, /python scripts\/apply-radar-auto-refresh-v1\.py/);
 

@@ -214,10 +214,19 @@ replace_once(
     '"./storage.js?v=9.8.3"',
     '"./storage.js?v=20261103-bounded-site-indexeddb-v1"'
 )
-replace_once(
-    "getRadarFrames(region, cacheCutoff).catch(error => {",
-    "getRadarFrames(region, cacheCutoff, cacheFrameBudget).catch(error => {"
-)
+# The pinned release can express this call with different whitespace
+# after the earlier overlays. Replace only the selected cache read inside
+# the source-result Promise.all, not other radar or Doppler readers.
+cache_read_start=data.index("  const [sourceResult, cachedFrames] = await Promise.all([")
+cache_read_end=data.index("  const resolvedSource=",cache_read_start)
+cache_call_start=data.index("getRadarFrames(",cache_read_start,cache_read_end)
+cache_call_end=data.index(").catch",cache_call_start,cache_read_end)+1
+old_cache_call=data[cache_call_start:cache_call_end]
+assert "region" in old_cache_call and "cacheCutoff" in old_cache_call
+assert "getRadarFrames(region, cacheCutoff, cacheFrameBudget)" in source
+data=(data[:cache_call_start] +
+      "getRadarFrames(region, cacheCutoff, cacheFrameBudget)" +
+      data[cache_call_end:])
 budget_start=source.index("  // Load only a small, site-specific verified archive slice")
 budget_end=source.index("  // Startup metadata failure",budget_start)
 inject_once_cache_anchor='''  const [sourceResult, cachedFrames] = await Promise.all(['''
