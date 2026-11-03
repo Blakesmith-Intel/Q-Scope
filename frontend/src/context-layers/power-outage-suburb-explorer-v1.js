@@ -158,11 +158,23 @@ export function createPowerOutageSuburbExplorer({
         provider.replaceChildren(link);
       }
       const present=item.state!=="unavailable";
+      const sourceState=create("td","outage-provider-status",
+        item.state==="ok"?"Current":item.state==="partial"?"Partial feed":"Unavailable");
+      if(item.sourceNewestAtMs!==null){
+        const date=new Date(item.sourceNewestAtMs);
+        const sourceClock=new Intl.DateTimeFormat("en-AU",{
+          timeZone:"Australia/Brisbane",day:"2-digit",month:"2-digit",
+          hour:"2-digit",minute:"2-digit",hourCycle:"h23"
+        }).format(date);
+        const timestamp=create("small","outage-provider-source-time",
+          "Source "+sourceClock+" AEST");
+        timestamp.title="Latest provider-published record time, not the app's last refresh time";
+        sourceState.append(timestamp);
+      }
       tr.append(provider,
         create("td","outage-provider-number",present?number(item.outages):"—"),
         create("td","outage-provider-number",present?number(item.customers):"—"),
-        create("td","",item.state==="ok"?"Current":
-          item.state==="partial"?"Partial feed":"Unavailable"));
+        sourceState);
       tbody.append(tr);
     }
     const footer=create("tr");
@@ -172,7 +184,7 @@ export function createPowerOutageSuburbExplorer({
       create("td","",report.partial?"Partial total":"All three feeds"));
     tbody.append(footer);table.append(tbody);results.append(table);
     results.append(create("p","outage-suburb-note",
-      "Counts are unique live UNPLANNED incident IDs per provider; a shared outage is counted once, not once per suburb or LGA. Customers affected are a separate measure."));
+      "Counts are unique UNPLANNED incidents per provider. Customers affected is a separate estimate. Source time shows the latest provider-published record; checked time shows when StormTracker retrieved it. Shared councils are not double-counted."));
     if(report.total.withoutGeometry)results.append(create("p","outage-suburb-note",
       number(report.total.withoutGeometry)+" provider outage records have no source-mapped geometry; included in statewide counts but not plotted or assigned to a council."));
     if(report.partial)results.append(create("p","outage-suburb-note",
