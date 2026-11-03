@@ -76,9 +76,9 @@ assert.match(sourcePower,/groupOutagesByVerifiedGeometry\(suburbGroups,eventLgas
 assert.doesNotMatch(sourcePower,/LGA not verified/);
 // Both the sidebar and provider report now use the same unique-event
 // aggregation. Council/suburb multiplicity must never inflate statewide totals.
-assert.match(sourcePower,/powerOutageProviderCounts\\(latestFeatures/);
-assert.match(sourcePower,/const count=providerSummary\\.total\\.outages/);
-assert.match(sourcePower,/const total=providerSummary\\.total\\.customers/);
+assert.match(sourcePower,/powerOutageProviderCounts\(latestFeatures/);
+assert.match(sourcePower,/const count=providerSummary\.total\.outages/);
+assert.match(sourcePower,/const total=providerSummary\.total\.customers/);
 assert.ok(html.includes('id="outageByProviderReport"'));
 assert.match(sourcePower,/sidebarCustomers\.textContent/);
 assert.match(sourceRoad,/sidebarCount\.textContent/);
