@@ -315,3 +315,5 @@
   #powerOutageExplorer .outage-provider-table th:nth-child(4),
   #powerOutageExplorer .outage-provider-table td:nth-child(4){width:26%;}
 }
+
+#powerOutageExplorer .outage-provider-source-time{display:block;margin-top:3px;color:#abc8d7;font-size:10px;line-height:1.3;font-weight:400;overflow-wrap:normal;}
