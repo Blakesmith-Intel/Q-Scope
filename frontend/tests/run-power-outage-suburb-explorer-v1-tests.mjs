@@ -49,11 +49,17 @@ const css=read("../src/power-outage-suburb-explorer-v1.css");
 const simpleCss=read("../src/friendly-ui-v1.css");
 for(const id of ["openPowerOutageExplorer","powerOutageExplorer","outageSuburbSearch",
   "outageSuburbResults","outageSuburbSummary","outageSuburbFeedStatus",
-  "refreshPowerOutageExplorer","outageSuburbMore","closePowerOutageExplorer"])
+  "refreshPowerOutageExplorer","outageByProviderReport","outageSuburbMore","closePowerOutageExplorer"])
   assert.ok(html.includes('id="'+id+'"'),id+" missing");
 assert.match(html,/power-outage-suburb-explorer-v1\.css/);
 assert.match(view,/groupOutagesBySuburb\(features\)/);
 assert.match(view,/document\.createElement/);
+assert.match(view,/renderProviderReport\\(\\)/);
+assert.match(view,/powerOutageProviderCounts\\(latestFeatures/);
+assert.match(view,/byProvider\\.addEventListener\\("click",onProviderView\\)/);
+assert.ok(view.includes('providerView?"Report by LGA":"Report by provider"'));
+assert.ok(view.includes('item.state==="partial"?"Partial feed":"Unavailable"'));
+
 assert.match(view,/dialog\.showModal\(\)/);
 assert.match(view,/status\.kind==="error"/);
 assert.match(view,/outageLocation\(item\.feature\)/);
