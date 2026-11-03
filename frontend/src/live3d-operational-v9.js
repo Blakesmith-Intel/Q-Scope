@@ -358,12 +358,12 @@ const motionTransition={cancel(){visualMotionGeneration++;}};
 const radarImageryHandover = createRadarImageryHandover({
   imageryLayers: viewer.imageryLayers, scene,
   retireLayer:deferredImageryRetirement?.retire,
-  // Retain at most two previous native-resolution GPU layers, on desktop
-  // AND mobile. Keeping all six textures on software-rendered Chromium caused
-  // Cesium to stall for over two minutes during active source handover.
-  // The genuine six-frame timeline is unchanged; evicted surfaces render
-  // again on demand from their verified source, never at reduced resolution.
-  maxRetainedLayers:2
+  // Six measured frames reuse their already rendered native-resolution GPU
+  // images on desktop. Evicting after only three layers forced expensive
+  // texture teardown and re-upload on EVERY six-frame playback cycle.
+  // Mobile retains its established three-layer memory ceiling. Longer loops
+  // remain bounded; the genuine source PNGs and UTCs are never modified.
+  maxRetainedLayers:window.matchMedia?.("(max-width:700px)").matches?2:5
 });
 let additionalRadarSiteIds=[];
 let previousPrimaryRadarId=null;

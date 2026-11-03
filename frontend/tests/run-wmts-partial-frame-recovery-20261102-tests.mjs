@@ -156,10 +156,10 @@ assert(source.includes("timeoutMs:10000,"),
   "Actual predecoded Cesium tiles need a bounded but mobile-safe handover window");
 assert(packageOverlay.includes("timeoutMs:10000,"),
   "Production-equivalent build must carry the handover budget");
-assert(source.includes("maxRetainedLayers:2"),
-  "Operator must retain at most two prior authentic native-resolution GPU layers on every platform");
-assert(packageOverlay.includes("maxRetainedLayers:2"),
-  "Production-equivalent overlay must enforce the same three-layer GPU budget");
+assert(source.includes('maxRetainedLayers:window.matchMedia?.("(max-width:700px)").matches?2:5'),
+  "Desktop must reuse the six genuine frames; mobile must remain at three GPU layers");
+assert(packageOverlay.includes('maxRetainedLayers:window.matchMedia?.("(max-width:700px)").matches?2:5'),
+  "Production-equivalent overlay must preserve identical desktop/mobile texture ceilings");
 assert(source.includes("cacheFrameBudget=automatic?9"),
   "routine source checks must not reload all archived high-resolution frames");
 assert(packageOverlay.includes("cacheFrameBudget=automatic?9"),

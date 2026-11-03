@@ -412,12 +412,12 @@ inject_once(
     '''const radarImageryHandover = createRadarImageryHandover({
   imageryLayers: viewer.imageryLayers, scene,
   retireLayer:deferredImageryRetirement?.retire,
-  // Retain at most two previous native-resolution GPU layers, on desktop
-  // AND mobile. Keeping all six textures on software-rendered Chromium caused
-  // Cesium to stall for over two minutes during active source handover.
-  // The genuine six-frame timeline is unchanged; evicted surfaces render
-  // again on demand from their verified source, never at reduced resolution.
-  maxRetainedLayers:2
+  // Six measured frames reuse their already rendered native-resolution GPU
+  // images on desktop. Evicting after only three layers forced expensive
+  // texture teardown and re-upload on EVERY six-frame playback cycle.
+  // Mobile retains its established three-layer memory ceiling. Longer loops
+  // remain bounded; the genuine source PNGs and UTCs are never modified.
+  maxRetainedLayers:window.matchMedia?.("(max-width:700px)").matches?2:5
 });'''
 )
 replace_once(
@@ -486,7 +486,7 @@ assert "if(resume && !incrementalCommit && !noninterruptingBackfill)playback.pla
 assert "const noninterruptingBackfill = automatic" in data
 assert "radarTileFailureSnapshot" in data
 assert (site / "src/radar-incremental-window-v1.js").exists()
-assert "maxRetainedLayers:2" in data
+assert 'maxRetainedLayers:window.matchMedia?.("(max-width:700px)").matches?2:5' in data
 assert "20261103-postrender-cleanup-v1" in data
 assert "Never synchronously destroy WebGL textures" in (site / "src/imagery-layer-retirement-v1.js").read_text()
 assert "canvas.toBlob(blob=>blob" in data
