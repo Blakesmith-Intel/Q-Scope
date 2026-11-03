@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {loadCompleteRadarTiles} from "../src/radar-tile-retry-v1.js";
 import {readFileSync} from "node:fs";
 import {fetchWmtsPreflightTile,loadBomReflectivityMosaicAtTime,
   retryableWmtsMosaicFailure} from "../src/bom-wmts-loop-v2.js";
@@ -166,6 +167,48 @@ console.log("PASS_BOM_403_NEGATIVE_CACHE_EXPIRES_AND_ORIGINAL_PNG_RECOVERS");
 console.log("PASS_EXACT_BOM_403_NATIVE_ORIGINAL_SOURCE_RECOVERY",JSON.stringify({
  relay403,native200,sourceUtcUnchanged:true,refusalRetained:true
 }));
+// Actual browser compressed-PNG cache across a single-tile 403 recovery.
+// The first attempt must collect all eight genuine neighbours despite the
+// refusal, and the next bounded retry must fetch ONLY the missing original.
+const mosaicUtc="2026-11-03T07%3A25%3A00Z";
+const mosaicTasks=Array.from({length:9},(_,i)=>({
+  url:"https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev/wmts?"+
+      "SERVICE=WMTS&REQUEST=GetTile&LAYER=atm_surf_air_precip_reflectivity_dbz"+
+      "&TILECOL="+(60+i)+"&TILEROW=14&time="+mosaicUtc,
+  col:60+i,row:14,x:i*256,y:0
+}));
+const refusedMosaicUrl=mosaicTasks[3].url;
+let refusedMosaic=true;
+const sourceReads=new Map();
+globalThis.fetch=async(target)=>{
+  const url=String(target);
+  sourceReads.set(url,(sourceReads.get(url)??0)+1);
+  if(refusedMosaic && (url===refusedMosaicUrl ||
+      url===officialWmtsFallbackUrl(refusedMosaicUrl)))
+    return {ok:false,status:403};
+  return {ok:true,status:200,
+    blob:async()=>new Blob(["original-source-png"],{type:"image/png"})};
+};
+await assert.rejects(()=>loadCompleteRadarTiles(mosaicTasks,fetchReadableImage,{
+  stopOnPermanent:true,wait:async()=>{}
+}),/HTTP 403/);
+for(const task of mosaicTasks)
+  assert.equal(sourceReads.get(task.url),1,
+    "Source must collect every available original even after one 403");
+refusedMosaic=false;
+const retryClock=Date.now;
+const t=Date.now();
+try{
+  Date.now=()=>t+31000;
+  const recovered=await loadCompleteRadarTiles(mosaicTasks,fetchReadableImage,{
+    stopOnPermanent:true,wait:async()=>{}
+  });
+  assert.equal(recovered.length,9);
+  for(const task of mosaicTasks)
+    assert.equal(sourceReads.get(task.url),task.url===refusedMosaicUrl?2:1,
+      "On retry, only the exact refused source tile may re-download");
+}finally{Date.now=retryClock;}
+console.log("PASS_ONE_REFUSED_BOM_TILE_RECOVERS_WITHOUT_REFETCHING_EIGHT_REAL_NEIGHBOURS");
 console.log("PASS_GLOBAL_RADAR_WMTS_GUARD_AND_PREFLIGHT_RECOVERY",JSON.stringify({
  previewRoute:globalThis.location.pathname,peak,requests:actualRequests,
  verifiedTileBlobs:networkPressureDiagnostics().verifiedTileBlobs

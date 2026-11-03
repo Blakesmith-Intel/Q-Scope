@@ -34,7 +34,7 @@ replace_once(old_radar_runtime, source[start:end].rstrip())
 
 replace_once(
     "bom-wmts-loop-v2.js?v=9.18.6-bounded-published-history",
-    "bom-wmts-loop-v2.js?v=20261103-source-403-cache-unblock-v1"
+    "bom-wmts-loop-v2.js?v=20261103-complete-original-403-mosaic-v1"
 )
 replace_once(
     "live-loop-refresh-v1.js?v=9.9.0-4",

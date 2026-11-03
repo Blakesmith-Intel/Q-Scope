@@ -178,4 +178,9 @@ assert(packageOverlay.includes("canvas.toBlob(blob=>blob"),
   "Delivered Pages application must use the same nonblocking lossless radar PNG");
 assert(packageOverlay.includes('copyfile("frontend/src/radar-imagery-handover-v1.js"'),
   "The real packaged application must contain the matching GPU handover helper");
+const core=readFileSync(new URL("frontend/src/bom-wmts-loop-v2.js",root),"utf8");
+assert(core.includes("firstRefusal=error"),
+  "Source preflight 403 must still cache other original PNGs before retry");
+assert(core.includes("20261103-complete-original-403-mosaic-v1"),
+  "Six-frame recovery must load the source-only mosaic correction");
 console.log("PASS Taroom/global real-tile timeout and six-frame missing-observation recovery source + shipped overlay");

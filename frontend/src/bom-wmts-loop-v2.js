@@ -6,7 +6,7 @@ export const HIGH_RESOLUTION_FRAMES_ONLY=true;
 import { BORDER_RADAR_SITES } from "./border-radar-sites-v1.js";
 import { decodeReflectivityImageData, SOURCE_PALETTES, REFLECTIVITY_CLASSES } from "./palette.js?v=diagnostics-v1";
 import { fetchReadableImage } from "./radar-source.js?v=20261103-source-403-cache-unblock-v1";
-import { loadCompleteRadarTiles } from "./radar-tile-retry-v1.js?v=9.16-radar-recovery";
+import { loadCompleteRadarTiles } from "./radar-tile-retry-v1.js?v=20261103-complete-original-403-mosaic-v1";
 import {publishedReflectivityTimes} from "./bom-wmts-published-times-v1.js?v=20261019-native-bom-hires-current";
 
 // Retain the genuine high-resolution national BoM WMTS PNG product; only
@@ -271,25 +271,31 @@ export async function loadVerifiedNationalMosaicAtTime(observedUtc, region = 'SE
   if(unavailableTime.isRejected(observedUtc,region))
     throw Error("BoM WMTS timestamp unavailable (cached source rejection): "+observedUtc);
   const first=tasks[0];
-  let firstImage;
+  let firstImage,firstRefusal=null;
   try{
     // One brief transient retry for the SOURCE-PROOF preflight tile. A single
-    // 502/503/network hiccup must not silently remove an otherwise published
-    // five-minute frame from the operator loop. A real 400/403/429 remains
-    // terminal for this attempt and is not hammered or fabricated.
+    // A genuine 400/429 still aborts. An isolated 403 on this ONE tile
+    // must not prevent caching the OTHER official source PNGs at this UTC.
+    // It remains a failed complete frame until the refused original recovers.
     firstImage=await fetchWmtsPreflightTile(first.url,fetchReadableImage);
   }catch(error){
-    if(/HTTP\s+400\b/.test(String(error?.message??error)))
-      unavailableTime.reject(observedUtc,region);
-    logWmtsFailure(region,observedUtc,
-      "tile "+first.col+"/"+first.row+": "+String(error?.message??error));
-    throw Error("BoM WMTS source time preflight failed at "+
-      observedUtc+": "+String(error?.message??error));
+    if(/HTTP\s+403\b/.test(String(error?.message??error))){
+      firstRefusal=error;
+    }else{
+      if(/HTTP\s+400\b/.test(String(error?.message??error)))
+        unavailableTime.reject(observedUtc,region);
+      logWmtsFailure(region,observedUtc,
+        "tile "+first.col+"/"+first.row+": "+String(error?.message??error));
+      throw Error("BoM WMTS source time preflight failed at "+
+        observedUtc+": "+String(error?.message??error));
+    }
   }
   let tiles;
   try{
     tiles=await loadCompleteRadarTiles(tasks,
-      url=>url===first.url?Promise.resolve(firstImage):fetchReadableImage(url),{
+      url=>url===first.url
+        ? (firstRefusal?Promise.reject(firstRefusal):Promise.resolve(firstImage))
+        : fetchReadableImage(url),{
       retries:1,stopOnPermanent:true
     });
   }catch(error){

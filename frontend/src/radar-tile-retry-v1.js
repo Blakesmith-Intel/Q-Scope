@@ -13,10 +13,12 @@ export async function loadCompleteRadarTiles(tasks, fetchTile, {
   let pending = tasks.map((task, i) => ({ task, i }));
   for (let attempt = 0; attempt <= retries; attempt++) {
     const failures = [];
-    // A source-denied mosaic cannot be used. With the production permanent-
-    // refusal guard enabled, stop requesting further tiles after the first
-    // refused pair rather than draining the remaining WMTS queue pointlessly.
-    // Two at a time matches the existing global two-request pressure limit.
+    // A 403 can affect ONE specific source tile while other tiles at this
+    // exact observation UTC remain authentic and available. Collect/cache
+    // them now; next source recovery needs only the refused original PNG.
+    // Never present an incomplete mosaic or hammer a refused tile. Confirmed
+    // unpublished UTC (400) and global rate-limit (429) still stop the batch.
+    // Two at a time respects the existing global two-request pressure limit.
     const batchSize = stopOnPermanent ? 2 : pending.length;
     let permanent = false;
     for (let offset = 0; offset < pending.length; offset += batchSize) {
@@ -39,14 +41,16 @@ export async function loadCompleteRadarTiles(tasks, fetchTile, {
           });
         }
       });
-      // A 400 means BoM rejected the UTC/tile; 403/429 means access denied.
-      // Neither can be repaired by fetching more tiles for this SAME frame.
+      // Only a source-rejected UTC (400) or global rate-limit (429) makes
+      // remaining tiles futile. A tile-specific 403 is not a global denial.
       permanent = stopOnPermanent && failures.some(({error}) =>
-        /(?:HTTP\s+(?:400|403|429)\b|relay cooldown|queue full)/i.test(error));
+        /(?:HTTP\s+(?:400|429)\b|relay cooldown|queue full)/i.test(error));
       if (permanent) break;
     }
     if (!failures.length) return results;
-    if (attempt === retries || permanent) {
+    const refusedTile=stopOnPermanent && failures.some(({error}) =>
+      /(?:HTTP\s+403\b|source refusal cooldown)/i.test(error));
+    if (attempt === retries || permanent || refusedTile) {
       const details = failures.slice(0, 6).map(({ task, error }) =>
         "tile " + task.col + "/" + task.row + ": " + error
       ).join("; ");
