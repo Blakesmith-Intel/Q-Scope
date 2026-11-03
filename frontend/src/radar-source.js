@@ -106,7 +106,10 @@ export async function fetchReadableImage(url) {
   try {
     const response=await fetch(url, {
       mode: "cors",
-      cache: "no-store",
+      // Exact WMTS URLs include the immutable BoM observation UTC and tile.
+      // Let the browser reuse a successful PNG instead of needlessly asking
+      // the relay for the same source bytes on every loop/site switch.
+      cache: isWmts ? "default" : "no-store",
       signal:controller.signal
     });
     if (!response.ok) {
