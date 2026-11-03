@@ -1,3 +1,11 @@
+# CURRENT OPERATOR-ACCEPTED PRODUCTION — V10.2.51 (3 November 2026)
+
+**Official restore source:** commit `a641e0407287c826382bf5e47cf4dee59a97821a`, annotated tag `v10.2.51` and same-commit branch `restore/v10.2.51`. The exact published Pages run [41641906435](https://github.com/Blakesmith-Intel/StormTracker/actions/runs/41641906435) passed, including live production-root verification of the one 30-minute rain-radar playback option, native BoM imagery/CORS guard, V10.2.50 genuine-frame recovery, and preserved warning polygons. The operator explicitly approved this release as the official restore point.
+
+**Start all further changes at `v10.2.51`.** Six source-published BoM rain scans maximum, original source UTC, five-minute polling and recovery, multi-radar sync, Doppler, operator camera, 3-D and other approved layers remain untouched. Keep all older tags/restore branches immutable. [V10.2.51 official contract](PRODUCTION_BASELINE_V10.2.51.md) · [Release notes](RELEASE_NOTES_V10.2.51.md) · [Restore instructions](BASELINE_RESTORE.md). The independent BoM/relay/agency services are not included in a code freeze.
+
+---
+
 # CURRENT ACCEPTED PRODUCTION — V10.2.46 (1 November 2026)
 
 **New immutable baseline:** `v10.2.46`, matching `restore/v10.2.46`, after successful public Pages verification. This source-verified active-warning polygon recovery hotfix retains all V10.2.45 radar and situational-awareness capabilities. The healthy BoM warnings polling interval is still 15 minutes; only an active warning missing an original polygon gets bounded two-minute catch-up checks. No invented geometry, false all-clears or changes to approved warning map styling.
