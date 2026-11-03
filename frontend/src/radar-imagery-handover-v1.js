@@ -171,13 +171,13 @@ export function createRadarImageryHandover({
         // Cesium's documented signal covers queued terrain and imagery
         // for this view. Two consecutive rendered frames avoid a single
         // stale true immediately after the layer was inserted.
-        // A decoded native BoM SingleTile image does not depend on unrelated
-        // basemap/terrain requests completing. Permit handover after THREE
-        // successful render boundaries even if the global Cesium tile queue
-        // is still busy with other layers. Non-predecoded imagery must pass
-        // the existing global tilesLoaded test.
+        // The native BoM SingleTile image was decoded before staging.
+        // After TWO completed Cesium render boundaries, reveal the matching
+        // original-source image and 3-D together. A third unnecessary scene
+        // render previously stalled on unrelated GPU/map work in Chromium.
+        // Non-predecoded imagery still requires Cesium's tilesLoaded signal.
         const imageReady = scene.globe?.tilesLoaded === true ||
-          (decodedSingleTile && frames >= 3);
+          (decodedSingleTile && frames >= 2);
         consecutiveReady = imageReady ? consecutiveReady + 1 : 0;
         if (frames >= 2 && consecutiveReady >= (decodedSingleTile ? 1 : 2)) {
           finish(true);

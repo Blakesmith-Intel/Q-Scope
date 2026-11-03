@@ -91,9 +91,9 @@ assert.ok(runtime.includes("renderSurface(displayFrame,renderToken"),"intermedia
 assert.ok(!runtime.includes("frameCrossfade.play("),"whole-scene opacity fade must never be used");
 assert.ok(runtime.includes("previousVisibleIndex"),"failed Cesium loads cannot falsely advance the frame indicator");
 assert.ok(!runtime.includes('"pointerdown", "pointermove", "wheel", "keydown"'),"hover must not interrupt radar transitions");
-// A native SingleTile image already decoded from BoM must not await every
-// unrelated map/terrain tile. Its outgoing image is still retained until
-// Cesium has had three render boundaries to composite the new source.
+// An already decoded native BoM image needs two rendered boundaries, not a
+// third render delayed by unrelated map tiles. The outgoing image stays until
+// the measured 2-D and inferred 3-D can reveal together.
 const native=fixture();
 const oldNative={name:"old-native"};
 await native.api.replace(oldNative);
@@ -101,8 +101,7 @@ native.scene.globe.tilesLoaded=false;
 const newNative={name:"decoded-native"};
 const nativeSwap=native.api.replace(newNative,{decodedSingleTile:true});
 native.fire();
-native.fire();
-assert.equal(native.api.currentLayer,oldNative,"do not unveil immediately");
+assert.equal(native.api.currentLayer,oldNative,"do not unveil on first boundary");
 native.fire();
 assert.equal(await nativeSwap,true,
   "decoded SingleTile image advances despite independently loading basemap");
@@ -126,8 +125,8 @@ const waiting=synced.api.replace(next2d,{
     geometryFrame="t1";
   }
 });
-synced.fire();synced.fire();
-assert.equal(geometryFrame,"t0","waiting for radar texture must not change 3-D data");
+synced.fire();
+assert.equal(geometryFrame,"t0","staging radar must not change 3-D data");
 synced.fire();
 assert.equal(await waiting,true);
 assert.equal(geometryFrame,"t1");
@@ -157,7 +156,7 @@ for(let cycle=0;cycle<3;cycle++){
     if(cycle===0)firstLayers.push(next);
     let beforeReveal=0;
     const swap=warm.api.replace(next,{decodedSingleTile:true,cacheEligible:true,beforeReveal:()=>beforeReveal++});
-    if(cycle!==0||i!==0){warm.fire();warm.fire();warm.fire();}
+    if(cycle!==0||i!==0){warm.fire();warm.fire();}
     assert.equal(await swap,true);
     assert.equal(beforeReveal,1,"Atomic measured image and geometry handover retained");
     assert.equal(warm.api.currentLayer.imageryProvider,genuineProviders[i]);
@@ -174,13 +173,13 @@ for(const layer of firstLayers)
 const syntheticProvider={displayOnly:true};
 const synthetic={name:"display-only",imageryProvider:syntheticProvider,alpha:1,show:true};
 const syntheticSwap=warm.api.replace(synthetic,{decodedSingleTile:true,cacheEligible:false});
-warm.fire();warm.fire();warm.fire();
+warm.fire();warm.fire();
 assert.equal(await syntheticSwap,true);
 const backToMeasured=warm.api.replace(
   {name:"measured-again",imageryProvider:genuineProviders[5],alpha:1,show:true},
   {decodedSingleTile:true,cacheEligible:true}
 );
-warm.fire();warm.fire();warm.fire();
+warm.fire();warm.fire();
 assert.equal(await backToMeasured,true);
 assert(warm.removed.includes(synthetic),
   "Visual-only images must be retired, never preserved in measured GPU cache");
@@ -198,7 +197,7 @@ for(let i=0;i<12;i++){
   const swap=mobile.api.replace({imageryProvider:provider,alpha:1,show:true},{
     decodedSingleTile:true,cacheEligible:true
   });
-  if(i){mobile.fire();mobile.fire();mobile.fire();}
+  if(i){mobile.fire();mobile.fire();}
   assert.equal(await swap,true,"mobile measured radar source must remain presentable");
   assert(mobile.layers.length<=3,
     "mobile must not retain all six primary scan GPU textures");

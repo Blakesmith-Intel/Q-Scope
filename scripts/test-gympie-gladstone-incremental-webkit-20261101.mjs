@@ -46,8 +46,26 @@ try{
  // different radars exercise the same system-wide renderer and scheduler.
  for(const region of ["08","23","66","106","56","107","36"]){
   await page.locator("#radarSite").selectOption(region);
-  const baseline=await stable(region);
-  const baselineCount=Number((baseline.label||"").split("/")[1]);
+  let baseline=await stable(region);
+  let baselineCount=Number((baseline.label||"").split("/")[1]);
+  // A real BoM tile may temporarily return 403 despite a published UTC.
+  // Exercise the existing one-minute retry in the SAME browser session;
+  // never substitute an older tile or mark a denied source as a test pass.
+  if(["08","23"].includes(region) && baselineCount<6 &&
+     baseline.diagnostic?.tileFailures?.some(item=>/HTTP\\s+403\\b/i.test(item.message??""))){
+    console.log("REAL_SOURCE_TEMPORARY_DENIAL_RETRY",JSON.stringify({
+      region,initialFrames:baseline.label,
+      refusals:baseline.diagnostic.tileFailures.slice(-4)
+    }));
+    await page.waitForTimeout(65000);
+    await page.evaluate(async()=>window.__stormtrackerRadarQaCheck());
+    baseline=await stable(region);
+    baselineCount=Number((baseline.label||"").split("/")[1]);
+    console.log("REAL_SOURCE_TEMPORARY_DENIAL_RECOVERY",JSON.stringify({
+      region,frames:baseline.label,
+      refusals:baseline.diagnostic?.tileFailures?.slice(-4)
+    }));
+  }
   assert(baselineCount>=1,"No real BoM frame at "+region);
   assert(baseline.pressure?.peakActive>0 && baseline.pressure.peakActive<=2,
     "Radar WMTS source not protected by shared two-request limit in review path");
