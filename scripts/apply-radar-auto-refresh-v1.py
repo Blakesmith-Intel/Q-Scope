@@ -455,11 +455,11 @@ data=data.replace(old_options,new_options,1)
 # The optional archive warmer used to fetch two extra historical mosaics even
 # after six genuine current frames had loaded. In this source-only mode that
 # causes avoidable old-tile 403s, so do not schedule it for 30-minute rain.
-warm_anchor='async function warmRadarHistoryCache(\\n  region,\\n  observedTimes\\n) {\\n'
+warm_anchor='async function warmRadarHistoryCache(\n  region,\n  observedTimes\n) {\n'
 assert data.count(warm_anchor)==1
 data=data.replace(warm_anchor,warm_anchor+
-    '  // No off-window historical downloads in normal BoM rain playback.\\n'+
-    '  if (selectedLoopSelection() === "30") return;\\n',1)
+    '  // No off-window historical downloads in normal BoM rain playback.\n'+
+    '  if (selectedLoopSelection() === "30") return;\n',1)
 assert 'six-published-scans-only-v1' in data
 assert 'No off-window historical downloads' in data
 app.write_text(data, encoding="utf-8")
