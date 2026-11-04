@@ -630,7 +630,13 @@ export function createRiverGaugeLayer({
           historyScreeningAlertsAffected:coverage.affectedActiveSignals,
           historySourceMissing:coverage.missingSource,
           historyLoaded:success,historyFailed:failures,historyNoData:noData,
-          historyRetainedStationSamples:Object.keys(history).length});
+          historyRetainedStationSamples:Object.keys(history).length,
+          // Carry existing live-source health through history-only updates;
+          // otherwise an optional history pass can hide a genuine feed issue.
+          staleOfficial:currentFeatures.filter(f=>
+            f.properties?.STORMTRACKER_OBSERVATION_STALE).length,
+          metadataFallback:Boolean(diagnostics?.metadataFallback),
+          failedProducts:diagnostics?.failedProducts??[]});
       }
     })();
     try{return await recentLoading;}
@@ -935,6 +941,8 @@ export function createRiverGaugeLayer({
 
           historySourceMissing:
             screening.missingSource,
+
+          historyRetainedStationSamples:Object.keys(history).length,
 
           failedProducts:
             result.failedProducts,
