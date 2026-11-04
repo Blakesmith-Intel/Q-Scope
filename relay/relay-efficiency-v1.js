@@ -76,12 +76,16 @@ export function createRelayEfficiency({
     }
     if(pending.size>=maxInflight)return handler();
     stats.source++;
+    const started=now();
     const task=Promise.resolve().then(handler);
     pending.set(key,task);
     try{
       const response=await task;
-      // The retained original response is never consumed by clients.
-      return response.clone();
+      // The retained original response is never consumed by clients. Keep
+      // the more precise history HIT/MISS label when it is already present.
+      const cloned=response.clone();
+      return cloned.headers.has(CACHE_LABEL)?cloned:
+        annotatedResponse(cloned,"SOURCE",started,now());
     }finally{
       if(pending.get(key)===task)pending.delete(key);
     }
