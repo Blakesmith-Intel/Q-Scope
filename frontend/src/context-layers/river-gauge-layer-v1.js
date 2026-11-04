@@ -47,6 +47,15 @@ import {
 // Preserve exact same-station browser observations after a numeric BoM
 // network ID gains its published leading zero (35295 -> 035295).
 // Never join by geography/name and never reassign a different AWRC station.
+// Operator text only. A history-coverage gap never creates an extra flood
+// signal or changes an existing BoM classification.
+export function describeRiverGaugeRiseCoverage({
+  incomplete=0,affectedActiveSignals=0,activeSignals=0
+}={}){
+  if(!incomplete)return "";
+  return ` · 30–120 min rise check incomplete at ${incomplete} eligible gauge${incomplete===1?"":"s"} statewide (${affectedActiveSignals} of ${activeSignals} flood signals affected; not extra flood alerts)`;
+}
+
 export function canonicaliseLegacyBoMStationCache(records){
   if(!records||typeof records!=="object"||Array.isArray(records))return records;
   const entries=Object.entries(records);
@@ -452,9 +461,13 @@ export function createRiverGaugeLayer({
   function recentHistoryCoverage(features=latestSourceFeatures,at=now()){
     const gaps=features.map(feature=>recentFloodHistoryGap(feature,history,at,crossingCatalogue))
       .filter(Boolean);
+    // These are ALL eligible statewide gauges, not additional map alerts.
+    // Count the overlap solely to explain the status; never change inclusion.
+    const activeIds=new Set(currentFeatures.map(feature=>String(feature.id)));
     return {
       incomplete:gaps.length,
-      missingSource:gaps.filter(gap=>!gap.target).length
+      missingSource:gaps.filter(gap=>!gap.target).length,
+      affectedActiveSignals:gaps.filter(gap=>activeIds.has(gap.id)).length
     };
   }
 
@@ -585,29 +598,39 @@ export function createRiverGaugeLayer({
       const coverage=recentHistoryCoverage();
       diagnostics={...(diagnostics??{}),
         historyScreeningIncomplete:coverage.incomplete,
+        historyScreeningAlertsAffected:coverage.affectedActiveSignals,
         historySourceMissing:coverage.missingSource,
         recentHistory:{loaded:success,failed:failures,noData,
           attempted:recentAttempted.size,screeningIncomplete:coverage.incomplete,
+          affectedActiveSignals:coverage.affectedActiveSignals,
+          retainedStationSamples:Object.keys(history).length,
           missingSource:coverage.missingSource,blockedUntil:recentRelayBlockedUntil}};
       if(failures||success||noData){
         const counts=diagnostics.floodSignalCounts??{};
         const count=currentFeatures.length;
-        const incompleteText=coverage.incomplete
-          ? ` · 30-minute rise screening incomplete for ${coverage.incomplete} gauge(s)`
-          : "";
+        const incompleteText=describeRiverGaugeRiseCoverage({
+          incomplete:coverage.incomplete,
+          affectedActiveSignals:coverage.affectedActiveSignals,
+          activeSignals:count
+        });
         const missingText=coverage.missingSource
           ? ` · ${coverage.missingSource} without a valid history link`
           : "";
         onStatus({kind:coverage.incomplete||lastBulletinsPartial?"warning":"ok",
-          message:`${count} qualifying flood signals · ${success} station histories loaded`+
-            (failures?` · ${failures} source failures (${lastFailureScope??"unknown"})`:"")+
-            (noData?` · ${noData} station(s) without recent history`:"")+
-            incompleteText+missingText+
+          message:`${count} qualifying flood signals`+
+            incompleteText+
+            ` · history: ${success} station table${success===1?"":"s"} loaded this pass`+
+            ` (${Object.keys(history).length} stations with retained samples)`+
+            (failures?` · ${failures} station-history request${failures===1?"":"s"} failed this pass (${lastFailureScope??"unknown"})`:"")+
+            (noData?` · ${noData} station${noData===1?"":"s"} returned no recent history this pass`:"")+
+            missingText+
             " · screening only; follow BoM warnings",
           count,...counts,partial:lastBulletinsPartial,
           screeningIncomplete:coverage.incomplete,
+          historyScreeningAlertsAffected:coverage.affectedActiveSignals,
           historySourceMissing:coverage.missingSource,
-          historyLoaded:success,historyFailed:failures,historyNoData:noData});
+          historyLoaded:success,historyFailed:failures,historyNoData:noData,
+          historyRetainedStationSamples:Object.keys(history).length});
       }
     })();
     try{return await recentLoading;}
@@ -866,6 +889,7 @@ export function createRiverGaugeLayer({
 
         const screening=recentHistoryCoverage(latestSourceFeatures,observedAt);
         diagnostics.historyScreeningIncomplete=screening.incomplete;
+        diagnostics.historyScreeningAlertsAffected=screening.affectedActiveSignals;
         diagnostics.historySourceMissing=screening.missingSource;
 
         const staleText=staleOfficial ? ` · ${staleOfficial} last-confirmed flood stage(s), observations stale` : "";
@@ -888,7 +912,7 @@ export function createRiverGaugeLayer({
               : "ok",
 
           message:
-            `${summaries.length} qualifying flood signal${summaries.length === 1 ? "" : "s"} · ${major} major · ${moderate} moderate · ${minor} minor · ${rapidRise} rapid above minor · ${tidalAnomaly} unusual tidal rise${staleText}${partialText}${screening.incomplete ? ` · 30-minute rise screening incomplete for ${screening.incomplete} gauge(s)` : ""}${screening.missingSource ? ` · ${screening.missingSource} without a valid history link` : ""}${metadataText} · screening only; follow BoM warnings`,
+            `${summaries.length} qualifying flood signal${summaries.length === 1 ? "" : "s"} · ${major} major · ${moderate} moderate · ${minor} minor · ${rapidRise} rapid above minor · ${tidalAnomaly} unusual tidal rise${staleText}${partialText}${describeRiverGaugeRiseCoverage({incomplete:screening.incomplete,affectedActiveSignals:screening.affectedActiveSignals,activeSignals:summaries.length})}${screening.missingSource ? ` · ${screening.missingSource} without a valid history link` : ""}${metadataText} · screening only; follow BoM warnings`,
 
           count:
             summaries.length,
@@ -905,6 +929,9 @@ export function createRiverGaugeLayer({
 
           screeningIncomplete:
             screening.incomplete,
+
+          historyScreeningAlertsAffected:
+            screening.affectedActiveSignals,
 
           historySourceMissing:
             screening.missingSource,
