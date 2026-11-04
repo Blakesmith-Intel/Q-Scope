@@ -437,6 +437,37 @@ function cachedGaugeLocations(storage,nowMs){
       validGaugeLocations(record?.payload))
       return {payload:record.payload,checkedAt:record.checkedAt};
   }catch{/* unavailable storage must never block source reads */}
+  // Existing browsers already have BoM-verified POINT metadata embedded in
+  // previously joined source observations. Salvage ONLY location/identity
+  // attributes (never a cached height, rise, flood class or observation time)
+  // to recover current live bulletin IDs when both metadata transports fail.
+  try{
+    const original=JSON.parse(storage?.getItem("stormtracker.qld-latest-river-gauge.v1")??"{}");
+    const keys=["bom_stn_num","awrc_stateid","name","lat","long","state",
+      "location_types","forecast_site_classification","basin","agency","featreal"];
+    const features=[];
+    let oldest=nowMs;
+    for(const [id,entry] of Object.entries(original??{}).slice(0,1800)){
+      const f=entry?.feature,at=Number(entry?.observedAt);
+      if(!/^(?:bom|awrc):[a-z0-9_-]+$/i.test(id)||f?.id!==id||
+        !Number.isFinite(at)||at<=0||at>nowMs||
+        nowMs-at>GAUGE_LOCATION_CACHE_MAX_AGE_MS||
+        f.geometry?.type!=="Point"||
+        !Array.isArray(f.geometry.coordinates)||
+        f.geometry.coordinates.length<2||
+        !f.geometry.coordinates.slice(0,2).every(Number.isFinite)||
+        String(f.properties?.state??"").toUpperCase()!=="QLD")continue;
+      // Retain source-supplied identity, never remembered display decisions.
+      const properties=Object.fromEntries(keys.filter(k=>Object.hasOwn(f.properties,k))
+        .map(k=>[k,f.properties[k]]));
+      if(!properties.bom_stn_num&&!properties.awrc_stateid)continue;
+      features.push({type:"Feature",id,geometry:f.geometry,properties});
+      oldest=Math.min(oldest,at);
+    }
+    const payload={type:"FeatureCollection",features};
+    if(validGaugeLocations(payload))return {payload,checkedAt:oldest,
+      legacy:true};
+  }catch{/* no old source cache or unparseable legacy data */}
   return null;
 }
 function storeGaugeLocations(storage,payload,nowMs){
@@ -463,7 +494,8 @@ async function readVerifiedGaugeLocations({fetchImpl,gaugeUrl,storage,nowMs}){
     return {payload,source:"direct-official-bom-arcgis",fallback:true};
   }catch(error){directError=error;}
   const cached=cachedGaugeLocations(storage,nowMs);
-  if(cached)return {payload:cached.payload,source:"cached-official-bom-arcgis",
+  if(cached)return {payload:cached.payload,
+    source:cached.legacy?"cached-verified-bom-station-observations":"cached-official-bom-arcgis",
     fallback:true,checkedAt:cached.checkedAt};
   throw Error("BoM gauge-location sources unavailable; "+
     "relay: "+String(relayError?.message??relayError)+"; official ArcGIS: "+
