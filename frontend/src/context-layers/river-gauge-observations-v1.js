@@ -431,7 +431,7 @@ export function officialQueenslandFloodCheckLocations(payload){
       const raw=String(p.gaugeno??"").trim();
       const point=feature?.geometry?.coordinates;
       const lon=Number(point?.[0]),lat=Number(point?.[1]);
-      if(!/^\\d{1,6}$/.test(raw)||feature?.geometry?.type!=="Point"||
+      if(!/^\d{1,6}$/.test(raw)||feature?.geometry?.type!=="Point"||
         !Number.isFinite(lon)||!Number.isFinite(lat)||
         lon<137||lon>154.1||lat< -30||lat> -9)return null;
       const id=raw.padStart(6,"0");
