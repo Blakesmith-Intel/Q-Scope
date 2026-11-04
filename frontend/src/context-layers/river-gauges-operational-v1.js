@@ -45,19 +45,27 @@ function setRiverGaugeStatus({
   message =
     ""
 } = {}) {
-  const target =
-    $("riverGaugeStatus");
-
-  if (!target) {
-    return;
+  const text=message||"BoM · live river heights";
+  // Runtime diagnostics is intentionally hidden in the four-section menu.
+  // Operators MUST still see real flood-feed status with the enabled layer.
+  const row=$("showRiverGauges")?.closest(".river-gauge-row");
+  let visible=$("floodGaugeInlineStatus");
+  if(row?.parentElement&&!visible){
+    visible=document.createElement("div");
+    visible.id="floodGaugeInlineStatus";
+    visible.className="note flood-gauge-inline-status";
+    visible.setAttribute("role","status");
+    visible.setAttribute("aria-live","polite");
+    visible.style.cssText="font-size:10px;line-height:1.4;margin:5px 0;overflow-wrap:anywhere";
+    row.insertAdjacentElement("afterend",visible);
   }
-
-  target.textContent =
-    message
-    || "BoM · live river heights";
-
-  target.dataset.kind =
-    kind;
+  for(const target of [$("riverGaugeStatus"),visible]){
+    if(!target)continue;
+    target.textContent=text;
+    target.dataset.kind=kind;
+    if(target===visible)target.style.color=
+      kind==="error"?"#f2ab9f":kind==="warning"?"#f2d39d":"";
+  }
 }
 
 function labelFloodClass(
@@ -772,6 +780,9 @@ export function initialiseOperationalRiverGauges({
         feature.properties?.STORMTRACKER_DISPLAY_STATE ?? "unknown"
       ),
       matched: layer.diagnostics?.matchedCount ?? 0,
+      totalObservations:layer.diagnostics?.totalObservations??null,
+      metadataSource:layer.diagnostics?.metadataSource??null,
+      metadataFallback:layer.diagnostics?.metadataFallback??null,
       counts: layer.diagnostics?.floodSignalCounts ?? null,
       historyStationCount: layer.historyStationCount,
       recentHistoryRequestCount: layer.recentHistoryRequestCount,

@@ -265,7 +265,7 @@ for relative,marker in (
                         encoding="utf-8")
 # Invalidate ONLY the published flood-gauge module import chain after the
 # measured history/rate fix. All other assets retain their approved cache keys.
-gauge_cache_suffix="-bom-gauge-history-30to120-20261026-station-table-current-height-v2-informational-stale-rate-v1-source-evidence-expiry-v1-approaches-crossing-indicators-20261027-v1-approaches-info-depth-20261027-v1-stale-road-depth-observation-20261027-v1-agency-time-formats-20261027-v1"
+gauge_cache_suffix="-bom-gauge-history-30to120-20261026-station-table-current-height-v2-informational-stale-rate-v1-source-evidence-expiry-v1-approaches-crossing-indicators-20261027-v1-approaches-info-depth-20261027-v1-stale-road-depth-observation-20261027-v1-agency-time-formats-20261027-v1-official-bom-gauge-location-recovery-20261105-v1"
 for relative,needle in (
     ("index.html","-jasper-alfred-v1"+suffix),
     ("live3d-operational-v9.html","-jasper-alfred-archive-v1"+suffix),
