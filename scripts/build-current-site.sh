@@ -27,6 +27,8 @@ for asset in index.html live3d-operational-v9.html app.css src 3d-models; do
   cp -a "$production/$asset" "_site/$asset"
 done
 cp "$production/data/nsw-radar-places-v1.json" "_site/data/"
+# Official BoM station ID/coordinates stay local; live heights remain the only flood feed.
+cp frontend/data/qld-bom-river-station-locations-v1.json _site/data/
 printf 'SEALED StormTracker V10.2.0 source %s\n' \
   '047b3bd1c66b0ed5f070d2298202f46d0cd8dae2' > _site/BUILD.txt
 
@@ -265,7 +267,7 @@ for relative,marker in (
                         encoding="utf-8")
 # Invalidate ONLY the published flood-gauge module import chain after the
 # measured history/rate fix. All other assets retain their approved cache keys.
-gauge_cache_suffix="-qld-gauge-source-20261105-v2"
+gauge_cache_suffix="-qld-station-catalogue-20261105-v3"
 for relative,needle in (
     ("index.html","-jasper-alfred-v1"+suffix),
     ("live3d-operational-v9.html","-jasper-alfred-archive-v1"+suffix),
