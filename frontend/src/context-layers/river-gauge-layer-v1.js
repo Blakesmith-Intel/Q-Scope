@@ -870,8 +870,8 @@ export function createRiverGaugeLayer({
 
         const staleText=staleOfficial ? ` · ${staleOfficial} last-confirmed flood stage(s), observations stale` : "";
         const metadataText=result.metadataFallback
-          ?result.metadataSource==="cached-official-bom-arcgis"
-            ?` · location references cached from verified BoM GIS as at ${new Date(result.metadataCheckedAt).toLocaleString("en-AU",{timeZone:"Australia/Brisbane"})}; live river readings checked separately`
+          ?String(result.metadataSource??"").startsWith("cached-")
+            ?` · station locations from verified BoM browser records as at ${new Date(result.metadataCheckedAt).toLocaleString("en-AU",{timeZone:"Australia/Brisbane"})}; river heights checked LIVE`
             :" · location references recovered directly from official BoM GIS"
           :"";
         const partialText =
