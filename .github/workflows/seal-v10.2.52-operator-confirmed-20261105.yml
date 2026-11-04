@@ -1,0 +1,40 @@
+name: Seal operator-approved StormTracker v10.2.52 restore point
+on:
+  push:
+    branches:
+      - ops/seal-v10.2.52-operator-confirmed-20261105
+    paths:
+      - .github/workflows/seal-v10.2.52-operator-confirmed-20261105.yml
+permissions:
+  contents: write
+jobs:
+  seal-approved-state:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Assert exact user-approved main/deployed commit, then create annotated restore tag
+        env:
+          APPROVED_SHA: 083e5df47c95430553d60ca5dcad810272b907fe
+          TAG: v10.2.52
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse "${APPROVED_SHA}^{commit}")" = "$APPROVED_SHA"
+          main_now="$(git ls-remote origin refs/heads/main | cut -f1)"
+          test "$main_now" = "$APPROVED_SHA" || { echo "ABORT: main moved from approved release"; exit 1; }
+          if [ -n "$(git ls-remote origin "refs/tags/$TAG")" ]; then
+            echo "ABORT: never overwrite an existing restore tag"
+            exit 1
+          fi
+          git config user.name "StormTracker Operator Release"
+          git config user.email "41898214+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$APPROVED_SHA" -m "Operator-confirmed working StormTracker production, 5 November 2026. All approved components frozen. No code changes authorised. Flood gauges and BoM original-source feed restored in PR #303/#304/#305. Main deployed commit $APPROVED_SHA. Never move or rewrite this tag."
+          git push origin "refs/tags/$TAG"
+          test "$(git rev-parse "${TAG}^{commit}")" = "$APPROVED_SHA"
+          gh release create "$TAG" --verify-tag --latest=false \
+            --title "StormTracker v10.2.52 — OPERATOR APPROVED FROZEN RESTORE POINT" \
+            --notes "Operator acceptance: 5 November 2026.\n\nExact production commit: \`$APPROVED_SHA\`.\nConfirmed: flood gauges are operational after restoration of their original BoM source and correction of request self-abort and browser-cache binding (PRs #303–#305). Radar and all previously approved operational features remain at the deployed production state.\n\n**STRICT CHANGE CONTROL:** Treat the entire state as frozen. No modification, redesign, replacement, source swap, refresh change, calculation change, display change or regression to any previously approved function without the operator expressly identifying and authorising that exact change. New work must be isolated and must preserve all untouched features. Validate desktop/mobile and verify actual production before acceptance. Do not overwrite, move or delete this tag; keep all previous restore tags unchanged.\n\nSource deployment: https://github.com/Blakesmith-Intel/StormTracker/actions/runs/41877544366 ."
+          echo "APPROVED_STORMTRACKER_FROZEN_TAG=$TAG target=$APPROVED_SHA"
