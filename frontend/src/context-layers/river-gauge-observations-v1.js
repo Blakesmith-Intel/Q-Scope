@@ -417,6 +417,35 @@ async function fetchJson(
   }
 }
 
+// Independent Queensland Government BoM flood-network station locations.
+// This is a source for published coordinates / official gauge numbers ONLY;
+// river-height readings and flood classification remain sourced from BoM.
+const QLD_FLOODCHECK_GAUGE_URL=
+  "https://spatial-gis.information.qld.gov.au/arcgis/rest/services/FloodCheck/FloodGauges/MapServer/1/query"+
+  "?where=1%3D1&outFields=gaugeno%2Cstn_name%2Cbasin%2Cagency"+
+  "&returnGeometry=true&outSR=4326&f=geojson";
+export function officialQueenslandFloodCheckLocations(payload){
+  const features=(Array.isArray(payload?.features)?payload.features:[])
+    .map(feature=>{
+      const p=feature?.properties??{};
+      const raw=String(p.gaugeno??"").trim();
+      const point=feature?.geometry?.coordinates;
+      const lon=Number(point?.[0]),lat=Number(point?.[1]);
+      if(!/^\d{1,6}$/.test(raw)||feature?.geometry?.type!=="Point"||
+        !Number.isFinite(lon)||!Number.isFinite(lat)||
+        lon<137||lon>154.1||lat< -30||lat> -9)return null;
+      const id=raw.padStart(6,"0");
+      return {type:"Feature",id:"bom:"+id,
+        geometry:{type:"Point",coordinates:[lon,lat]},
+        properties:{bom_stn_num:id,name:String(p.stn_name??""),
+          basin:String(p.basin??""),agency:String(p.agency??""),
+          state:"QLD",lat,long:lon,
+          // Don't invent tidal or qualitative status from this dataset.
+          location_types:"",forecast_site_classification:""}};
+    }).filter(Boolean);
+  return {type:"FeatureCollection",features};
+}
+
 // Reliable station-coordinate intake: a BoM ArcGIS relay outage is not a
 // verified zero-gauge result. Use only the SAME official BoM GIS query, then
 // a bounded, previously source-verified station-location snapshot. Height
@@ -484,11 +513,22 @@ async function readVerifiedGaugeLocations({fetchImpl,gaugeUrl,storage,nowMs}){
     storeGaugeLocations(storage,payload,nowMs);
     return {payload,source:"metadata-relay",fallback:false};
   }catch(error){relayError=error;}
-  // The official source is already approved for direct gauge-location reads
-  // in river-gauges-v1.js. Never switch to a third-party map or name match.
+  // Independent origin FIRST: retrying the same BoM ArcGIS server twice
+  // after its relay times out merely adds another whole timeout.
+  let qldError=null;
+  try{
+    const source=await fetchJson(fetchImpl,QLD_FLOODCHECK_GAUGE_URL,
+      "Queensland Government BoM flood network",12000,true);
+    const payload=officialQueenslandFloodCheckLocations(source);
+    if(!validGaugeLocations(payload))
+      throw Error("Queensland Government BoM flood network has no verified numbered point locations");
+    storeGaugeLocations(storage,payload,nowMs);
+    return {payload,source:"qld-government-bom-flood-network",fallback:true};
+  }catch(error){qldError=error;}
+  // Original full BoM ArcGIS source is still available as a final fallback.
   try{
     const payload=await fetchJson(fetchImpl,BOM_RIVER_TIDE_GAUGE_QUERY_URL,
-      "Official BoM ArcGIS gauge metadata",15000,true);
+      "Official BoM ArcGIS gauge metadata",12000,true);
     if(!validGaugeLocations(payload))throw Error("Official BoM ArcGIS metadata has no verified Queensland point locations");
     storeGaugeLocations(storage,payload,nowMs);
     return {payload,source:"direct-official-bom-arcgis",fallback:true};
@@ -500,6 +540,7 @@ async function readVerifiedGaugeLocations({fetchImpl,gaugeUrl,storage,nowMs}){
   throw Error("BoM gauge-location sources unavailable; "+
     "relay: "+String(relayError?.message??relayError)+"; official ArcGIS: "+
     String(directError?.message??directError)+
+    "; Queensland Government GIS: "+String(qldError?.message??qldError)+
     "; no time-valid verified station-location cache");
 }
 

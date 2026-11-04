@@ -872,7 +872,9 @@ export function createRiverGaugeLayer({
         const metadataText=result.metadataFallback
           ?String(result.metadataSource??"").startsWith("cached-")
             ?` · station locations from verified BoM browser records as at ${new Date(result.metadataCheckedAt).toLocaleString("en-AU",{timeZone:"Australia/Brisbane"})}; river heights checked LIVE`
-            :" · location references recovered directly from official BoM GIS"
+            :result.metadataSource==="qld-government-bom-flood-network"
+              ?" · station locations from Queensland Government BoM flood network; live BoM readings"
+              :" · location references recovered directly from official BoM GIS"
           :"";
         const partialText =
           result.partialBulletins
