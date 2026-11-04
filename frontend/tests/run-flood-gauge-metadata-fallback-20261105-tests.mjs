@@ -76,6 +76,41 @@ assert.equal(legacy.payload.features[0].properties.STORMTRACKER_FLOOD_CLASS,"min
 assert.equal(legacy.payload.features[0].properties.STORMTRACKER_RAPID_RISE,undefined);
 assert.equal(reconcileFloodEvents(legacy.payload.features,{}, {},now).features.length,1);
 
+// On an empty browser cache, both BoM location endpoints can time out.
+// The independent Queensland Government BoM flood-network layer must then
+// recover the same six-digit station ID, not infer it from a similar name.
+let qldRequests=0;
+const qldSource={type:"FeatureCollection",features:[{
+  type:"Feature",geometry:{type:"Point",coordinates:[145.683,-28.100]},
+  properties:{gaugeno:"544019",stn_name:"CUNNAMULLA WEIR",
+    basin:"Warrego",agency:"BoM"}
+}]};
+const qldOnlyFetch=async url=>{
+  const target=String(url);
+  if(target.includes("/river-height-bulletins"))
+    return {ok:true,json:async()=>bulletin};
+  if(target.includes("FloodCheck/FloodGauges/MapServer/1/query")){
+    qldRequests++;
+    return {ok:true,json:async()=>qldSource};
+  }
+  throw Error("Both BoM location endpoints refused");
+};
+const independent=await loadRiverGaugeOperationalSnapshot({
+  fetchImpl:qldOnlyFetch,now:()=>now,
+  storage:{getItem:()=>null,setItem:()=>{}}
+});
+assert.equal(qldRequests,1);
+assert.equal(independent.metadataSource,"qld-government-bom-flood-network");
+assert.equal(independent.matchedCount,1);
+assert.equal(independent.payload.features[0].id,"bom:544019");
+assert.deepEqual(independent.payload.features[0].geometry,
+  qldSource.features[0].geometry);
+assert.equal(independent.payload.features[0].properties.STORMTRACKER_HEIGHT_METRES,6.69);
+assert.equal(independent.payload.features[0].properties.STORMTRACKER_FLOOD_CLASS,"minor");
+assert.equal(reconcileFloodEvents(independent.payload.features,{}, {},now).features.length,1);
+assert.equal(independent.payload.features[0].properties.forecast_site_classification,
+  "","No invented station classifications");
+
 const noCache=await loadRiverGaugeOperationalSnapshot({
  fetchImpl,now:()=>now,storage:{getItem:()=>null,setItem:()=>{}}
 }).then(()=>null,e=>e);
