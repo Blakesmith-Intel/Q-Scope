@@ -1,0 +1,29 @@
+name: Generate source-verified Queensland flood station coordinates (one-time)
+on:
+  push:
+    branches: [fix/restore-frozen-flood-gauges-20261105]
+    paths:
+      - scripts/generate-qld-bom-station-snapshot-20261105.py
+      - .github/workflows/generate-qld-bom-station-snapshot-20261105.yml
+permissions:
+  contents: write
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Fetch published official BoM station index; validate exact IDs and coordinates
+        run: python3 scripts/generate-qld-bom-station-snapshot-20261105.py
+      - name: Commit verified static station positions onto this isolated fix branch
+        env:
+          GH_TOKEN: ${{ secrets.STORMTRACKER_RELEASE_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "stormtracker-source-validation"
+          git config user.email "41898214+github-actions[bot]@users.noreply.github.com"
+          git add frontend/data/qld-bom-river-station-locations-v1.json
+          git commit -m 'Bundle official BoM Queensland source station coordinates for resilience'
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/fix/restore-frozen-flood-gauges-20261105
