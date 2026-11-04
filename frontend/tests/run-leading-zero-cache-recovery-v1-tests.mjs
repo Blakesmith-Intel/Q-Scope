@@ -57,7 +57,7 @@ const stored={
 };
 const fetchImpl=async url=>{
  const s=String(url);
- const body=s.includes("river-gauge-metadata")?metadata:
+ const body=s.includes("qld-bom-river-station-locations-v1.json")?metadata:
   s.includes("river-height-bulletins")?bulletin:null;
  if(!body)throw Error("Unexpected fetch "+s);
  return {ok:true,json:async()=>body};
