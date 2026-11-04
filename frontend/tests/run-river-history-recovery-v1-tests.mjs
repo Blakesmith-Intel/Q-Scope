@@ -96,6 +96,14 @@ assert.equal(layer.recentHistoryRequestCount,1);
 assert.equal(layer.diagnostics.historyScreeningIncomplete,1);
 assert.ok(statuses.some(s=>s.kind==="warning"&&s.screeningIncomplete===1),
   "Failure should warn about unscreened rising gauges");
+assert.match(statuses.at(-1).message,/1 eligible gauge statewide/,
+  "Unscreened statewide gauges must be identified as rise-history gaps");
+assert.match(statuses.at(-1).message,/1 of 1 flood signals affected/,
+  "Show only actual overlap with current alerts, not an invented extra alert");
+assert.match(statuses.at(-1).message,/0 station tables loaded this pass/,
+  "Historical table counts must be marked as per-pass, not total coverage");
+assert.equal(statuses.at(-1).historyScreeningAlertsAffected,1);
+
 const renderedAfterFailure=renderCalls;
 await layer.refresh({force:true});
 assert.equal(historyCalls,1,"Do not retry the failed station during its own 15-minute cooldown");
