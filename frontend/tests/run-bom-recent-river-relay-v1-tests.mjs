@@ -26,7 +26,9 @@ try {
   assert.equal(response.status,200);
   assert.equal(response.headers.get("access-control-allow-origin"),
     "https://blakesmith-intel.github.io");
-  assert.equal(response.headers.get("Cache-Control"),"public, max-age=300");
+  assert.equal(response.headers.get("Cache-Control"),"public, max-age=60",
+    "Verified table is shared briefly; browser TTL must not compound source delay");
+  assert.equal(response.headers.get("X-StormTracker-Relay-Cache"),"MISS");
   const json=await response.json();
   assert.equal(json.format,"StormTrackerBomRecentRiverHistoryV1");
   assert.equal(json.product,"IDQ65388");
