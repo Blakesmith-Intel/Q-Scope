@@ -439,9 +439,7 @@ const loaded =
           String(url);
 
         if (
-          target.includes(
-            "river-gauge-metadata"
-          )
+          target.includes("qld-bom-river-station-locations-v1.json")
         ) {
           gaugeRequested =
             true;
@@ -499,7 +497,7 @@ assert.equal(
 
 assert.equal(
   loaded.transport,
-  "BoM ArcGIS metadata + StormTracker river-height relay"
+  "Verified BoM Queensland station catalogue + live BoM river-height relay"
 );
 let forcedCount=0;
 const forced=await loadRiverGaugeOperationalSnapshot({
@@ -513,7 +511,7 @@ const forced=await loadRiverGaugeOperationalSnapshot({
       assert.equal(options.cache,"no-store");
       return {ok:true,json:async()=>bulletins};
     }
-    if(target.includes("river-gauge-metadata"))
+    if(target.includes("qld-bom-river-station-locations-v1.json"))
       return {ok:true,json:async()=>gauges};
     throw Error("Unexpected force fetch "+target);
   }
