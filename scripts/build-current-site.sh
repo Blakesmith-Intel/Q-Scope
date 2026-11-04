@@ -265,7 +265,7 @@ for relative,marker in (
                         encoding="utf-8")
 # Invalidate ONLY the published flood-gauge module import chain after the
 # measured history/rate fix. All other assets retain their approved cache keys.
-gauge_cache_suffix="-qld-gauge-source-20261105-v2"
+gauge_cache_suffix="-flood-source-15s-abort-repair-20261105-v3"
 for relative,needle in (
     ("index.html","-jasper-alfred-v1"+suffix),
     ("live3d-operational-v9.html","-jasper-alfred-archive-v1"+suffix),
