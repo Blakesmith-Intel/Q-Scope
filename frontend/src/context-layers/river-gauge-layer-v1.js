@@ -869,6 +869,11 @@ export function createRiverGaugeLayer({
         diagnostics.historySourceMissing=screening.missingSource;
 
         const staleText=staleOfficial ? ` · ${staleOfficial} last-confirmed flood stage(s), observations stale` : "";
+        const metadataText=result.metadataFallback
+          ?result.metadataSource==="cached-official-bom-arcgis"
+            ?` · location references cached from verified BoM GIS as at ${new Date(result.metadataCheckedAt).toLocaleString("en-AU",{timeZone:"Australia/Brisbane"})}; live river readings checked separately`
+            :" · location references recovered directly from official BoM GIS"
+          :"";
         const partialText =
           result.partialBulletins
             ? ` · partial (${result.failedProducts.length} product${result.failedProducts.length === 1 ? "" : "s"} unavailable)`
@@ -876,12 +881,12 @@ export function createRiverGaugeLayer({
 
         onStatus({
           kind:
-            (result.partialBulletins || screening.incomplete || staleOfficial)
+            (result.partialBulletins || result.metadataFallback || screening.incomplete || staleOfficial)
               ? "warning"
               : "ok",
 
           message:
-            `${summaries.length} qualifying flood signal${summaries.length === 1 ? "" : "s"} · ${major} major · ${moderate} moderate · ${minor} minor · ${rapidRise} rapid above minor · ${tidalAnomaly} unusual tidal rise${staleText}${partialText}${screening.incomplete ? ` · 30-minute rise screening incomplete for ${screening.incomplete} gauge(s)` : ""}${screening.missingSource ? ` · ${screening.missingSource} without a valid history link` : ""} · screening only; follow BoM warnings`,
+            `${summaries.length} qualifying flood signal${summaries.length === 1 ? "" : "s"} · ${major} major · ${moderate} moderate · ${minor} minor · ${rapidRise} rapid above minor · ${tidalAnomaly} unusual tidal rise${staleText}${partialText}${screening.incomplete ? ` · 30-minute rise screening incomplete for ${screening.incomplete} gauge(s)` : ""}${screening.missingSource ? ` · ${screening.missingSource} without a valid history link` : ""}${metadataText} · screening only; follow BoM warnings`,
 
           count:
             summaries.length,
@@ -904,6 +909,9 @@ export function createRiverGaugeLayer({
 
           failedProducts:
             result.failedProducts,
+          metadataSource:result.metadataSource,
+          metadataFallback:result.metadataFallback,
+          metadataCheckedAt:result.metadataCheckedAt,
 
           loadedAt:
             lastLoadedAt
