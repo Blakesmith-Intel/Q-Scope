@@ -75,5 +75,7 @@ jobs:
           }
           console.log("PASS live exact-cell BoM IFD 1–1440 minutes",payload.cell);
           NODE
+      - name: Record one-shot existing-relay shared history and text-product timing (advisory)
+        run: node scripts/probe-relay-efficiency-v1.mjs
       - name: Verify significant rainfall route and original BoM station data
         run: node scripts/probe-live-qld-significant-rainfall-v1.mjs
