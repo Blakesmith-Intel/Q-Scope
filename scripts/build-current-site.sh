@@ -318,6 +318,30 @@ assert outage_html_data.count(old_entry)==1
 outage_html.write_text(outage_html_data.replace(
     old_entry,old_entry+outage_cache_identity,1),encoding="utf-8")
 
+# Invalidate only the operator-facing flood-status module and two entry
+# pages. Leave the science, source, station-history, radar and all other module
+# identities untouched from the approved baseline.
+flood_ui_identity="-20261105-operator-flood-status-v1"
+for relative,needle in (
+    ("index.html",
+        "-jasper-alfred-v1"+suffix+gauge_cache_suffix),
+    ("live3d-operational-v9.html",
+        "-jasper-alfred-archive-v1"+suffix+gauge_cache_suffix+outage_cache_identity),
+    ("src/live3d-operational-v9.js",
+        "river-gauges-operational-v1.js?v=9.18.11-gauge-green-yellow-red-v2"+suffix+gauge_cache_suffix)
+):
+    path=site/relative
+    data=path.read_text(encoding="utf-8")
+    assert data.count(needle)==1, f"Expected one frozen UI cache marker: {relative}"
+    path.write_text(data.replace(needle,needle+flood_ui_identity,1),
+                    encoding="utf-8")
+operator_ui=(site/"src/context-layers/river-gauges-operational-v1.js").read_text(encoding="utf-8")
+assert "formatFloodGaugeOperatorStatus(" in operator_ui
+assert "floodGaugeCoverageDetails" in operator_ui
+assert ("river-gauges-operational-v1.js?v=9.18.11-gauge-green-yellow-red-v2"+
+        suffix+gauge_cache_suffix+flood_ui_identity) in (
+    site/"src/live3d-operational-v9.js").read_text(encoding="utf-8")
+
 # Ensure the V10 pinned HTML uses the patched operational geometry modules.
 # Both genuine closure lines and Energex outage polygons otherwise resolve to
 # the obsolete, cached modules even after changes reach GitHub main.
