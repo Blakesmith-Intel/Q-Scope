@@ -35,6 +35,8 @@ import {
 } from "../frontend/src/context-layers/significant-rainfall-source-v1.js";
 
 import {relayOfficialIfdPoint} from "./ifd-on-demand.js";
+import {createRelayEfficiency} from "./relay-efficiency-v1.js";
+const relayEfficiency=createRelayEfficiency();
 import {relayQldCrossingHeights} from "./river-crossing-heights-v1.js";
 import {relayRoadOwnershipReports} from "./road-ownership-reports-v1.js";
 import {relayBomWarningPolygons} from "./bom-warning-polygons-v1.js";
@@ -1106,6 +1108,12 @@ async function relayRiverRecentHistory(request,incoming,origin){
   // Missing station observations are a valid data state, not an HTTP error.
   // Cache briefly to allow genuinely new flood telemetry to be discovered.
   headers.set("Cache-Control",samples.length?"public, max-age=300":"public, max-age=60");
+  // The sharing layer accepts only fully parsed, source-verified same-station
+  // results. Errors and unpublished station pages cannot enter the cache.
+  headers.set("X-StormTracker-Verified-History","v1");
+  const newest=samples.at(-1)?.time;
+  if(Number.isFinite(newest))
+    headers.set("X-StormTracker-Latest-Observation-Ms",String(newest));
   return new Response(request.method==="HEAD"?null:JSON.stringify({
     format:"StormTrackerBomRecentRiverHistoryV1",
     product,station,availability,samples,crossing
@@ -1681,8 +1689,7 @@ async function relayTimestampedReflectivityFrame(request,incoming,origin){
   return new Response(request.method==="HEAD"?null:upstream.body,{status:200,headers});
 }
 
-export default {
-  async fetch(request, env) {
+async function dispatchRelayRequest(request,env,ctx){
     const incoming =
       new URL(request.url);
 
@@ -1771,7 +1778,14 @@ export default {
     }
 
     if (incoming.pathname === "/river-recent-history") {
-      return relayRiverRecentHistory(request,incoming,origin);
+      const product=String(incoming.searchParams.get("product")??"").toUpperCase();
+      const station=String(incoming.searchParams.get("station")??"");
+      // Keep the original 400/typed-error validation path unchanged.
+      if(!QLD_RECENT_PRODUCT_IDS.has(product)||!/^[0-9]{5,7}$/.test(station))
+        return relayRiverRecentHistory(request,incoming,origin);
+      return relayEfficiency.verifiedStationHistory(
+        request,product,station,origin,
+        ()=>relayRiverRecentHistory(request,incoming,origin),ctx);
     }
 
     if (incoming.pathname === "/wmts-native-capabilities") {
@@ -1829,5 +1843,13 @@ export default {
       404,
       origin
     );
+  }
+// Only approved text/JSON routes use in-flight coalescing. Every other
+// existing route, including native Doppler and radar imagery, follows the
+// exact original dispatch without any caching or other processing change.
+export default {
+  fetch(request,env,ctx){
+    return relayEfficiency.identicalRead(request,
+      ()=>dispatchRelayRequest(request,env,ctx));
   }
 };
