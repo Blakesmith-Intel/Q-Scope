@@ -33,7 +33,7 @@ const viewer={dataSources:{add(){}},scene:{requestRender(){}}};
 const fetchImpl=async url=>{
  const s=String(url),u=new URL(s);
  let data;
- if(s.includes("/river-gauge-metadata")) data={type:"FeatureCollection",features};
+ if(s.includes("/qld-bom-river-station-locations-v1.json")) data={type:"FeatureCollection",features};
  else if(s.includes("/river-height-bulletins"))data={products:[{product:"IDQ60289",observations}],failed:[],partial:false};
  else if(s.includes("/river-recent-history")){
   const station=u.searchParams.get("station");
