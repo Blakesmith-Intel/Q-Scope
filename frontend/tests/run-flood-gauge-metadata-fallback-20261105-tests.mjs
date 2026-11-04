@@ -28,7 +28,7 @@ const fetchImpl=async (url,{signal}={})=>{
    metadataRequests++;
    // The source isn't absent: it just isn't ready immediately while the
    // radar-heavy browser is also fetching genuine imagery.
-   await new Promise(resolve=>nativeSetTimeout(resolve,25));
+   await new Promise(resolve=>nativeSetTimeout(resolve,16100));
    assert.equal(signal?.aborted,false,"Never abort a valid slow metadata read after 15s");
    return {ok:true,json:async()=>source};
  }
