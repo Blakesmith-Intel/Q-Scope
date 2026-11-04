@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - "relay/worker.js"
+      - "relay/relay-efficiency-v1.js"
       - "relay/bom-warning-polygons-v1.js"
       - "relay/bom-warning-gis2web-replica-v1.js"
       - "relay/bom-warning-product-reconcile-v1.js"
