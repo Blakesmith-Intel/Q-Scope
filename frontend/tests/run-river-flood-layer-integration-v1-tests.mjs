@@ -49,7 +49,7 @@ const fetchImpl=async url=>{
   calls.requests++;
   if (failFetch) throw new Error("Simulated BoM relay outage");
   let response;
-  if(String(url).includes("river-gauge-metadata"))response={type:"FeatureCollection",features};
+  if(String(url).includes("qld-bom-river-station-locations-v1.json"))response={type:"FeatureCollection",features};
   else if(String(url).includes("river-height-bulletins"))
     response={products:[{product:"IDQ60285",observations:latest()}],failed:[],partial:false};
   else throw Error("Unexpected relay URL: "+url);
