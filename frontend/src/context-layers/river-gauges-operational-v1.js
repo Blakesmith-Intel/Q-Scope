@@ -92,8 +92,19 @@ export function formatFloodGaugeOperatorStatus({
   return {main,kind:issues.length?"warning":"ok",summary,details};
 }
 
+// Background history completion cannot replace a genuine failed live
+// bulletin/metadata check with a green monitoring status. Clear only after
+// a successful *live* source refresh, never merely a history-cache hit.
+let lastLiveGaugeSourceFailure=null;
 function setRiverGaugeStatus(status={}) {
-  const view=formatFloodGaugeOperatorStatus(status);
+  if(status.kind==="error")lastLiveGaugeSourceFailure=status.message;
+  else if(Number.isFinite(status.loadedAt)&&status.loadedAt>0&&
+          Number.isInteger(status.count))
+    lastLiveGaugeSourceFailure=null;
+  const effective=lastLiveGaugeSourceFailure&&status.kind!=="error"&&
+    status.kind!=="loading"
+    ?{kind:"error",message:lastLiveGaugeSourceFailure}:status;
+  const view=formatFloodGaugeOperatorStatus(effective);
   // Keep the operator status visible in Severe Weather even though the old
   // advanced dashboard diagnostics are hidden in the four-section menu.
   const row=$("showRiverGauges")?.closest(".river-gauge-row");
