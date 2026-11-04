@@ -274,6 +274,8 @@ for relative,needle in (
     ("src/context-layers/river-gauges-operational-v1.js",
         "river-gauge-layer-v1.js?v=9.18.11-flood-colour-20261015"+suffix),
     ("src/context-layers/river-gauge-layer-v1.js",
+        "river-gauge-observations-v1.js?v=9.12.0"+suffix),
+    ("src/context-layers/river-gauge-layer-v1.js",
         "bom-recent-river-history-v1.js?v=9.13.1"+suffix),
     ("src/context-layers/river-gauge-layer-v1.js",
         "river-flood-signals-v1.js?v=9.13.2"+suffix),
@@ -295,6 +297,11 @@ for relative,needle in (
     assert data.count(needle)==1, f"Expected one gauge source import: {relative}"
     path.write_text(data.replace(needle,needle+gauge_cache_suffix,1),
                     encoding="utf-8")
+
+# Ensure the actual observation loader (not just its parent) has a new
+# browser module identity, otherwise Safari can replay #301/#302 code.
+assert ("river-gauge-observations-v1.js?v=9.12.0"+suffix+gauge_cache_suffix) in (
+    site/"src/context-layers/river-gauge-layer-v1.js").read_text(encoding="utf-8")
 
 # Only AFTER the pinned flood-gauge cache chain is built, give the html
 # module entrypoint a fresh identity for this outage UI. Preserves every
