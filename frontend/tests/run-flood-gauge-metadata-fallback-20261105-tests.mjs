@@ -57,6 +57,25 @@ assert.equal(bulletinReads,2,"Live BoM heights continue during GIS metadata loss
 assert.equal(directReads,2,"Never skip official direct source on outage");
 assert.equal(relayReads,2,"Relay first, then direct, then verified cached metadata");
 
+// Before this fix, StormTracker saved BoM-verified source station points
+// alongside height cache records. Recover their COORDINATES only; a fabricated
+// old high reading must never contaminate the current BoM bulletin.
+const legacyPoint={...original.features[0],properties:{
+ ...original.features[0].properties,STORMTRACKER_HEIGHT_METRES:99,
+ STORMTRACKER_FLOOD_CLASS:"major",STORMTRACKER_RAPID_RISE:true
+}};
+const legacyPayload={"bom:544019":{observedAt:now-7*86400000,feature:legacyPoint}};
+const legacyStorage={getItem:key=>key==="stormtracker.qld-latest-river-gauge.v1"?
+ JSON.stringify(legacyPayload):null,setItem:()=>{}};
+const legacy=await loadRiverGaugeOperationalSnapshot({
+ fetchImpl,now:()=>now,storage:legacyStorage
+});
+assert.equal(legacy.metadataSource,"cached-verified-bom-station-observations");
+assert.equal(legacy.payload.features[0].properties.STORMTRACKER_HEIGHT_METRES,6.69);
+assert.equal(legacy.payload.features[0].properties.STORMTRACKER_FLOOD_CLASS,"minor");
+assert.equal(legacy.payload.features[0].properties.STORMTRACKER_RAPID_RISE,undefined);
+assert.equal(reconcileFloodEvents(legacy.payload.features,{}, {},now).features.length,1);
+
 const noCache=await loadRiverGaugeOperationalSnapshot({
  fetchImpl,now:()=>now,storage:{getItem:()=>null,setItem:()=>{}}
 }).then(()=>null,e=>e);
