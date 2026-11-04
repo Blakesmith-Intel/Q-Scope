@@ -1,6 +1,7 @@
 import {
   filterQueenslandRiverGauges,
-  riverGaugeSummary
+  riverGaugeSummary,
+  BOM_RIVER_TIDE_GAUGE_QUERY_URL
 } from "./river-gauges-v1.js?v=9.12.0";
 import {withStationFloodLevels}
   from "./river-flood-thresholds-v1.js?v=20261020-new-beith-ahd-v2";
@@ -416,6 +417,60 @@ async function fetchJson(
   }
 }
 
+// Reliable station-coordinate intake: a BoM ArcGIS relay outage is not a
+// verified zero-gauge result. Use only the SAME official BoM GIS query, then
+// a bounded, previously source-verified station-location snapshot. Height
+// observations are NEVER sourced from this cache or estimated.
+const GAUGE_LOCATION_CACHE_KEY="stormtracker.qld-bom-gauge-locations.v1";
+const GAUGE_LOCATION_CACHE_MAX_AGE_MS=30*24*60*60*1000;
+const validGaugeLocations=payload=>Array.isArray(payload?.features)&&
+  payload.features.some(f=>f?.geometry?.type==="Point"&&
+    String(f?.properties?.state??"").toUpperCase()==="QLD"&&
+    (f?.properties?.bom_stn_num!==undefined||f?.properties?.awrc_stateid));
+
+function cachedGaugeLocations(storage,nowMs){
+  try{
+    const record=JSON.parse(storage?.getItem(GAUGE_LOCATION_CACHE_KEY)??"null");
+    if(Number.isFinite(record?.checkedAt)&&record.checkedAt>0&&
+      record.checkedAt<=nowMs&&
+      nowMs-record.checkedAt<=GAUGE_LOCATION_CACHE_MAX_AGE_MS&&
+      validGaugeLocations(record?.payload))
+      return {payload:record.payload,checkedAt:record.checkedAt};
+  }catch{/* unavailable storage must never block source reads */}
+  return null;
+}
+function storeGaugeLocations(storage,payload,nowMs){
+  if(!validGaugeLocations(payload))return;
+  try{storage?.setItem(GAUGE_LOCATION_CACHE_KEY,
+    JSON.stringify({checkedAt:nowMs,payload}));}
+  catch{/* browsers may deny/quota-limit localStorage */}
+}
+async function readVerifiedGaugeLocations({fetchImpl,gaugeUrl,storage,nowMs}){
+  let relayError=null,directError=null;
+  try{
+    const payload=await fetchJson(fetchImpl,gaugeUrl,"BoM river-gauge metadata",15000);
+    if(!validGaugeLocations(payload))throw Error("BoM river-gauge metadata has no verified Queensland point locations");
+    storeGaugeLocations(storage,payload,nowMs);
+    return {payload,source:"metadata-relay",fallback:false};
+  }catch(error){relayError=error;}
+  // The official source is already approved for direct gauge-location reads
+  // in river-gauges-v1.js. Never switch to a third-party map or name match.
+  try{
+    const payload=await fetchJson(fetchImpl,BOM_RIVER_TIDE_GAUGE_QUERY_URL,
+      "Official BoM ArcGIS gauge metadata",15000,true);
+    if(!validGaugeLocations(payload))throw Error("Official BoM ArcGIS metadata has no verified Queensland point locations");
+    storeGaugeLocations(storage,payload,nowMs);
+    return {payload,source:"direct-official-bom-arcgis",fallback:true};
+  }catch(error){directError=error;}
+  const cached=cachedGaugeLocations(storage,nowMs);
+  if(cached)return {payload:cached.payload,source:"cached-official-bom-arcgis",
+    fallback:true,checkedAt:cached.checkedAt};
+  throw Error("BoM gauge-location sources unavailable; "+
+    "relay: "+String(relayError?.message??relayError)+"; official ArcGIS: "+
+    String(directError?.message??directError)+
+    "; no time-valid verified station-location cache");
+}
+
 export async function loadRiverGaugeOperationalSnapshot({
   fetchImpl =
     globalThis.fetch,
@@ -425,7 +480,9 @@ export async function loadRiverGaugeOperationalSnapshot({
 
   relayUrl =
     DEFAULT_RIVER_HEIGHT_RELAY_URL,
-  force = false
+  force = false,
+  storage = globalThis.localStorage,
+  now = () => Date.now()
 } = {}) {
   if (
     typeof fetchImpl
@@ -436,26 +493,17 @@ export async function loadRiverGaugeOperationalSnapshot({
     );
   }
 
-  const [
-    gauges,
-    bulletins
-  ] =
-    await Promise.all([
-      fetchJson(
-        fetchImpl,
-        gaugeUrl,
-        "BoM river-gauge metadata"
-      ),
-
-      fetchJson(
-        fetchImpl,
-        relayUrl,
-        "BoM river-height relay",15000,force
-      )
-    ]);
-
-  const joined =
-    joinRiverGaugeObservations({gauges,bulletins});
+  const [locations,bulletins]=await Promise.all([
+    readVerifiedGaugeLocations({fetchImpl,gaugeUrl,storage,nowMs:now()}),
+    fetchJson(fetchImpl,relayUrl,"BoM river-height relay",15000,force)
+  ]);
+  const joined=joinRiverGaugeObservations({
+    gauges:locations.payload,bulletins,nowMs:now()
+  });
+  // An apparently healthy bulletin with multiple real station IDs and NO
+  // geographic joins is an identity/source failure, never an all-clear.
+  if(joined.totalObservations>=5 && joined.matchedCount===0)
+    throw Error("BoM river bulletin/verified station-location join returned zero matching station IDs; flood status unverified");
   // Station thresholds are a single bundled, versioned BoM 2026 catalogue.
   // No third upstream HTTP request, no competing 2022 relay overrides and
   // no 12-second stall for each 10-minute height refresh.
@@ -463,6 +511,9 @@ export async function loadRiverGaugeOperationalSnapshot({
   joined.payload.features=withStationFloodLevels(joined.payload.features);
   return {
     ...joined,
+    metadataSource:locations.source,
+    metadataFallback:locations.fallback,
+    metadataCheckedAt:locations.checkedAt??null,
     thresholds,
 
     source:
