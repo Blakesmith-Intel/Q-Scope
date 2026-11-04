@@ -513,17 +513,8 @@ async function readVerifiedGaugeLocations({fetchImpl,gaugeUrl,storage,nowMs}){
     storeGaugeLocations(storage,payload,nowMs);
     return {payload,source:"metadata-relay",fallback:false};
   }catch(error){relayError=error;}
-  // The official source is already approved for direct gauge-location reads
-  // in river-gauges-v1.js. Never switch to a third-party map or name match.
-  try{
-    const payload=await fetchJson(fetchImpl,BOM_RIVER_TIDE_GAUGE_QUERY_URL,
-      "Official BoM ArcGIS gauge metadata",15000,true);
-    if(!validGaugeLocations(payload))throw Error("Official BoM ArcGIS metadata has no verified Queensland point locations");
-    storeGaugeLocations(storage,payload,nowMs);
-    return {payload,source:"direct-official-bom-arcgis",fallback:true};
-  }catch(error){directError=error;}
-  // Separate Queensland Government GIS host: published BoM flood-network
-  // gauge numbers, mapped without name matching or invented coordinates.
+  // Independent origin FIRST: retrying the same BoM ArcGIS server twice
+  // after its relay times out merely adds another whole timeout.
   let qldError=null;
   try{
     const source=await fetchJson(fetchImpl,QLD_FLOODCHECK_GAUGE_URL,
@@ -534,6 +525,14 @@ async function readVerifiedGaugeLocations({fetchImpl,gaugeUrl,storage,nowMs}){
     storeGaugeLocations(storage,payload,nowMs);
     return {payload,source:"qld-government-bom-flood-network",fallback:true};
   }catch(error){qldError=error;}
+  // Original full BoM ArcGIS source is still available as a final fallback.
+  try{
+    const payload=await fetchJson(fetchImpl,BOM_RIVER_TIDE_GAUGE_QUERY_URL,
+      "Official BoM ArcGIS gauge metadata",12000,true);
+    if(!validGaugeLocations(payload))throw Error("Official BoM ArcGIS metadata has no verified Queensland point locations");
+    storeGaugeLocations(storage,payload,nowMs);
+    return {payload,source:"direct-official-bom-arcgis",fallback:true};
+  }catch(error){directError=error;}
   const cached=cachedGaugeLocations(storage,nowMs);
   if(cached)return {payload:cached.payload,
     source:cached.legacy?"cached-verified-bom-station-observations":"cached-official-bom-arcgis",
