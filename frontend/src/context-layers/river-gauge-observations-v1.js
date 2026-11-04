@@ -407,6 +407,11 @@ async function fetchJson(
     }
 
     return await response.json();
+  } catch (error) {
+    // Distinguish our own deadline from genuine BoM upstream errors.
+    if (controller?.signal.aborted)
+      throw new Error(`${label} timed out locally after ${timeoutMs / 1000}s`,{cause:error});
+    throw error;
   } finally {
     if (timeout) {
       clearTimeout(
