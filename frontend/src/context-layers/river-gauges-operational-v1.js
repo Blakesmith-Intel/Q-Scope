@@ -39,15 +39,74 @@ export function bindRiverGaugeManualRefresh(button, refresh) {
   return true;
 }
 
-function setRiverGaugeStatus({
-  kind =
-    "normal",
-  message =
-    ""
-} = {}) {
-  const text=message||"BoM · live river heights";
-  // Runtime diagnostics is intentionally hidden in the four-section menu.
-  // Operators MUST still see real flood-feed status with the enabled layer.
+// Presentation only: retain authoritative source errors and diagnostics,
+// but do not treat the absence of OPTIONAL station rise history as a
+// broken live BoM bulletin. No gauge classification or source logic here.
+export function formatFloodGaugeOperatorStatus({
+  kind="normal",message="",count,
+  partial=false,failedProducts=[],staleOfficial=0,metadataFallback=false,
+  screeningIncomplete=0,historyScreeningAlertsAffected=0,
+  historyRetainedStationSamples,historyLoaded,historyFailed,historyNoData,
+  historySourceMissing=0
+}={}){
+  const raw=message||"BoM · live river heights";
+  if(!Number.isInteger(count)||count<0||kind==="error"||kind==="loading"||
+     kind==="normal")
+    return {main:raw,kind,summary:"",details:[]};
+
+  const affected=Math.max(0,Math.min(count,Number(historyScreeningAlertsAffected)||0));
+  const gaps=Math.max(0,Number(screeningIncomplete)||0);
+  const issues=[];
+  if(partial)issues.push(
+    `BoM height feed partial${Array.isArray(failedProducts)&&failedProducts.length?
+      ` (${failedProducts.length} bulletin product${failedProducts.length===1?"":"s"} unavailable)`:""}`);
+  if(staleOfficial>0)issues.push(
+    `${staleOfficial} last-confirmed flood stage${staleOfficial===1?"":"s"} with stale observations`);
+  if(metadataFallback)issues.push("station reference recovery in use");
+  // Preserve any otherwise unexplained source warning, but don't colour a
+  // routine missing 30–120-minute optional history check amber.
+  if(kind==="warning"&&!issues.length&&!gaps&&!historySourceMissing&&
+     !historyFailed&&!historyNoData)issues.push("source status requires attention");
+
+  const main=`Flood gauges · ${count} signal${count===1?"":"s"} · `+
+    (issues.length?issues.join(" · "):"Monitoring active");
+  const summary=affected
+    ?`${affected} signal${affected===1?"":"s"} awaiting additional rise-rate history · View data coverage`
+    :"View data coverage";
+  const details=[
+    `Statewide rise-rate history: ${gaps} eligible gauge${gaps===1?"":"s"} awaiting enough recent verified observations (30–120-minute comparison).`,
+    `Active flood signals affected: ${affected} of ${count}. These are not additional flood alerts.`
+  ];
+  if(Number.isInteger(historyRetainedStationSamples))
+    details.push(`Stations with retained observations: ${historyRetainedStationSamples}.`);
+  if(Number.isInteger(historyLoaded))
+    details.push(`Station tables loaded in latest retrieval pass: ${historyLoaded}.`);
+  if(Number.isInteger(historyNoData)&&historyNoData)
+    details.push(`Station tables without recent observations in latest pass: ${historyNoData}.`);
+  if(Number.isInteger(historyFailed)&&historyFailed)
+    details.push(`Station-history retrieval failures in latest pass: ${historyFailed}.`);
+  if(historySourceMissing)
+    details.push(`Eligible stations without a verified history link: ${historySourceMissing}.`);
+  details.push("Official BoM flood stages remain independent of optional measured rise-rate screening. Follow current BoM warnings.");
+  details.push("Full source diagnostics: "+raw);
+  return {main,kind:issues.length?"warning":"ok",summary,details};
+}
+
+// Background history completion cannot replace a genuine failed live
+// bulletin/metadata check with a green monitoring status. Clear only after
+// a successful *live* source refresh, never merely a history-cache hit.
+let lastLiveGaugeSourceFailure=null;
+function setRiverGaugeStatus(status={}) {
+  if(status.kind==="error")lastLiveGaugeSourceFailure=status.message;
+  else if(Number.isFinite(status.loadedAt)&&status.loadedAt>0&&
+          Number.isInteger(status.count))
+    lastLiveGaugeSourceFailure=null;
+  const effective=lastLiveGaugeSourceFailure&&status.kind!=="error"&&
+    status.kind!=="loading"
+    ?{kind:"error",message:lastLiveGaugeSourceFailure}:status;
+  const view=formatFloodGaugeOperatorStatus(effective);
+  // Keep the operator status visible in Severe Weather even though the old
+  // advanced dashboard diagnostics are hidden in the four-section menu.
   const row=$("showRiverGauges")?.closest(".river-gauge-row");
   let visible=$("floodGaugeInlineStatus");
   if(row?.parentElement&&!visible){
@@ -56,15 +115,40 @@ function setRiverGaugeStatus({
     visible.className="note flood-gauge-inline-status";
     visible.setAttribute("role","status");
     visible.setAttribute("aria-live","polite");
-    visible.style.cssText="font-size:10px;line-height:1.4;margin:5px 0;overflow-wrap:anywhere";
+    visible.style.cssText="font-size:11px;line-height:1.45;margin:5px 0;overflow-wrap:anywhere";
     row.insertAdjacentElement("afterend",visible);
+  }
+  let coverage=$("floodGaugeCoverageDetails");
+  if(visible?.parentElement&&!coverage){
+    coverage=document.createElement("details");
+    coverage.id="floodGaugeCoverageDetails";
+    coverage.setAttribute("aria-label","Flood-gauge data coverage and retrieval details");
+    coverage.style.cssText="font-size:10px;line-height:1.45;margin:3px 0 7px;overflow-wrap:anywhere";
+    const summary=document.createElement("summary");
+    summary.id="floodGaugeCoverageSummary";
+    summary.style.cssText="cursor:pointer;list-style-position:inside";
+    const content=document.createElement("div");
+    content.id="floodGaugeCoverageContent";
+    content.style.cssText="margin:5px 0 0 10px;white-space:pre-line";
+    coverage.append(summary,content);
+    visible.insertAdjacentElement("afterend",coverage);
   }
   for(const target of [$("riverGaugeStatus"),visible]){
     if(!target)continue;
-    target.textContent=text;
-    target.dataset.kind=kind;
+    target.textContent=view.main;
+    target.dataset.kind=view.kind;
     if(target===visible)target.style.color=
-      kind==="error"?"#f2ab9f":kind==="warning"?"#f2d39d":"";
+      view.kind==="error"?"#f2ab9f":view.kind==="warning"?"#f2d39d":"";
+  }
+  if(coverage){
+    coverage.hidden=!view.details.length;
+    if(view.details.length){
+      const summary=$("floodGaugeCoverageSummary");
+      const content=$("floodGaugeCoverageContent");
+      if(summary)summary.textContent=view.summary;
+      if(content)content.textContent=view.details.join("\n");
+      // Never reset the user's expanded/collapsed choice on refresh.
+    }
   }
 }
 
