@@ -17,9 +17,9 @@ assert.equal(cunnamulla.properties.STORMTRACKER_HEIGHT_METRES,undefined,
   "The location file cannot carry old heights");
 
 // The live bulletin supplies the height and flood class, never the catalogue.
-const now=Date.UTC(2026,10,5,0,0);
+const now=Date.UTC(2026,10,4,16,0);
 const bulletins={products:[{product:"IDQ60294",observations:[{
-  stationId:"544019",stationName:"Cunnamulla Weir",observedText:"8:00 am Thu 05/11/2026",
+  stationId:"544019",stationName:"Cunnamulla Weir",observedText:"12:00 am Thu 05/11/2026",
   heightMetres:6.69,floodClass:"minor",tendency:"steady",sourceProduct:"IDQ60294"
 }]}],partial:false,failed:[]};
 const requested=[];
