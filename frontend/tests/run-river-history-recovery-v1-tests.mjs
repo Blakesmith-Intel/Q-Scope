@@ -21,7 +21,7 @@ let mode="service-down",historyCalls=0,renderCalls=0;
 const statuses=[];
 const fetchImpl=async url=>{
   const u=String(url);
-  if(u.includes("/river-gauge-metadata"))return {ok:true,json:async()=>({
+  if(u.includes("/qld-bom-river-station-locations-v1.json"))return {ok:true,json:async()=>({
     type:"FeatureCollection",features})};
   if(u.includes("/river-height-bulletins"))return {ok:true,json:async()=>({
     partial:false,products:[{product:"IDQ60285",observations:features.map(f=>({
