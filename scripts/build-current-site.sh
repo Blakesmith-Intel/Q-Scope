@@ -265,7 +265,7 @@ for relative,marker in (
                         encoding="utf-8")
 # Invalidate ONLY the published flood-gauge module import chain after the
 # measured history/rate fix. All other assets retain their approved cache keys.
-gauge_cache_suffix="-flood-source-15s-abort-repair-20261105-v3"
+gauge_cache_suffix="-flood-source-15s-abort-repair-20261105-v4-screening-status"
 for relative,needle in (
     ("index.html","-jasper-alfred-v1"+suffix),
     ("live3d-operational-v9.html","-jasper-alfred-archive-v1"+suffix),
@@ -301,6 +301,11 @@ for relative,needle in (
 # Ensure the actual observation loader (not just its parent) has a new
 # browser module identity, otherwise Safari can replay #301/#302 code.
 assert ("river-gauge-observations-v1.js?v=9.12.0"+suffix+gauge_cache_suffix) in (
+    site/"src/context-layers/river-gauge-layer-v1.js").read_text(encoding="utf-8")
+
+# Screen-status change is display-only. The actual published flood module
+# must carry new operator wording without rewriting source science.
+assert "describeRiverGaugeRiseCoverage(" in (
     site/"src/context-layers/river-gauge-layer-v1.js").read_text(encoding="utf-8")
 
 # Only AFTER the pinned flood-gauge cache chain is built, give the html
