@@ -36,6 +36,7 @@ import {
 
 import {relayOfficialIfdPoint} from "./ifd-on-demand.js";
 import {createRelayEfficiency} from "./relay-efficiency-v1.js";
+import {relayVerifiedRiverGaugeMetadata} from "./river-gauge-metadata-recovery-v1.js";
 const relayEfficiency=createRelayEfficiency();
 import {relayQldCrossingHeights} from "./river-crossing-heights-v1.js";
 import {relayRoadOwnershipReports} from "./road-ownership-reports-v1.js";
@@ -594,97 +595,11 @@ function dopplerProduct(incoming) {
     : null;
 }
 
-async function relayRiverGaugeMetadata(
-  request,
-  origin
-) {
-  let upstream;
-
-  try {
-    upstream =
-      await fetch(
-        BOM_RIVER_TIDE_GAUGE_QUERY_URL,
-        {
-          method:
-            "GET",
-
-          headers: {
-            Accept:
-              "application/geo+json,application/json"
-          },
-
-          cf: {
-            cacheEverything:
-              true,
-            cacheTtl:
-              300
-          }
-        }
-      );
-  } catch (error) {
-    return errorResponse(
-      `BoM river-gauge metadata fetch failed: ${error?.message || String(error)}`,
-      502,
-      origin
-    );
-  }
-
-  if (!upstream.ok) {
-    return errorResponse(
-      `BoM river-gauge metadata HTTP ${upstream.status}`,
-      502,
-      origin
-    );
-  }
-
-  const headers =
-    new Headers(
-      upstream.headers
-    );
-
-  for (
-    const [
-      key,
-      value
-    ]
-    of corsHeaders(
-      origin
-    ).entries()
-  ) {
-    headers.set(
-      key,
-      value
-    );
-  }
-
-  headers.set(
-    "Content-Type",
-    "application/geo+json; charset=utf-8"
-  );
-
-  headers.set(
-    "Cross-Origin-Resource-Policy",
-    "cross-origin"
-  );
-
-  headers.set(
-    "Cache-Control",
-    "public, max-age=300"
-  );
-
-  return new Response(
-    request.method
-    === "HEAD"
-      ? null
-      : upstream.body,
-    {
-      status:
-        upstream.status,
-      statusText:
-        upstream.statusText,
-      headers
-    }
-  );
+function relayRiverGaugeMetadata(request,origin,ctx){
+  return relayVerifiedRiverGaugeMetadata(request,origin,{
+    sourceUrl:BOM_RIVER_TIDE_GAUGE_QUERY_URL,
+    corsHeaders,errorResponse,ctx
+  });
 }
 
 function riverHeightProductUrls(
@@ -1762,7 +1677,8 @@ async function dispatchRelayRequest(request,env,ctx){
     if (incoming.pathname === "/river-gauge-metadata") {
       return relayRiverGaugeMetadata(
         request,
-        origin
+        origin,
+        ctx
       );
     }
 

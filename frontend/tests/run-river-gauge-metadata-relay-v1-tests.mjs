@@ -62,6 +62,17 @@ const metadataPayload = {
   ]
 };
 
+// The relay now fail-closes incomplete statewide catalogues. Simulate a
+// representative official BoM QLD response rather than a one-site fragment.
+const representativeGauge=metadataPayload.features[0];
+metadataPayload.features=Array.from({length:600},(_,index)=>({
+  ...representativeGauge,
+  properties:{
+    ...representativeGauge.properties,
+    bom_stn_num:String(40123+index).padStart(6,"0")
+  }
+}));
+
 let requestedUrl = "";
 
 globalThis.fetch =
