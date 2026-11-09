@@ -361,7 +361,8 @@ async function fetchJson(
   url,
   label,
   timeoutMs = 15000,
-  force = false
+  force = false,
+  onResponse = null
 ) {
   const controller =
     typeof AbortController
@@ -406,6 +407,7 @@ async function fetchJson(
       );
     }
 
+    if(typeof onResponse==="function")onResponse(response);
     return await response.json();
   } catch (error) {
     // Distinguish our own deadline from genuine BoM upstream errors.
@@ -428,21 +430,68 @@ async function fetchJson(
 // 15 seconds while radar requests were busy. Do not restart or multiply it.
 const verifiedGaugeMetadata=new WeakMap();
 const GAUGE_METADATA_TIMEOUT_MS=60000;
+const STORED_METADATA_KEY="stormtracker.verified-qld-bom-gauge-metadata.v1";
+const STORED_METADATA_MAX_AGE_MS=14*24*60*60*1000;
 
+// Persist ONLY data that passed the original official BoM source validation.
+// The verified date is never advanced when recovering an old catalogue.
+function readStoredBoMMetadata(){
+  try{
+    const raw=globalThis.localStorage?.getItem(STORED_METADATA_KEY);
+    if(!raw)return null;
+    const item=JSON.parse(raw),checkedAt=Number(item?.checkedAt);
+    const age=Date.now()-checkedAt;
+    if(!Number.isFinite(checkedAt)||checkedAt<=0||
+       age<0||age>STORED_METADATA_MAX_AGE_MS||
+       !Array.isArray(item?.payload?.features)||
+       !filterQueenslandRiverGauges(item.payload).features.length)return null;
+    return {payload:item.payload,metadataFallback:true,
+      metadataSource:"cached-verified-bom-browser",metadataCheckedAt:checkedAt};
+  }catch{return null;}
+}
+function storeVerifiedBoMMetadata(item){
+  try{
+    const checkedAt=Number(item.metadataCheckedAt);
+    if(!Number.isFinite(checkedAt)||checkedAt<=0||
+       Date.now()-checkedAt<0||
+       Date.now()-checkedAt>STORED_METADATA_MAX_AGE_MS)return;
+    globalThis.localStorage?.setItem(STORED_METADATA_KEY,JSON.stringify({
+      checkedAt,payload:item.payload
+    }));
+  }catch{/* Storage quota or private mode cannot interrupt live observations. */}
+}
 async function loadVerifiedGaugeMetadata(fetchImpl,gaugeUrl){
   const prior=verifiedGaugeMetadata.get(fetchImpl);
   if(prior?.url===gaugeUrl){
-    if(prior.payload)return prior.payload;
+    if(prior.data)return prior.data;
     if(prior.pending)return prior.pending;
   }
+  let responseMetadata={metadataFallback:false,metadataSource:"bom-live",
+    metadataCheckedAt:Date.now()};
   const pending=fetchJson(fetchImpl,gaugeUrl,
-    "BoM river-gauge metadata",GAUGE_METADATA_TIMEOUT_MS).then(payload=>{
+    "BoM river-gauge metadata",GAUGE_METADATA_TIMEOUT_MS,false,response=>{
+      const get=name=>response.headers?.get?.(name)??null;
+      const cached=get("X-StormTracker-Metadata-Fallback")==="1";
+      const date=Date.parse(get("X-StormTracker-Metadata-Checked-At")??"");
+      responseMetadata={
+        metadataFallback:cached,
+        metadataSource:cached?"cached-verified-bom-worker":"bom-live",
+        metadataCheckedAt:Number.isFinite(date)?date:Date.now()
+      };
+    }).then(payload=>{
     if(!Array.isArray(payload?.features)||
        !filterQueenslandRiverGauges(payload).features.length)
       throw Error("BoM river-gauge metadata returned no verified Queensland gauge locations");
-    verifiedGaugeMetadata.set(fetchImpl,{url:gaugeUrl,payload});
-    return payload;
+    const data={payload,...responseMetadata};
+    verifiedGaugeMetadata.set(fetchImpl,{url:gaugeUrl,data});
+    storeVerifiedBoMMetadata(data);
+    return data;
   }).catch(error=>{
+    const recovered=readStoredBoMMetadata();
+    if(recovered){
+      verifiedGaugeMetadata.set(fetchImpl,{url:gaugeUrl,data:recovered});
+      return recovered;
+    }
     const current=verifiedGaugeMetadata.get(fetchImpl);
     if(current?.url===gaugeUrl&&current.pending===pending)
       verifiedGaugeMetadata.delete(fetchImpl);
@@ -487,7 +536,7 @@ export async function loadRiverGaugeOperationalSnapshot({
     ]);
 
   const joined =
-    joinRiverGaugeObservations({gauges,bulletins});
+    joinRiverGaugeObservations({gauges:gauges.payload,bulletins});
   // Observations are always freshly sourced from the original BoM bulletin
   // relay; only source-verified station reference metadata is reused.
   // Station thresholds are a single bundled, versioned BoM 2026 catalogue.
@@ -498,6 +547,9 @@ export async function loadRiverGaugeOperationalSnapshot({
   return {
     ...joined,
     thresholds,
+    metadataSource:gauges.metadataSource,
+    metadataFallback:gauges.metadataFallback,
+    metadataCheckedAt:gauges.metadataCheckedAt,
 
     source:
       "Bureau of Meteorology",
