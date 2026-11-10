@@ -60,7 +60,9 @@ jobs:
           bash scripts/build-current-site.sh
           python scripts/apply-ftp-aep-release-v10.py
           python scripts/apply-radar-auto-refresh-v1.py
-          test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 5
+          test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -ge 5
+          # Test of the pinned V10.5 inbox remains valid with an added
+          # isolated V10.6 preview. Never delete or rewrite V10.5.
           grep -Fq 'Q-SCOPE PASSIVE WIND/HOOK RESEARCH V10.5' _site/preview/wind-hook-v10-5/BUILD.txt
           grep -Fq 'Q-SCOPE QUEENSLAND OPERATOR BRANDING' _site/BUILD.txt
           ! grep -Fq 'enableWindHookResearch' _site/preview/wind-hook-v10-5/src/live3d-operational-v9.js
