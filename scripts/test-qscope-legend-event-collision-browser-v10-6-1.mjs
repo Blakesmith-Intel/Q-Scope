@@ -1,0 +1,135 @@
+import assert from "node:assert/strict";
+import {chromium,webkit} from "playwright";
+
+const mobile=process.env.STORMTRACKER_BROWSER==="mobile";
+const browser=await (mobile?webkit:chromium).launch({headless:true});
+const viewport=mobile?{width:390,height:760}:{width:1280,height:800};
+const context=await browser.newContext(mobile?
+  {viewport,isMobile:true,hasTouch:true}:{viewport});
+const page=await context.newPage();
+const base="http://127.0.0.1:8137/";
+const preview="/preview/wind-hook-v10-6/";
+const url=base+"qscope-radar-dock-legend-collision-fixture.html";
+const html='<!doctype html><html><head>'+
+  '<meta name="viewport" content="width=device-width, initial-scale=1">'+
+  '<link rel="stylesheet" href="'+preview+'src/operational-dashboard-v9-1.css">'+
+  '<link rel="stylesheet" href="'+preview+'src/lga-sidebar-legend-v1.css">'+
+  '<link rel="stylesheet" href="'+preview+'src/qscope-reviewable-event-inbox-v10-6.css">'+
+  '</head><body class="simple-ui" style="margin:0;overflow:hidden">'+
+  '<main id="mapPanel" style="position:relative;overflow:hidden;isolation:isolate;height:'+(mobile?"500px":"780px")+
+  ';width:'+(mobile?"390px":"920px")+';--stormtracker-control-z:3000">'+
+  '<div id="nav" style="position:absolute;z-index:3000;top:6px;right:6px;display:flex;background:#0b2432;padding:4px"><button>Controls</button><button>Radar site</button><button>Reset view</button></div>'+
+  '<section id="legendDock" class="card" data-mode="rain"><div id="legend" class="weather-legend-rain"><strong>BoM rain radar · reflectivity (dBZ)</strong>'+
+  '<div class="intensity-scale">'+Array.from({length:15},(_,i)=>'<span><i style="background:hsl('+i*23+' 80% 50%)"></i>'+(12+i*4)+'</span>').join("")+'</div></div></section>'+
+  '<div id="mapTruthLabel" style="position:absolute;left:8px;bottom:28px;z-index:3000">Measured BoM reflectivity</div>'+
+  '</main></body></html>';
+await page.route(url,route=>route.fulfill({status:200,contentType:"text/html",body:html}));
+function intersection(a,b){
+ const x=Math.max(0,Math.min(a.x+a.width,b.x+b.width)-Math.max(a.x,b.x));
+ const y=Math.max(0,Math.min(a.y+a.height,b.y+b.height)-Math.max(a.y,b.y));
+ return x*y;
+}
+async function geometry(){
+ return page.evaluate(()=>{
+   const selectors=[".qscope-wind-event-inbox","#legendDock","#nav",".qscope-wind-event-open","#mapPanel"];
+   const result={};
+   for(const s of selectors){
+     const el=document.querySelector(s);
+     if(!el)continue;
+     const r=el.getBoundingClientRect();
+     result[s]={x:r.x,y:r.y,width:r.width,height:r.height};
+   }
+   const btn=document.querySelector(".qscope-wind-event-open");
+   if(btn) {
+     const r=btn.getBoundingClientRect();
+     const el=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+     result.clickable=el===btn||btn.contains(el);
+   }
+   const inbox=document.querySelector(".qscope-wind-event-inbox");
+   result.position=inbox?.dataset.placement??"";
+   result.zIndex=inbox?Number(getComputedStyle(inbox).zIndex):null;
+   return result;
+ });
+}
+try {
+  const packed=await (await page.request.get(base+preview.slice(1)+"src/live3d-operational-v9.js")).text();
+  assert(packed.includes("attachQscopeResearchEventDock"),
+    "Full Q-SCOPE preview must use actual responsive event layout");
+  const layoutScript=await (await page.request.get(
+    base+preview.slice(1)+"src/qscope-research-event-dock-layout-v10-6-1.js")).text();
+  assert(layoutScript.includes("chooseQscopeRadarEventDock"));
+  await page.goto(url,{waitUntil:"load"});
+  await page.evaluate(async preview=>{
+    const [{createPassiveWindEventInbox}, {attachQscopeResearchEventDock}]=await Promise.all([
+      import(preview+"src/qscope-reviewable-event-inbox-v10-6.js"),
+      import(preview+"src/qscope-research-event-dock-layout-v10-6-1.js")
+    ]);
+    const m=document.querySelector("#mapPanel");
+    window.visits=[];
+    window.researchInbox=createPassiveWindEventInbox({
+      container:m,documentRef:document,storage:null,
+      onNavigate:async(event,evidence)=>{
+        window.visits.push({event,evidence});return {ok:true};
+      }
+    });
+    window.placement=attachQscopeResearchEventDock({
+      map:m,inbox:m.querySelector(".qscope-wind-event-inbox"),
+      details:m.querySelector(".qscope-wind-event-detail"),
+      win:window,documentRef:document
+    });
+    window.addEvent=(i=0)=>{
+      const time=new Date(Date.UTC(2026,10,10,2,0)+i*60*60000).toISOString();
+      return window.researchInbox.observe([{
+        category:"hook_shape_only",observed_utc:time,
+        source_utc:time,radar_id:"66",track_id:"ST"+i,
+        latitude:-27.4+i*0.25,longitude:153.1,
+        caveat:"Experimental only; not an official BoM warning."
+      }],{mode:"rain",frameUtc:time});
+    };
+    window.addEvent();
+    window.placement.reposition();
+  },preview);
+  await page.waitForTimeout(160);
+  let g=await geometry();
+  assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#legendDock"]),0,
+    "One pending alert cannot overlap the existing BoM legend");
+  assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#nav"]),0,
+    "Alert cannot obscure map navigation controls");
+  assert(g.clickable,"Operator MUST be able to actually click the event button");
+  assert(g.zIndex>3000,"Event dock must have map-control stacking priority");
+
+  // Multiple separate events must not grow underneath the original legend.
+  await page.evaluate(()=>{
+    for(let i=1;i<9;i++)window.addEvent(i);
+    window.placement.reposition();
+  });
+  await page.waitForTimeout(200);
+  g=await geometry();
+  assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#legendDock"]),0,
+    "Event list with 9 stored cases remains clear of BoM legend");
+  assert(g.clickable,"Top actionable event survives scrollable multi-event queue");
+  assert(await page.locator(".qscope-wind-event-list").evaluate(x=>
+    getComputedStyle(x).overflowY==="auto"),"Long event queue scrolls rather than covering legend");
+  await page.locator(".qscope-wind-event-open").first().click();
+  assert.equal(await page.evaluate(()=>window.visits.length),1);
+  const details=await page.locator(".qscope-wind-event-detail").boundingBox();
+  const map=await page.locator("#mapPanel").boundingBox();
+  assert(details&&details.x>=map.x-1&&details.y>=map.y-1 &&
+    details.x+details.width<=map.x+map.width+1 &&
+    details.y+details.height<=map.y+map.height+1,
+    "Evidence review window must fit inside available map canvas");
+  assert.equal(await page.locator(".qscope-wind-event-detail:not([hidden])").count(),1);
+  await page.locator(".qscope-wind-event-detail-title button").click();
+  await page.evaluate(()=>{
+    const legend=document.querySelector("#legendDock");
+    legend.dataset.mode="wind";
+    legend.style.height="155px"; // Different BoM wind legend height.
+    window.placement.reposition();
+  });
+  await page.waitForTimeout(80);
+  g=await geometry();
+  assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#legendDock"]),0,
+    "Doppler legend resizing cannot cover persistent event queue");
+  console.log("PASS "+(mobile?"mobile WebKit":"desktop Chromium")+
+    ": real BoM 15-band legend and 9 persistent alert cards do not collide; clickable actions and centred evidence window confirmed");
+}finally{await context.close();await browser.close();}

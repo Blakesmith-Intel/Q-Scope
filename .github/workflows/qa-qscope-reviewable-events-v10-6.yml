@@ -7,6 +7,10 @@ on:
       - "frontend/src/qscope-reviewable-event-inbox-v10-6.css"
       - "frontend/src/qscope-source-evidence-thumbnail-v10-6.js"
       - "frontend/src/qscope-intelligent-pause-v10-6.js"
+      - "frontend/src/qscope-research-event-dock-layout-v10-6-1.js"
+      - "frontend/src/qscope-reviewable-event-inbox-v10-6.css"
+      - "frontend/tests/run-qscope-event-dock-placement-v10-6-1-tests.mjs"
+      - "scripts/test-qscope-legend-event-collision-browser-v10-6-1.mjs"
       - "frontend/tests/run-qscope-reviewable-alerts-v10-6-tests.mjs"
       - "scripts/test-qscope-reviewable-alerts-browser-v10-6.mjs"
       - "scripts/apply-qscope-reviewable-events-v10-6.py"
@@ -81,3 +85,4 @@ jobs:
           python -m http.server 8137 --bind 127.0.0.1 --directory _site > /tmp/qscope-v10-6-qa.log 2>&1 &
           sleep 2
           node scripts/test-qscope-reviewable-alerts-browser-v10-6.mjs
+          node scripts/test-qscope-legend-event-collision-browser-v10-6-1.mjs

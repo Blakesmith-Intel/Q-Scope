@@ -69,3 +69,36 @@ live operational alert integration.
 
 **Never promote experimental alerts to the public root based solely on
 successful browser/automated tests.**
+
+## V10.6.1 operator interface repair — 10 November 2026
+
+A real desktop screenshot showed the **original BoM 15-band reflectivity
+legend obscuring a pending Q-SCOPE radar-event card**. The warning queue and
+legend had independently been placed at the right/bottom corner, with the
+legend above the inbox in the map's stacking context. A technically persistent
+notification was therefore not actually reviewable.
+
+The repair applies ONLY to `/preview/wind-hook-v10-6/`, without modifying its
+research detection, source retrieval or persistence rules:
+
+- Preserve the existing authoritative BoM legend and all its source colours,
+  mode controls, refresh rules and original map position.
+- Position the event inbox as a first-class **separate map control**, not in
+  the legend's area. On wide maps prefer a free lower-left slot; on narrow
+  maps stack it above the real measured legend height, with an internal
+  scrollable event list.
+- React to actual legend changes, map resizing, source-mode changes and
+  other live map controls via bounded local ResizeObserver / MutationObserver
+  logic. No polling or additional Worker calls.
+- Show the explicit operator-requested evidence review as a centred,
+  dismissible, scrollable window, rather than leaving it wedged below the
+  legend.
+- A zero-event status stays compact; a real pending alert remains accessible.
+  Event action buttons must be visually unobscured and physically clickable.
+- Test desktop Chromium and mobile WebKit against a real 15-band legend
+  fixture, dynamic radar mode, multiple simultaneous events, and an active
+  operator's event review.
+
+No changes to the frozen V10.2.53 accepted root, the original V10.3–V10.5
+research routes, Cloudflare Workers, scientific classification or BoM data
+flow are authorised by this repair.
