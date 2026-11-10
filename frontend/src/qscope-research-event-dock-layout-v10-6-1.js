@@ -196,7 +196,13 @@ export function attachQscopeResearchEventDock({
     }
     // Opening the evidence panel must not simply cover map controls;
     // place it independently and constrain its scroll height.
-    const inboxRect=rectInMap(inbox,map,win);
+    // Measure even while temporarily visibility:hidden, otherwise the next
+    // unrelated resize would reveal the queue and reintroduce the collision.
+    const queueBox=inbox.getBoundingClientRect();
+    const inboxRect=queueBox.width>0&&queueBox.height>0?{
+      x:queueBox.left-r.left,y:queueBox.top-r.top,
+      width:queueBox.width,height:queueBox.height
+    }:null;
     const review=chooseQscopeRadarEvidenceWindow({
       width:r.width,height:r.height,legend,scale,nav,truth,
       inbox:inboxRect,obstacles
