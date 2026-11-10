@@ -245,3 +245,116 @@
 #mapPanel .qscope-wind-event-inbox .qscope-wind-event-list {
   flex:1 1 auto; min-height:0; overflow-y:auto;
 }
+
+/* V10.6.6 operator-approved Q-SCOPE wind event visual identity. Distinct
+   source-faithful cards; this is NOT a BoM warning intensity palette.
+   All snapshots MUST be the retained genuine radar scan for that event. */
+#mapPanel .qscope-wind-event-inbox,
+#mapPanel .qscope-wind-event-detail {
+  background:linear-gradient(145deg,rgba(9,27,39,.98),rgba(2,12,23,.98));
+  border-radius:11px;
+}
+#mapPanel .qscope-wind-event-card {
+  align-items:stretch;
+  gap:6px;
+  padding:6px 0;
+}
+#mapPanel .qscope-wind-event-card .qscope-wind-event-open {
+  position:relative;isolation:isolate;
+  display:flex;flex-direction:column;
+  gap:5px;min-width:0;min-height:68px;
+  padding:7px 8px 8px;
+  text-align:left;border-radius:7px;
+  overflow:hidden;white-space:normal;
+  color:#f6faff;
+}
+.qscope-wind-event-card[data-severity="wind"] .qscope-wind-event-open {
+  border:1px solid #f5d45c;
+  border-left:5px solid #f5d45c;
+  background:linear-gradient(110deg,#4d4515b8,#101e29 74%);
+}
+.qscope-wind-event-card[data-severity="hook"] .qscope-wind-event-open {
+  border:1px solid #ff994e;
+  border-left:5px solid #ff994e;
+  background:linear-gradient(110deg,#56321db8,#101e29 74%);
+}
+.qscope-wind-event-card[data-severity="couplet"] .qscope-wind-event-open {
+  border:1px solid #ed5c70;
+  border-left:5px solid #ed5c70;
+  background:linear-gradient(110deg,#5b1d2bc4,#101e29 74%);
+}
+.qscope-wind-signature-identity {
+  display:flex;gap:9px;align-items:center;
+  width:100%;min-width:0;
+}
+.qscope-wind-signature-emblem {
+  display:flex;flex:none;
+  width:35px;height:35px;
+  align-items:center;justify-content:center;
+  border-radius:7px;color:#101925;
+  font:800 28px/1 system-ui,sans-serif;
+}
+[data-severity="wind"]>.qscope-wind-signature-emblem {
+  background:#f5d45c;
+}
+[data-severity="hook"]>.qscope-wind-signature-emblem {
+  background:#ff994e;
+}
+[data-severity="couplet"]>.qscope-wind-signature-emblem {
+  background:#ed5c70;
+}
+.qscope-wind-signature-summary {
+  display:flex;flex:1;flex-direction:column;gap:3px;
+  min-width:0;line-height:1.24;
+}
+.qscope-wind-signature-summary strong {
+  font-size:12px;letter-spacing:.015em;
+  color:#fff;overflow-wrap:anywhere;
+}
+.qscope-wind-signature-priority {
+  font-size:9px;font-weight:550;
+  letter-spacing:.04em;color:#c0dae8;
+}
+.qscope-wind-card-meta {
+  font-size:10px;color:#dbe5f2;letter-spacing:.01em;
+}
+.qscope-wind-card-source {
+  display:block;align-self:flex-start;
+  width:86px;height:68px;
+  object-fit:cover;image-rendering:pixelated;
+  border:1px solid #8caebe;border-radius:5px;
+  background:#092333;
+}
+#mapPanel .qscope-wind-event-detail .qscope-wind-signature-identity {
+  padding:9px 10px;border-radius:8px;
+  border:1px solid #516477;
+  background:linear-gradient(105deg,#193643,#0d1f2b);
+  margin-bottom:5px;
+}
+#mapPanel .qscope-wind-event-detail[data-severity="wind"] .qscope-wind-signature-identity {
+  border-color:#f5d45c;background:linear-gradient(105deg,#544b18,#102534);
+}
+#mapPanel .qscope-wind-event-detail[data-severity="hook"] .qscope-wind-signature-identity {
+  border-color:#ff994e;background:linear-gradient(105deg,#5a3319,#102534);
+}
+#mapPanel .qscope-wind-event-detail[data-severity="couplet"] .qscope-wind-signature-identity {
+  border-color:#ed5c70;background:linear-gradient(105deg,#581d2d,#102534);
+}
+#mapPanel .qscope-wind-event-detail .qscope-wind-signature-emblem {
+  height:42px;width:42px;font-size:32px;
+}
+#mapPanel .qscope-wind-event-evidence-row {
+  border-radius:7px;background:linear-gradient(140deg,#1d3547,#0e2433);
+}
+#mapPanel .qscope-wind-event-detail .qscope-wind-evidence-snapshot img {
+  max-width:100%;width:min(210px,100%);
+}
+@media(max-width:700px){
+  .qscope-wind-signature-emblem{width:30px;height:30px;font-size:24px;}
+  .qscope-wind-signature-summary strong{font-size:11px;}
+  .qscope-wind-signature-priority{font-size:8px;}
+  #mapPanel .qscope-wind-event-card .qscope-wind-event-open {min-height:60px;}
+  #mapPanel .qscope-wind-event-detail .qscope-wind-signature-emblem {
+    width:34px;height:34px;font-size:27px;
+  }
+}
