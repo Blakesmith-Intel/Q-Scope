@@ -997,3 +997,27 @@ else
 fi
 
 
+
+# Q-SCOPE V10.5 passive notifications are a FIFTH *isolated* science QA
+# preview. Pin the already-accepted V10.4 sibling unchanged. Never modify
+# the public root, the Cloudflare relay, or earlier research source tags.
+passive_next="_site/preview/wind-hook-v10-5"
+test ! -e "$passive_next"
+cp -a "_site/preview/wind-hook-v10-4" "$passive_next"
+cp "frontend/src/qscope-passive-wind-inbox-v10-5.js" "$passive_next/src/"
+cp "frontend/src/qscope-passive-wind-inbox-v10-5.css" "$passive_next/src/"
+python3 scripts/apply-qscope-passive-wind-v10-5.py --site "$passive_next"
+node --check "$passive_next/src/qscope-passive-wind-inbox-v10-5.js"
+node --check "$passive_next/src/live3d-operational-v9.js"
+node frontend/tests/run-qscope-passive-wind-inbox-v10-5-tests.mjs
+grep -Fq '<title>Q-SCOPE | Passive Wind & Hook Event Research V10.5</title>' "$passive_next/index.html"
+grep -Fq 'Q-SCOPE PASSIVE WIND/HOOK RESEARCH V10.5' "$passive_next/BUILD.txt"
+grep -Fq 'queuePassiveResearchPair("rain",i)' "$passive_next/src/live3d-operational-v9.js"
+grep -Fq 'queuePassiveResearchPair("doppler",i)' "$passive_next/src/live3d-operational-v9.js"
+grep -Fq 'createPassiveWindEventInbox' "$passive_next/src/live3d-operational-v9.js"
+! grep -Fq 'enableWindHookResearch' "$passive_next/src/live3d-operational-v9.js"
+test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 5
+# Archive and operational root checks remain source-pinned and fail closed.
+grep -Fq 'Q-SCOPE WIND / HOOK RESEARCH V10.4' "_site/preview/wind-hook-v10-4/BUILD.txt"
+grep -Fq 'EXPERIMENTAL V10.3 wind-hook original radar QA source f3a07688ca02f5f0234ae6425fc1177722518c53' "_site/preview/wind-hook-v10-3/BUILD.txt"
+grep -Fq '<title>Q-SCOPE | Queensland Situational Awareness</title>' "_site/index.html"
