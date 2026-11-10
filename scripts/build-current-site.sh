@@ -960,3 +960,30 @@ grep -Fq 'Q-SCOPE QUEENSLAND OPERATOR BRANDING' _site/BUILD.txt
 grep -Fq 'RIVER_HISTORY_WINDOW_LIMIT = 24' _site/src/context-layers/river-history-request-budget-v1.js
 grep -Fq 'MANUAL_FLOOD_STAGE_MAX_AGE_MS' _site/src/context-layers/river-flood-signals-v1.js
 
+# Q-SCOPE V10.4 is a FOURTH, isolated QA-only preview. Clone the exact
+# pinned V10.3 science research preview, overlay ONLY the new scientifically
+# guarded detectors, and add Q-SCOPE preview branding/route. This has NO
+# path into live root, the three archived previews or the Cloudflare Worker.
+wind_next="_site/preview/wind-hook-v10-4"
+test ! -e "$wind_next"
+cp -a "_site/preview/wind-hook-v10-3" "$wind_next"
+for detector in severe-storm-v10.js doppler-persistence-v10-3.js; do
+  cp "frontend/src/$detector" "$wind_next/src/$detector"
+  node --check "$wind_next/src/$detector"
+done
+python3 scripts/apply-qscope-wind-research-v10-4.py --site "$wind_next"
+grep -Fq '<title>Q-SCOPE | Experimental Wind & Hook Research V10.4</title>' "$wind_next/index.html"
+grep -Fq 'Q-SCOPE</strong><span>WIND / HOOK RESEARCH · NOT OFFICIAL WARNINGS' "$wind_next/live3d-operational-v9.html"
+grep -Fq 'Q-SCOPE WIND / HOOK RESEARCH V10.4' "$wind_next/BUILD.txt"
+grep -Fq 'MAX_ARC_GAP_MINUTES = 8' "$wind_next/src/severe-storm-v10.js"
+grep -Fq 'ADJACENCY_KM = 1.5' "$wind_next/src/doppler-persistence-v10-3.js"
+test "$(grep -Foc '/preview/wind-hook-v10-4/' "$wind_next/src/live3d-operational-v9.js")" = 2
+! grep -Fq '/preview/wind-hook-v10-3/' "$wind_next/src/live3d-operational-v9.js"
+# All previous preview markers, pinned code and root source identity stay valid.
+grep -Fq 'EXPERIMENTAL V10.3 wind-hook original radar QA source f3a07688ca02f5f0234ae6425fc1177722518c53' "_site/preview/wind-hook-v10-3/BUILD.txt"
+grep -Fq '<title>Q-SCOPE | Queensland Situational Awareness</title>' "_site/index.html"
+grep -Fq 'Q-SCOPE QUEENSLAND OPERATOR BRANDING' "_site/BUILD.txt"
+test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 4
+node --check "$wind_next/src/live3d-operational-v9.js"
+
+
