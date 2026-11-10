@@ -1,0 +1,39 @@
+name: Verify public Q-SCOPE identity without modifying production
+on:
+  push:
+    branches: [maintenance/q-scope-live-public-verification-20261110]
+    paths: [.github/workflows/verify-q-scope-public-once-20261110.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check actual GitHub Pages identity and frozen-source compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://blakesmith-intel.github.io/StormTracker"
+          ready=0
+          for i in $(seq 1 24); do
+            urltag="?qscope-public-verify-20261110-$GITHUB_RUN_ID-$i"
+            root="$(curl --fail --silent --show-error --location --max-time 15 "$base/index.html$urltag" || true)"
+            ui="$(curl --fail --silent --show-error --location --max-time 15 "$base/live3d-operational-v9.html$urltag" || true)"
+            if grep -Fq '<title>Q-SCOPE | Queensland Situational Awareness</title>' <<< "$root" &&
+               grep -Fq 'title="Q-SCOPE Queensland weather and hazard map"' <<< "$root" &&
+               grep -Fq '<title>Q-SCOPE | Queensland Situational Awareness Map</title>' <<< "$ui" &&
+               grep -Fq '<strong>Q-SCOPE</strong><span>QLD Situational Awareness</span>' <<< "$ui" &&
+               grep -Fq 'id="refreshRiverGaugesButton"' <<< "$ui" &&
+               grep -Fq 'id="operatorGuideLink"' <<< "$ui" &&
+               grep -Fq 'id="sidebarToggle"' <<< "$ui"; then
+              ready=1
+              echo "PUBLIC_Q_SCOPE_BRANDING_PASS attempt=$i"
+              break
+            fi
+            echo "Public Pages branding still propagating: $i/24"
+            sleep 8
+          done
+          test "$ready" = 1 || { echo "Public Q-SCOPE identity not verified"; exit 1; }
+          echo "SOURCE_URL_UNCHANGED=https://blakesmith-intel.github.io/StormTracker/"
+          echo "ACCEPTED_BASELINE=1466851327584b62e06172b3aa2c279afd27870e"
