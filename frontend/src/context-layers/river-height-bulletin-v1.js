@@ -360,6 +360,11 @@ export function parseRiverHeightTable(
       ]
     );
 
+  // BoM identifies manual gauges in the actual current river-height table.
+  // Keep this metadata tied to the exact BoM station row, not a name guess.
+  const typeIndex = headers.findIndex(header =>
+    header==="type" || header==="station type" || header==="gauge type");
+
   const timeIndex =
     headerIndex(
       headers,
@@ -445,8 +450,15 @@ export function parseRiverHeightTable(
               )
             : "";
 
+        const reportingMode=typeIndex>=0
+          ?stripTags(row[typeIndex]).toLowerCase().trim():"";
+
         return {
           stationName,
+
+          // Only the literal source 'Manual' may extend the stale flood
+          // evidence window; automatic/unknown gauges retain 24-hour expiry.
+          ...(reportingMode==="manual"?{reportingMode:"manual"}:{}),
 
           stationId:
             stationIdFromHref(
