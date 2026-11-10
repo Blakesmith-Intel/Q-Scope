@@ -1,0 +1,51 @@
+/* Q-SCOPE V10.7 RESEARCH PREVIEW ONLY
+   The original BoM legend is fixed bottom-right at z=3000 by an approved
+   map layout stylesheet. V10.6 put a 34-z alert in that very same corner,
+   allowing both the legend and geographic labels (z=2000) to obscure it.
+   This overlay reserves separate slots without touching radar rendering. */
+#mapPanel .qscope-wind-event-inbox {
+  z-index:calc(var(--stormtracker-control-z,3000) + 24)!important;
+  background:#081722;
+  box-shadow:0 8px 26px #0009;
+  pointer-events:auto;
+}
+#mapPanel .qscope-wind-event-detail {
+  z-index:calc(var(--stormtracker-control-z,3000) + 48)!important;
+  background:#081722;
+  box-shadow:0 9px 28px #000c;
+  pointer-events:auto;
+  box-sizing:border-box;
+  width:min(445px,calc(100% - 24px));
+}
+/* Opening a case gives its evidence a dedicated review surface; the
+   notification queue remains stored and reappears when review is closed. */
+#mapPanel[data-qscope-event-review="true"] .qscope-wind-event-inbox {
+  visibility:hidden;
+  pointer-events:none;
+}
+#mapPanel[data-qscope-legend-review-hidden="true"] #legendDock {
+  visibility:hidden!important;
+}
+/* Any child cannot leak through the opaque alert above the town-label plane. */
+#mapPanel .qscope-wind-event-header,
+#mapPanel .qscope-wind-event-controls,
+#mapPanel .qscope-wind-event-list,
+#mapPanel .qscope-wind-event-status {
+  position:relative;
+}
+/* Explicit max-height is calculated against ACTUAL map panel dimensions
+   and the currently rendered legend size: no viewport-only bottom offsets. */
+#mapPanel .qscope-wind-event-list,
+#mapPanel .qscope-wind-event-evidence {
+  min-height:0;
+  overscroll-behavior:contain;
+}
+@media(max-width:700px) {
+  #mapPanel .qscope-wind-event-inbox,
+  #mapPanel .qscope-wind-event-detail {
+    width:min(360px,calc(100% - 24px));
+  }
+  #mapPanel .qscope-wind-event-detail {
+    font-size:11px;
+  }
+}
