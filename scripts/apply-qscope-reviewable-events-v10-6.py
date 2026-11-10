@@ -36,11 +36,11 @@ def main(site):
       '''import { createPassiveWindEventInbox } from "./qscope-reviewable-event-inbox-v10-6.js?v=source-retention";
 import { captureResearchSourceThumbnail } from "./qscope-source-evidence-thumbnail-v10-6.js?v=observed-only";
 import { shouldPauseForNewResearchEvent } from "./qscope-intelligent-pause-v10-6.js";
-import { attachQscopeResearchEventDock } from "./qscope-research-event-dock-layout-v10-6-1.js?v=under-radar-controls-v3";''',
+import { attachQscopeResearchEventDock } from "./qscope-research-event-dock-layout-v10-6-1.js?v=compass-safe-severity-v4";''',
       "new inbox and original-source thumbnail modules")
     s=one(s,
       'inboxStyle.href="./src/qscope-passive-wind-inbox-v10-5.css?v=v10-5";',
-      'inboxStyle.href="./src/qscope-reviewable-event-inbox-v10-6.css?v=v10-6-3-under-radar-controls";',
+      'inboxStyle.href="./src/qscope-reviewable-event-inbox-v10-6.css?v=v10-6-4-compass-safe-severity";',
       "preview-only CSS")
     s=one(s,
       '      onNavigate:navigateToPassiveResearchEvidence',
@@ -134,7 +134,7 @@ if (passiveRadarInbox) {
 // Prevent an older asynchronous radar-image load''',
       "research dock placement after inbox exists")
     a=one(a,"qscope-v10-6-persistent-evidence",
-      "qscope-v10-6-3-under-radar-controls","browser iframe cache refresh")
+      "qscope-v10-6-4-compass-safe-severity","browser iframe cache refresh")
     for forbidden in ["enableWindHookResearch", "windHookResearchQaControl",
                       "syncSevereStormAlerts(", "syncIndependentDopplerResearch("]:
         if forbidden in s:raise ValueError(f"Unwanted legacy research UI source: {forbidden}")
