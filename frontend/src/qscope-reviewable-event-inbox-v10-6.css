@@ -155,3 +155,61 @@
   .qscope-wind-event-inbox { max-height:38vh; }
   .qscope-wind-event-detail {bottom:calc(38vh + 16px);max-height:39vh;}
 }
+
+
+/* V10.6.1 operator-reported map-control collision fix.
+   The native BoM reflectivity/Doppler legend occupies the same right-bottom
+   corner as the original alert dock. Reserve separate geometry instead.
+   JS computes a collision-free placement from actual responsive map controls;
+   these rules are the safe fallback if the browser has not measured yet. */
+#mapPanel .qscope-wind-event-inbox {
+  box-sizing:border-box;
+  left:12px;
+  top:70px;
+  right:auto;
+  bottom:auto;
+  z-index:calc(var(--stormtracker-control-z, 3000) + 12);
+  max-width:calc(100% - 16px);
+  max-height:min(42%,390px);
+  overflow:hidden;
+}
+#mapPanel .qscope-wind-event-inbox .qscope-wind-event-list {
+  min-height:0;
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+}
+#mapPanel .qscope-wind-event-inbox .qscope-wind-event-open {
+  min-height:42px;
+}
+#mapPanel .qscope-wind-event-detail {
+  /* Intentional operator-requested review window, not a new passive dock.
+     Centred on the map, above the legend; fully scrollable and dismissible. */
+  box-sizing:border-box;
+  top:50%;
+  left:50%;
+  right:auto;
+  bottom:auto;
+  transform:translate(-50%,-50%);
+  width:min(500px,calc(100% - 20px));
+  max-height:calc(100% - 24px);
+  z-index:calc(var(--stormtracker-control-z, 3000) + 13);
+  overflow-y:auto;
+  overscroll-behavior:contain;
+}
+@media(max-width:700px) {
+  #mapPanel .qscope-wind-event-inbox {
+    left:8px;
+    top:64px;
+    max-width:calc(100% - 16px);
+  }
+  #mapPanel .qscope-wind-event-inbox .qscope-wind-event-status {
+    /* Preserve actual actions on a small screen over explanatory prose;
+       the experimental status remains in the title and review window. */
+    display:none;
+  }
+  #mapPanel .qscope-wind-event-detail {
+    width:calc(100% - 16px);
+    max-height:calc(100% - 20px);
+  }
+}
