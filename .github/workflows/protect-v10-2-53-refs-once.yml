@@ -1,0 +1,51 @@
+name: Enforce V10.2.53 exact reference protections (one-time)
+# No source, build, production deployment, or prior release is changed.
+on:
+  push:
+    branches: [maintenance/seal-v10.2.53]
+    paths: [.github/workflows/protect-v10-2-53-refs-once.yml]
+permissions:
+  contents: read
+jobs:
+  protect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - name: Lock only accepted V10.2.53 tag and restore branch
+        env:
+          GH_TOKEN: ${{ secrets.STORMTRACKER_RELEASE_TOKEN || github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          oldtag="$(gh api "repos/$repo/git/ref/tags/v10.2.53" --jq '.object.sha')"
+          test -n "$oldtag"
+          expected="1466851327584b62e06172b3aa2c279afd27870e"
+          test "$(gh api "repos/$repo/git/ref/heads/restore/v10.2.53" --jq '.object.sha')" = "$expected"
+          test "$(gh api "repos/$repo/git/tags/$oldtag" --jq '.object.sha')" = "$expected"
+          existing="$(gh api "repos/$repo/rulesets" --jq '[.[] | .name] | join(";")')"
+          for scope in tag branch; do
+            if [ "$scope" = tag ]; then
+              name="StormTracker V10.2.53 NEVER MOVE tag"
+              exact="refs/tags/v10.2.53"
+            else
+              name="StormTracker V10.2.53 NEVER MOVE restore branch"
+              exact="refs/heads/restore/v10.2.53"
+            fi
+            if grep -Fq "$name" <<< "$existing"; then
+              echo "EXISTING PROTECTION: $name"
+              continue
+            fi
+            jq -n --arg name "$name" --arg target "$scope" --arg exact "$exact" \
+              '{name:$name,target:$target,enforcement:"active",
+                bypass_actors:[],conditions:{ref_name:{include:[$exact],exclude:[]}},
+                rules:[{type:"update"},{type:"deletion"}]}' > /tmp/one-rule.json
+            if gh api --method POST "repos/$repo/rulesets" --input /tmp/one-rule.json \
+              --jq '[.id,.name,.enforcement,.target] | @tsv'; then
+              echo "REFERENCE PROTECTION CREATED: $name"
+            else
+              echo "::warning::Insufficient GitHub administration permission for $scope ref enforcement; annotated release and restore branch remain valid but not technically protected"
+              exit 1
+            fi
+          done
+          gh api "repos/$repo/rulesets" --jq '.[] | [.id,.name,.enforcement] | @tsv'
