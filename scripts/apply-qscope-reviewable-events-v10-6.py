@@ -35,11 +35,12 @@ def main(site):
       'import { createPassiveWindEventInbox } from "./qscope-passive-wind-inbox-v10-5.js";',
       '''import { createPassiveWindEventInbox } from "./qscope-reviewable-event-inbox-v10-6.js?v=source-retention";
 import { captureResearchSourceThumbnail } from "./qscope-source-evidence-thumbnail-v10-6.js?v=observed-only";
-import { shouldPauseForNewResearchEvent } from "./qscope-intelligent-pause-v10-6.js";''',
+import { shouldPauseForNewResearchEvent } from "./qscope-intelligent-pause-v10-6.js";
+import { attachQscopeResearchEventDock } from "./qscope-research-event-dock-layout-v10-6-1.js?v=legend-clear-v1";''',
       "new inbox and original-source thumbnail modules")
     s=one(s,
       'inboxStyle.href="./src/qscope-passive-wind-inbox-v10-5.css?v=v10-5";',
-      'inboxStyle.href="./src/qscope-reviewable-event-inbox-v10-6.css?v=v10-6";',
+      'inboxStyle.href="./src/qscope-reviewable-event-inbox-v10-6.css?v=v10-6-1-legend-clear";',
       "preview-only CSS")
     s=one(s,
       '      onNavigate:navigateToPassiveResearchEvidence',
@@ -116,6 +117,24 @@ function pauseForGenuineNewResearchEvent(event,context) {
       '  if (resume) playback.play();\n  // Bound decoded imagery',
       '  if (resume && !researchOperatorNavigationInProgress) playback.play();\n  // Bound decoded imagery',
       "do not auto-resume while loading an event's rain evidence")
+    s=one(s,
+      '  : null;\n\n// Prevent an older asynchronous radar-image load',
+      '''  : null;
+// V10.6.1: responsive operator UI placement; no changes to the weather.
+if (passiveRadarInbox) {
+  const qscopeMap=$("mapPanel");
+  attachQscopeResearchEventDock({
+    map:qscopeMap,
+    inbox:qscopeMap.querySelector(".qscope-wind-event-inbox"),
+    details:qscopeMap.querySelector(".qscope-wind-event-detail"),
+    documentRef:document,win:window
+  });
+}
+
+// Prevent an older asynchronous radar-image load''',
+      "research dock placement after inbox exists")
+    a=one(a,"qscope-v10-6-persistent-evidence",
+      "qscope-v10-6-1-legend-clear","browser iframe cache refresh")
     for forbidden in ["enableWindHookResearch", "windHookResearchQaControl",
                       "syncSevereStormAlerts(", "syncIndependentDopplerResearch("]:
         if forbidden in s:raise ValueError(f"Unwanted legacy research UI source: {forbidden}")
@@ -125,6 +144,7 @@ function pauseForGenuineNewResearchEvent(event,context) {
     runtime.write_text(s,encoding="utf-8")
     with (site/"BUILD.txt").open("a",encoding="utf-8") as handle:
         handle.write("Q-SCOPE PERSISTENT RESEARCH EVENTS V10.6 — TRUE-SOURCE CROP + OPT-IN SINGLE NEW-EVENT PAUSE + OPERATOR FRAME CONTROL; NO OPERATIONAL ALERTS\n")
+        handle.write("Q-SCOPE V10.6.1 MAP LEGEND / ALERT COLLISION REPAIR — DYNAMIC RESPONSIVE OPERATOR-CLICKABLE INBOX; NO WEATHER OR DATA CHANGES\\n")
 
 if __name__=="__main__":
     args=ArgumentParser()
