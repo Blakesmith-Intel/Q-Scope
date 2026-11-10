@@ -1021,3 +1021,26 @@ test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 5
 grep -Fq 'Q-SCOPE WIND / HOOK RESEARCH V10.4' "_site/preview/wind-hook-v10-4/BUILD.txt"
 grep -Fq 'EXPERIMENTAL V10.3 wind-hook original radar QA source f3a07688ca02f5f0234ae6425fc1177722518c53' "_site/preview/wind-hook-v10-3/BUILD.txt"
 grep -Fq '<title>Q-SCOPE | Queensland Situational Awareness</title>' "_site/index.html"
+
+# Q-SCOPE V10.6 is an independent SIXTH preview: retain the exact V10.5
+# grouped event queue for comparison and add original-source evidence crops,
+# sticky review, and a strictly opt-in one-shot new-event pause.
+review_next="_site/preview/wind-hook-v10-6"
+test ! -e "$review_next"
+cp -a "_site/preview/wind-hook-v10-5" "$review_next"
+cp "frontend/src/qscope-reviewable-event-inbox-v10-6.js" "$review_next/src/"
+cp "frontend/src/qscope-reviewable-event-inbox-v10-6.css" "$review_next/src/"
+cp "frontend/src/qscope-source-evidence-thumbnail-v10-6.js" "$review_next/src/"
+python3 scripts/apply-qscope-reviewable-events-v10-6.py --site "$review_next"
+node --check "$review_next/src/live3d-operational-v9.js"
+node --check "$review_next/src/qscope-reviewable-event-inbox-v10-6.js"
+node --check "$review_next/src/qscope-source-evidence-thumbnail-v10-6.js"
+node frontend/tests/run-qscope-reviewable-alerts-v10-6-tests.mjs
+grep -Fq '<title>Q-SCOPE | Persistent Wind & Hook Event Research V10.6</title>' "$review_next/index.html"
+grep -Fq 'Q-SCOPE PERSISTENT RESEARCH EVENTS V10.6' "$review_next/BUILD.txt"
+grep -Fq 'onNewEvent:pauseForGenuineNewResearchEvent' "$review_next/src/live3d-operational-v9.js"
+grep -Fq 'captureResearchSourceThumbnail' "$review_next/src/live3d-operational-v9.js"
+grep -Fq 'Q-SCOPE PASSIVE WIND/HOOK RESEARCH V10.5' "_site/preview/wind-hook-v10-5/BUILD.txt"
+grep -Fq '<title>Q-SCOPE | Queensland Situational Awareness</title>' "_site/index.html"
+! grep -Fq 'enableWindHookResearch' "$review_next/src/live3d-operational-v9.js"
+test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6
