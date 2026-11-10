@@ -263,7 +263,7 @@ const passiveRadarInbox=isWindHookQaPreview
         '  queuePassiveResearchPair("doppler",next);',
         "native Doppler passive scene")
     s=replace_once(s,
-        "  if (resume) playback.play();\n}",
+        "  if(resume) playback.play();\n}",
         '''  if(isWindHookQaPreview)
     for(let i=1;i<windPlaybackFrames.length;i++)
       queuePassiveResearchPair("doppler",i);
