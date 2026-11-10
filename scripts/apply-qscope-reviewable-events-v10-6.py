@@ -109,8 +109,8 @@ function pauseForGenuineNewResearchEvent(event,context) {
 }''',
       "release navigation scope on all results")
     s=one(s,
-      '  if(resume) playback.play();\n}',
-      '  if(resume && !researchOperatorNavigationInProgress) playback.play();\n}',
+      '  if (resume) playback.play();\n}',
+      '  if (resume && !researchOperatorNavigationInProgress) playback.play();\n}',
       "do not auto-resume while loading an event's Doppler evidence")
     s=one(s,
       '  if (resume) playback.play();\n  // Bound decoded imagery',
