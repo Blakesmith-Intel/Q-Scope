@@ -52,4 +52,32 @@ const conflicting=source(next,{extra:[
 ]});
 assert.equal(assessConsecutiveDopplerWind(older,conflicting).alerts.length,0,
   "Opposing local velocity prevents straight-line candidate classification");
+// Three high pixels in a 5km tile are not necessarily one observed wind
+// feature. Require actual source-pixel connectivity rather than tile count.
+const disconnected=[-27.442,-27.425,-27.409].map(lat=>({
+  longitude:153.1,latitude:lat,velocity_kmh:-65
+}));
+assert.equal(assessConsecutiveDopplerWind(
+  {...older,samples:disconnected},
+  {...newer,samples:disconnected}
+).alerts.length,0,"Separated pixels in one 5 km tile cannot form a wind cluster");
+
+// A missing 5/6-minute Doppler scan should not be silently counted as two
+// consecutive observations, even if two older files exist.
+assert.equal(assessConsecutiveDopplerWind(
+  older,source("2026-10-17T02:10:00Z")
+).alerts.length,0,"Ten-minute gap does not prove consecutive scans");
+
+// Multiple source-pixel indices carrying the same location cannot make an
+// artificial three-sample cluster. Repeated geographic coordinates are stale.
+const duplicateCoords={...newer,samples:[0,1,2].map(i=>({
+  longitude:153.1,latitude:-27.45,velocity_kmh:-66,pixel_index:i
+}))};
+assert.equal(assessConsecutiveDopplerWind(older,duplicateCoords).alerts.length,0);
+
+// Distinct contiguous samples still produce a provisional yellow indicator.
+// Its displayed magnitude remains radial velocity, never BoM's 90km/h gust.
+assert.equal(assessConsecutiveDopplerWind(older,newer).alerts.length,1);
+assert.equal(assessConsecutiveDopplerWind(older,newer).alerts[0].classification,undefined);
+
 console.log("PASS consecutive native Doppler scans, source UTC, persistence, negative controls and no surface-gust claims.");
