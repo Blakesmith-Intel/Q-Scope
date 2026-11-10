@@ -16,6 +16,8 @@ on:
       - "relay/river-crossing-heights-v1.js"
       - "relay/ftp-live-v1.js"
       - "frontend/src/context-layers/river-flood-stages-2026-full-v1.js"
+      # The existing Worker imports the official BoM river-height table parser.
+      - "frontend/src/context-layers/river-height-bulletin-v1.js"
   workflow_dispatch:
 
 permissions:
@@ -74,6 +76,28 @@ jobs:
               audited:reference.stormtrackerReference.auditedTotal,
               elapsedMs:Date.now()-started,
               source:response.headers.get('X-StormTracker-Metadata-Source')}));
+          NODE
+      - name: Verify live manual BoM station identity from existing bulletin route (single read)
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const url='https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev/river-height-bulletins';
+          const resp=await fetch(url,{signal:AbortSignal.timeout(25000),
+            headers:{Origin:'https://blakesmith-intel.github.io'}});
+          assert.equal(resp.status,200,'Live BoM bulletin relay must remain healthy');
+          const body=await resp.json();
+          const rows=(body.products??[]).flatMap(p=>p.observations??[]);
+          const why=rows.find(row=>String(row.stationId)==='044154');
+          const cul=rows.find(row=>String(row.stationId)==='544018');
+          if(why){
+            assert.equal(why.reportingMode,'manual');
+            assert.equal(why.stationId,'044154');
+          }
+          console.log('BO_M_MANUAL_STATION_PARSER_PRODUCTION',
+            JSON.stringify({whyenbahFound:Boolean(why),manual:why?.reportingMode??null,
+              observation:why?.observedText??null,station:'044154',
+              culgoaFound:Boolean(cul),culgoaIsManual:cul?.reportingMode==='manual',
+              products:body.products?.length,partial:body.partial}));
           NODE
       - name: Verify live official BoM bridge and causeway catalogue and production browser CORS
         run: node scripts/probe-live-qld-crossing-relay-v1.mjs
