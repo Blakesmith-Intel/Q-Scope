@@ -14,7 +14,7 @@ const makeDocument=async()=>{
   await page.goto(url+"BUILD.txt",{waitUntil:"domcontentloaded"});
   await page.setContent('<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="'+cssUrl+'"></head>'+
     '<body style="margin:0;background:#0b1f2b"><main id="mapPanel" style="position:relative;height:100vh;width:100vw;overflow:hidden"></main></body></html>');
-  await page.locator(cssUrl.replace(".css",".css")).count().catch(()=>{});
+  await page.locator("link[rel=stylesheet]").first().waitFor({state:"attached"});
 };
 try{
   const source=await (await page.request.get(url+moduleUrl.slice(1))).text();
