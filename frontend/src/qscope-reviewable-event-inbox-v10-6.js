@@ -20,11 +20,34 @@ const MAX_STORED_BYTES = 2000000;
 const CATEGORY_PRIORITY = Object.freeze({
   tornadic_candidate: 3, hook_shape_only: 2, strong_radial_signature: 1
 });
-const CATEGORY_LABEL = Object.freeze({
-  tornadic_candidate: "Hook + radial couplet candidate",
-  hook_shape_only: "Possible hook-shaped echo",
-  strong_radial_signature: "Strong radial-wind signature candidate"
+// Radar signature review priority, NOT a surface-wind magnitude, a verified
+// tornado classification, or an official BoM warning. Retain original source
+// categories for exact detection provenance and persisted event compatibility.
+export const RESEARCH_RADAR_EVENT_TYPES = Object.freeze({
+  strong_radial_signature:{
+    severity:"wind",rank:1,
+    label:"POSSIBLE STRAIGHT-LINE WIND",
+    priority:"WIND SIGNATURE · REVIEW",
+    evidence:"Strong radial-wind signature (wind type and surface gust unverified)"
+  },
+  hook_shape_only:{
+    severity:"hook",rank:2,
+    label:"HOOK ECHO",
+    priority:"HOOK SHAPE · ELEVATED REVIEW",
+    evidence:"Possible hook-shaped reflectivity echo (rotation not confirmed)"
+  },
+  tornadic_candidate:{
+    severity:"couplet",rank:3,
+    label:"HOOK + VELOCITY COUPLET",
+    priority:"COMBINED SIGNAL · HIGH-PRIORITY REVIEW",
+    evidence:"Hook shape with persistent Doppler couplet candidate (tornado not confirmed)"
+  }
 });
+const CATEGORY_LABEL = Object.freeze(Object.fromEntries(
+  Object.entries(RESEARCH_RADAR_EVENT_TYPES).map(([key,value])=>[
+    key,value.evidence
+  ])
+));
 function finite(n) { return typeof n === "number" && Number.isFinite(n); }
 function validUtc(s) { return typeof s === "string" && Number.isFinite(Date.parse(s)); }
 function distanceKm(a, b) {
@@ -224,11 +247,22 @@ function timeAest(utc) {
     hour:"2-digit",minute:"2-digit",hour12:false
   })+" AEST";
 }
-function eventHeading(e) {
-  const categories=[...new Set(e.evidence.map(item=>item.category))];
+export function radarEventPresentation(e) {
   const best=bestEvidence(e);
-  return (categories.length>1?"Multiple radar signatures":"Radar signature")+
-    " · "+best.title;
+  const selected=RESEARCH_RADAR_EVENT_TYPES[best?.category]??
+    RESEARCH_RADAR_EVENT_TYPES.strong_radial_signature;
+  const hasWind=e.evidence.some(item=>
+    item.category==="strong_radial_signature");
+  const mixed=hasWind&&best?.category!=="strong_radial_signature";
+  return {...selected,
+    summary:selected.label+(mixed?" + RADIAL WIND SIGNATURE":""),
+    // Preserve labels for multiple evidence types in the ONE grouped window.
+    observationCount:e.evidence.length
+  };
+}
+function eventHeading(e) {
+  const presentation=radarEventPresentation(e);
+  return presentation.summary+" · "+presentation.priority;
 }
 export function createPassiveWindEventInbox({
   container, documentRef=globalThis.document,
@@ -307,6 +341,8 @@ export function createPassiveWindEventInbox({
     details.replaceChildren();
     details.hidden=!record||record.status==="cleared";
     if(details.hidden)return;
+    const presentation=radarEventPresentation(record);
+    details.dataset.severity=presentation.severity;
     const headingLine=createNode(documentRef,"div","qscope-wind-event-detail-title");
     const label=createNode(documentRef,"strong","",eventHeading(record));
     const dismiss=createNode(documentRef,"button","", "Close window");
@@ -319,14 +355,16 @@ export function createPassiveWindEventInbox({
       "Recorded "+timeAest(record.firstUtc)+"–"+timeAest(record.latestUtc)+
       " · "+record.latitude.toFixed(3)+"°, "+record.longitude.toFixed(3)+"°");
     const sourceNote=createNode(documentRef,"p","",
-      "Experimental observations only. BoM warnings and source imagery remain authoritative.");
+      "Radar signature review priority only · Not a confirmed surface wind gust, tornado, road impact or official BoM warning. Original BoM products remain authoritative.");
     const evidenceList=createNode(documentRef,"div","qscope-wind-event-evidence");
     const sorted=[...record.evidence].sort((a,b)=>
       CATEGORY_PRIORITY[b.category]-CATEGORY_PRIORITY[a.category] ||
       Date.parse(b.frameUtc)-Date.parse(a.frameUtc));
     for(const e of sorted) {
       const article=createNode(documentRef,"article","qscope-wind-event-evidence-row");
-      const label=createNode(documentRef,"strong","",e.title);
+      article.dataset.severity=RESEARCH_RADAR_EVENT_TYPES[e.category]?.severity??"wind";
+      const label=createNode(documentRef,"strong","",
+        RESEARCH_RADAR_EVENT_TYPES[e.category]?.evidence??e.title);
       const detailsLine=createNode(documentRef,"p","",
         "Radar "+e.radarId+" · "+timeAest(e.frameUtc)+
         (e.velocityKmh!==null?" · "+Math.abs(e.velocityKmh).toFixed(0)+" km/h radial":"")+
@@ -365,10 +403,11 @@ export function createPassiveWindEventInbox({
     if(destroyed)return;
     const pending=ledger.list();
     const listed=ledger.list({includeAcknowledged:showHistory});
-    // A compact 0-event monitor must remain accessible so the operator can
-    // select Pause on new event BEFORE the first storm signature arrives.
-    // No map layer or frame-dependent dock is ever switched on.
-    root.hidden=false;
+    // Passive by default. Completely remove the queue from the map when
+    // there are neither pending observations nor historical events to view.
+    // Previous opt-in pause preference remains in storage even while hidden.
+    // Never hide an explicitly opened evidence window.
+    root.hidden=pending.length===0&&ledger.archivedCount===0&&!openEventId;
     root.dataset.empty=String(pending.length===0 &&
       ledger.archivedCount===0 && !showHistory && !openEventId);
     count.textContent=String(pending.length)+" awaiting review";
@@ -376,7 +415,9 @@ export function createPassiveWindEventInbox({
       "History ("+ledger.archivedCount+")";
     listArea.replaceChildren();
     for(const record of listed){
+      const presentation=radarEventPresentation(record);
       const item=createNode(documentRef,"article","qscope-wind-event-card");
+      item.dataset.severity=presentation.severity;
       const open=createNode(documentRef,"button","qscope-wind-event-open",
         eventHeading(record)+" · "+record.evidence.length+
         (record.evidence.length===1?" observation":" observations")+
@@ -396,7 +437,7 @@ export function createPassiveWindEventInbox({
       item.append(open,clear);
       listArea.appendChild(item);
     }
-    status.textContent="Automatic research observations · Remain until opened or cleared"+
+    status.textContent="Priority reflects experimental radar signatures, not confirmed impact or official BoM severity · Remain until opened or cleared"+
       (!ledger.storageAvailable?" · Browser storage unavailable (this session only)":"")+
       " · Not official BoM warnings.";
     renderDetails();
