@@ -1,0 +1,80 @@
+/* Isolated V10.3 research QA only. Loaded dynamically, NEVER by live production. */
+/* V10 research candidate visual contract. CSS classes are mapped exclusively
+   by severe-storm-alert-appearance-v10.js. All three are provisional signals,
+   not Bureau warnings and not an ordinal wind-speed or tornado probability. */
+.storm-severe-alert-dock {
+  --v10-gust: #F6D94F;
+  --v10-hook: #FF963F;
+  --v10-tornado: #D83045;
+}
+.storm-severe-alert-row.v10-wind,
+.storm-severe-alert-row.v10-hook,
+.storm-severe-alert-row.v10-tornado {
+  display:flex; align-items:center; gap:7px; min-width:0;
+  overflow-wrap:anywhere;
+  border-width:1px; border-style:solid;
+}
+.storm-severe-alert-row.v10-wind {
+  background:#423916; border-color:var(--v10-gust); color:#FFF0AE;
+}
+.storm-severe-alert-row.v10-hook {
+  background:#4D2D18; border-color:var(--v10-hook); color:#FFE0BF;
+}
+.storm-severe-alert-row.v10-tornado,
+.storm-severe-alert-row.tornadic {
+  background:#54202B; border-color:var(--v10-tornado); color:#FFE4EA;
+}
+.storm-v10-alert-icon {
+  display:block; flex:none; order:-1;
+  width:18px; height:18px;
+  object-fit:contain; pointer-events:none; user-select:none;
+}
+.storm-severe-alert-row .storm-v10-alert-icon {
+  background:var(--v10-icon-background, transparent);
+  border-radius:4px; padding:2px;
+  width:23px; height:23px;
+}
+.storm-severe-alert-row.v10-wind { --v10-icon-background:var(--v10-gust); }
+.storm-severe-alert-row.v10-hook { --v10-icon-background:var(--v10-hook); }
+.storm-severe-alert-row.v10-tornado { --v10-icon-background:var(--v10-tornado); }
+.storm-severe-alert-pin.v10-wind,
+.storm-severe-alert-pin.v10-hook,
+.storm-severe-alert-pin.v10-tornado {
+  display:grid; place-items:center;
+  width:29px; height:29px; min-height:29px;
+  padding:2px; border:2px solid #fff; border-radius:50%;
+  box-shadow:0 0 0 1px #101B24, 0 2px 8px #000d;
+}
+.storm-severe-alert-pin.v10-wind { background:var(--v10-gust); color:#15232B; }
+.storm-severe-alert-pin.v10-hook { background:var(--v10-hook); color:#15232B; }
+.storm-severe-alert-pin.v10-tornado,
+.storm-severe-alert-pin.tornadic { background:var(--v10-tornado); color:#fff; }
+.storm-severe-alert-pin .storm-v10-alert-icon {
+  width:21px; height:21px; order:0;
+}
+.storm-v10-alert-detail-heading {
+  display:flex; align-items:center; gap:7px; font-size:11px;
+  line-height:1.4; margin-bottom:5px;
+}
+.storm-v10-alert-detail-heading .storm-v10-alert-icon {
+  width:23px; height:23px; padding:2px; border-radius:4px;
+}
+.storm-severe-alert-detail.v10-wind .storm-v10-alert-detail-heading { color:#FFF0AE; }
+.storm-severe-alert-detail.v10-hook .storm-v10-alert-detail-heading { color:#FFE0BF; }
+.storm-severe-alert-detail.v10-tornado .storm-v10-alert-detail-heading { color:#FFE4EA; }
+.storm-severe-alert-detail.v10-wind .storm-v10-alert-detail-heading img { background:var(--v10-gust); }
+.storm-severe-alert-detail.v10-hook .storm-v10-alert-detail-heading img { background:var(--v10-hook); }
+.storm-severe-alert-detail.v10-tornado .storm-v10-alert-detail-heading img { background:var(--v10-tornado); }
+.storm-severe-alert-row:focus-visible,.storm-severe-alert-pin:focus-visible {
+  outline:3px solid #fff; outline-offset:3px;
+}
+@media(max-width:700px) {
+  .storm-severe-alert-pin.v10-wind,
+  .storm-severe-alert-pin.v10-hook,
+  .storm-severe-alert-pin.v10-tornado {
+    width:30px; height:30px; min-height:30px;
+  }
+  .storm-severe-alert-row.v10-wind,
+  .storm-severe-alert-row.v10-hook,
+  .storm-severe-alert-row.v10-tornado { gap:5px; line-height:1.4; }
+}
