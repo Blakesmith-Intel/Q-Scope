@@ -174,16 +174,12 @@ test("wrong radar, mismatched observation or palette-exceeding value rejected",(
     assert.equal(out.alerts.length,0);
   }
 });
-test("research is preview-only and main production alerts remain disabled",()=>{
+test("Q-SCOPE research remains outside live public runtime",()=>{
   const runtime=readFileSync(fileURLToPath(new URL("../src/live3d-operational-v9.js",import.meta.url)),"utf8");
-  assert.match(runtime,/assessV10RadarFrame\(/);
-  assert.match(runtime,/assessConsecutiveDopplerWind\(/);
-  assert.match(runtime,/syncIndependentDopplerResearch\(/);
-  assert.match(runtime,/previousDopplerState/);
-  assert.match(runtime,/loadDopplerHistoriesAndPalettes\(/);
-  assert.match(runtime,/isWindHookQaPreview/);
-  assert.match(runtime,/severeStormAlertOverlay\.setEnabled\(false\)/);
-  assert.match(runtime,/if \(!windHookResearchEnabled\)/);
+  const build=readFileSync(fileURLToPath(new URL("../../scripts/build-current-site.sh",import.meta.url)),"utf8");
+  assert.doesNotMatch(runtime,/import.*assessV10RadarFrame/);
+  assert.doesNotMatch(runtime,/enableWindHookResearch/);
+  assert.match(build,/wind-hook-v10-3/);
 });
 test("same original Doppler scan cannot be counted twice against consecutive rain frames",()=>{
   const prev=fixture("2026-10-08T04:00:00Z");
@@ -237,7 +233,9 @@ test("research pin colours and icons are category specific and not official aler
   assert.match(css,/#D83045/i);
   const runtime=readFileSync(fileURLToPath(
     new URL("../src/live3d-operational-v9.js",import.meta.url)),"utf8");
-  assert.match(runtime,/if \(isWindHookQaPreview\) \{/);
-  assert.match(runtime,/qaStyle\.href = "\.\/src\/wind-hook-research-v10\.css/);
+  assert.doesNotMatch(runtime,/windHookResearchEnabled/);
+  const build=readFileSync(fileURLToPath(
+    new URL("../../scripts/build-current-site.sh",import.meta.url)),"utf8");
+  assert.match(build,/wind-hook-v10-3/);
 });
 console.log(count+" V10 storm research contract tests passed.");
