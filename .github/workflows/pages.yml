@@ -751,6 +751,24 @@ jobs:
             curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
               "$base/preview/wind-hook-v10-3/assets/$icon" >/dev/null
           done
+          # New Q-SCOPE V10.4 is a second, experimental OPT-IN science
+          # preview; preserve the V10.3 pinned source and the live root.
+          qwind="$(curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors "$base/preview/wind-hook-v10-4/BUILD.txt")"
+          grep -Fq 'Q-SCOPE WIND / HOOK RESEARCH V10.4' <<< "$qwind"
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-4/index.html" \
+            | grep -F '<title>Q-SCOPE | Experimental Wind & Hook Research V10.4</title>' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-4/src/doppler-persistence-v10-3.js" \
+            | grep -F 'ADJACENCY_KM = 1.5' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-4/src/severe-storm-v10.js" \
+            | grep -F 'MAX_ARC_GAP_MINUTES = 8' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-4/src/live3d-operational-v9.js" \
+            | grep -F '/preview/wind-hook-v10-4/' >/dev/null
+          echo "PUBLIC Q-SCOPE V10.4 EXPERIMENTAL QA ONLY; PRIOR V10.3 AND LIVE ROOT RETAINED"
+
           for component in \
             'src/responsive-memory-diagnostics-v1.js|Memory diagnostics' \
             'src/context-layers/basemap-manager-v1.js|GLOBAL_SATELLITE_FALLBACK' \
