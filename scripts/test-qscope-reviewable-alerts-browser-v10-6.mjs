@@ -63,16 +63,24 @@ try {
   },{modulePath,reset});
   await load();
   await setup(true);
-  assert.equal(await page.locator(".qscope-wind-event-inbox").evaluate(x=>x.dataset.empty),"true",
-    "Compact monitor remains visible to set pause preference before detections");
+  assert.equal(await page.locator(".qscope-wind-event-inbox").isHidden(),true,
+    "No pending or historical event means no map-obstructing radar-event window");
   assert.equal(await page.locator(".storm-severe-alert-dock").evaluate(x=>
     getComputedStyle(x).display),"none","Old frame-based alert UI must never flash");
   const pref=page.locator(".qscope-wind-event-pause-setting input");
   assert.equal(await pref.isChecked(),false);
-  await pref.check();
+  // Preference can still be stored before the first event, even though its
+  // empty monitoring window is deliberately hidden.
+  await page.evaluate(()=>window.ui.setPauseOnNewEvent(true));
   await page.evaluate(()=>window.addCase());
+  assert.equal(await page.locator(".qscope-wind-event-inbox").isVisible(),true,
+    "A new source-verified event must reveal its persistent notification");
   assert.equal(await page.locator(".qscope-wind-event-card").count(),1,
     "One event window rather than two transient frame alerts");
+  assert.equal(await page.locator(".qscope-wind-event-card").getAttribute("data-severity"),
+    "couplet","Combined hook/couplet case uses highest radar review priority");
+  assert.match(await page.locator(".qscope-wind-event-open").innerText(),
+    /HOOK \+ VELOCITY COUPLET.*HIGH-PRIORITY REVIEW/);
   assert.equal(await page.evaluate(()=>window.newEvents.length),1,
     "Multiple alert types in same event cannot pause playback repeatedly");
   assert.equal(await page.evaluate(()=>window.framesVisited.length),0,
@@ -93,6 +101,12 @@ try {
     "Restored event is not a new alert that pauses playback");
   await page.locator(".qscope-wind-event-open").click();
   assert.equal(await page.locator(".qscope-wind-event-evidence-row").count(),2);
+  assert.equal(await page.locator(".qscope-wind-event-detail").getAttribute("data-severity"),
+    "couplet","Opened review retains experimental red coupled-signature priority");
+  assert.equal(await page.locator(
+    '.qscope-wind-event-evidence-row[data-severity="hook"]').count(),1);
+  assert.equal(await page.locator(
+    '.qscope-wind-event-evidence-row[data-severity="couplet"]').count(),1);
   assert.equal(await page.locator(".qscope-wind-event-detail:not([hidden])").count(),1);
   assert.equal(await page.locator(".qscope-wind-evidence-snapshot img").count(),1,
     "Actual source crop stays available after frame expires");
@@ -113,6 +127,42 @@ try {
     "History remains visible after acknowledgement");
   await page.locator(".qscope-wind-event-dismiss").click();
   assert.equal(await page.evaluate(()=>window.ui.events.length),0);
+  assert.equal(await page.locator(".qscope-wind-event-inbox").isHidden(),true,
+    "Clearing final historical event hides Radar Events again");
+  // Verify an independent radial-wind signature is not labelled as a hook.
+  await page.evaluate(()=>{
+    const time=new Date(Date.now()-180000).toISOString();
+    window.ui.observe([{
+      category:"strong_radial_signature",observed_utc:time,
+      source_utc:time,radar_id:"66",track_id:"WIND",
+      latitude:-26.6,longitude:152.8,
+      caveat:"Research only; radial velocity is not a measured surface gust"
+    }],{mode:"doppler",frameUtc:time});
+  });
+  assert.equal(await page.locator(".qscope-wind-event-card").getAttribute("data-severity"),
+    "wind");
+  assert.match(await page.locator(".qscope-wind-event-open").innerText(),
+    /POSSIBLE STRAIGHT-LINE WIND/);
+  assert(!/HOOK ECHO/.test(await page.locator(".qscope-wind-event-open").innerText()),
+    "Wind-only category must not claim a hook echo");
+  await page.evaluate(()=>window.ui.clearEvent(window.ui.events[0].id));
+  assert.equal(await page.locator(".qscope-wind-event-inbox").isHidden(),true);
+  // Orange hook-only evidence is distinct from yellow wind and red combination.
+  await page.evaluate(()=>{
+    const time=new Date(Date.now()-120000).toISOString();
+    window.ui.observe([{
+      category:"hook_shape_only",observed_utc:time,
+      source_utc:time,radar_id:"66",track_id:"HOOK",
+      latitude:-28.3,longitude:153.3,
+      caveat:"Research only; hook echo does not confirm a tornado"
+    }],{mode:"rain",frameUtc:time});
+  });
+  assert.equal(await page.locator(".qscope-wind-event-card").getAttribute("data-severity"),
+    "hook");
+  assert.match(await page.locator(".qscope-wind-event-open").innerText(),
+    /HOOK ECHO.*ELEVATED REVIEW/);
+  await page.evaluate(()=>window.ui.clearEvent(window.ui.events[0].id));
+  assert.equal(await page.locator(".qscope-wind-event-inbox").isHidden(),true);
   console.log("PASS "+(mobile?"mobile WebKit":"desktop Chromium")+
     ": persistent source crops, fresh-alert pause preference, grouped evidence, exact timestamp review, no frame-flicker UI");
 } finally {await context.close();await browser.close();}
