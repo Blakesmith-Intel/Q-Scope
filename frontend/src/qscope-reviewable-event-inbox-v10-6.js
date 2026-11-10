@@ -449,6 +449,7 @@ export function createPassiveWindEventInbox({
       // fake arrows or AI imagery masquerading as an observed signature.
       const original=bestEvidence(record)?.snapshot;
       if(original){
+        open.dataset.hasSnapshot="true";
         const sourceThumb=createNode(documentRef,"img","qscope-wind-card-source");
         sourceThumb.src=original.dataUrl;
         sourceThumb.alt="Retained source radar image at the detected time";
