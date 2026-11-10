@@ -275,9 +275,10 @@ function signatureIdentity(doc,presentation,kind) {
   emblem.setAttribute("aria-hidden","true");
   const summary=createNode(doc,"div","qscope-wind-signature-summary");
   summary.append(
-    createNode(doc,"strong","",presentation.summary),
+    createNode(doc,"strong","",
+      presentation.summary+" · "+presentation.priority),
     createNode(doc,"span","qscope-wind-signature-priority",
-      presentation.priority+" · EXPERIMENTAL")
+      "EXPERIMENTAL RADAR SIGNATURE · NOT AN OFFICIAL BOM WARNING")
   );
   bar.append(emblem,summary);
   return bar;
