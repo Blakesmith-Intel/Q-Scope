@@ -1046,3 +1046,23 @@ grep -Fq 'Q-SCOPE PASSIVE WIND/HOOK RESEARCH V10.5' "_site/preview/wind-hook-v10
 grep -Fq '<title>Q-SCOPE | Queensland Situational Awareness</title>' "_site/index.html"
 ! grep -Fq 'enableWindHookResearch' "$review_next/src/live3d-operational-v9.js"
 test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6
+
+# Q-SCOPE V10.7: screenshot-confirmed collision repair in a SEVENTH
+# independent experimental preview. All six previous research previews,
+# frozen operator science, original BoM legend source, and Cloudflare relay
+# remain unchanged. Responsive alert dock only.
+layout_next="_site/preview/wind-hook-v10-7"
+test ! -e "$layout_next"
+cp -a "_site/preview/wind-hook-v10-6" "$layout_next"
+cp "frontend/src/qscope-event-dock-layout-v10-7.js" "$layout_next/src/"
+cp "frontend/src/qscope-event-dock-layout-v10-7.css" "$layout_next/src/"
+python3 scripts/apply-qscope-radar-event-layout-v10-7.py --site "$layout_next"
+node --check "$layout_next/src/live3d-operational-v9.js"
+node --check "$layout_next/src/qscope-event-dock-layout-v10-7.js"
+node frontend/tests/run-qscope-event-dock-layout-v10-7-tests.mjs
+grep -Fq 'Q-SCOPE V10.7 NON-OVERLAP ALERT DOCK' "$layout_next/BUILD.txt"
+grep -Fq 'attachQScopeRadarEventLayout' "$layout_next/src/live3d-operational-v9.js"
+grep -Fq 'qscope-event-dock-layout-v10-7.css' "$layout_next/src/live3d-operational-v9.js"
+grep -Fq 'Q-SCOPE PERSISTENT RESEARCH EVENTS V10.6' "_site/preview/wind-hook-v10-6/BUILD.txt"
+grep -Fq '<title>Q-SCOPE | Queensland Situational Awareness</title>' "_site/index.html"
+test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 7
