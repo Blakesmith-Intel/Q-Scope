@@ -371,3 +371,18 @@
   object-fit:cover;
   pointer-events:none;
 }
+
+/* Independent measured-station evidence. Only displayed if an approved,
+   source-verified on-demand observation transport is connected. */
+#mapPanel .qscope-wind-event-observed-gust{
+  padding:9px 10px;margin:5px 0 10px;
+  border:1px solid #79aab9;border-left:4px solid #7ad6de;
+  border-radius:7px;background:#13313e;
+  color:#ecfaff;
+}
+#mapPanel .qscope-wind-event-observed-gust strong{
+  display:block;font-size:12px;
+}
+#mapPanel .qscope-wind-event-observed-gust p{
+  margin:5px 0 0;font-size:11px;line-height:1.45;
+}
