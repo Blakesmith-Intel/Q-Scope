@@ -1,0 +1,42 @@
+name: One-shot official BoM gauge-source diagnostics
+on:
+  push:
+    branches: [fix/simple-bom-gauge-catalogue-20261110]
+    paths: [.github/workflows/probe-bom-gauge-metadata-20261110.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe exact original BoM source and same-source MapServer independently
+        run: |
+          node --input-type=module <<'NODE'
+          const root='https://hosting.wsapi.cloud.bom.gov.au/arcgis/rest/services/flood/National_Flood_Gauge_Network';
+          const params=new URLSearchParams({
+            where:"state='QLD'",
+            outFields:"bom_stn_num,awrc_stateid,name,lat,long,state,location_types,forecast_site_classification,basin,agency,featreal",
+            returnGeometry:"true",outSR:"4326",f:"geojson"
+          });
+          const jobs=[
+            ['FeatureServer original full',root+'/FeatureServer/5/query?'+params],
+            ['MapServer same-layer full',root+'/MapServer/5/query?'+params],
+            ['FeatureServer 10-gauge',root+'/FeatureServer/5/query?'+params+'&resultRecordCount=10'],
+            ['MapServer 10-gauge',root+'/MapServer/5/query?'+params+'&resultRecordCount=10'],
+            ['FeatureServer count',root+'/FeatureServer/5/query?where=state%3D%27QLD%27&returnCountOnly=true&f=json'],
+          ];
+          await Promise.all(jobs.map(async([name,url])=>{
+            const began=Date.now();
+            try{
+              const response=await fetch(url,{signal:AbortSignal.timeout(18000),
+                headers:{Accept:'application/geo+json,application/json'}});
+              const raw=await response.text();
+              let p={};try{p=JSON.parse(raw);}catch{}
+              console.log(JSON.stringify({name,status:response.status,elapsedMs:Date.now()-began,
+                bytes:raw.length,features:p.features?.length??null,count:p.count??null,
+                type:p.type??null,error:p.error?.message??null,preview:raw.slice(0,100)}));
+            }catch(e){console.log(JSON.stringify({name,elapsedMs:Date.now()-began,error:String(e)}));}
+          }));
+          NODE
