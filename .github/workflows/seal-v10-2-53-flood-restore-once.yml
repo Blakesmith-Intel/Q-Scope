@@ -1,0 +1,121 @@
+name: One-time seal of operator-confirmed V10.2.53 flood recovery baseline
+# Deliberately lives ONLY on maintenance branch. Does not alter main, the
+# operator-confirmed commit, production assets, or earlier protected references.
+on:
+  push:
+    branches:
+      - maintenance/seal-v10.2.53
+    paths:
+      - .github/workflows/seal-v10-2-53-flood-restore-once.yml
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  seal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prove exact operator-approved commit and production deployment
+        env:
+          GH_TOKEN: ${{ secrets.STORMTRACKER_RELEASE_TOKEN || github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="1466851327584b62e06172b3aa2c279afd27870e"
+          git fetch --no-tags origin "$sha"
+          test "$(git cat-file -t "$sha")" = commit
+          test "$(git ls-remote origin refs/heads/restore/v10.2.53 | cut -f1)" = "$sha"
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$sha"
+
+          # Explicit evidence: the exact commit was shipped to Pages and the
+          # existing Cloudflare Worker deployment step succeeded. The Worker
+          # workflow's later cached-response assertion was transient and its
+          # actual parser response was independently verified immediately after.
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/42732980935" --jq .head_sha)" = "$sha"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/42732980935" --jq .conclusion)" = success
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/42732980996" --jq .head_sha)" = "$sha"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/42732980996/jobs?per_page=30" \
+            --jq '[.jobs[].steps[] | select(.name=="Deploy the existing production Worker only" and .conclusion=="success")] | length' \
+            | grep -qx '1'
+
+          # Verify it is the version with locally served gauge locations,
+          # manual-source stale-stage protection and the browser-side budget.
+          git grep -Fq 'MANUAL_FLOOD_STAGE_MAX_AGE_MS' "$sha" -- frontend/src/context-layers/river-flood-signals-v1.js
+          git grep -Fq 'RIVER_HISTORY_WINDOW_LIMIT = 24' "$sha" -- frontend/src/context-layers/river-history-request-budget-v1.js
+          git grep -Fq 'createRiverHistoryBudget' "$sha" -- frontend/src/context-layers/river-gauge-layer-v1.js
+          git grep -Fq 'qld-government-bom-sls-reference' "$sha" -- relay/worker.js
+          git grep -Fq 'reportingMode==="manual"' "$sha" -- frontend/src/context-layers/river-gauge-observations-v1.js
+          echo "EXACT ACCEPTED SOURCE AND SUCCESSFUL DEPLOYMENT STEPS VERIFIED"
+
+      - name: Verify the public browser serves the accepted flood correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://blakesmith-intel.github.io/StormTracker"
+          good=0
+          for i in 1 2 3 4 5; do
+            suffix="?freeze-v1053=$GITHUB_SHA-$i"
+            budget="$(curl -fsSL --max-time 20 "$base/src/context-layers/river-history-request-budget-v1.js$suffix" || true)"
+            signal="$(curl -fsSL --max-time 20 "$base/src/context-layers/river-flood-signals-v1.js$suffix" || true)"
+            layer="$(curl -fsSL --max-time 20 "$base/src/context-layers/river-gauge-layer-v1.js$suffix" || true)"
+            if grep -Fq 'RIVER_HISTORY_WINDOW_LIMIT = 24' <<<"$budget" &&
+               grep -Fq 'MANUAL_FLOOD_STAGE_MAX_AGE_MS' <<<"$signal" &&
+               grep -Fq 'createRiverHistoryBudget' <<<"$layer"; then
+              good=1
+              break
+            fi
+            sleep 5
+          done
+          test "$good" = 1 || { echo "REFUSING SEAL: public browser does not show approved flood correction"; exit 1; }
+          echo "PUBLIC OPERATOR-APPROVED FLOOD SOURCE VERIFIED"
+
+      - name: Create annotated never-move v10.2.53 release tag
+        env:
+          GH_TOKEN: ${{ secrets.STORMTRACKER_RELEASE_TOKEN || github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="1466851327584b62e06172b3aa2c279afd27870e"
+          tag="v10.2.53"
+          restore="restore/v10.2.53"
+          test "$(git ls-remote origin refs/heads/$restore | cut -f1)" = "$sha"
+          existing="$(git ls-remote origin "refs/tags/$tag^{}" | cut -f1)"
+          test -z "$existing" || test "$existing" = "$sha"
+          if [ -z "$existing" ]; then
+            tag_object="$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/tags" \
+              -f tag="$tag" \
+              -f message="StormTracker V10.2.53 — operator-approved working production 10 November 2026. Verified Whyenbah manual minor gauge and statewide 48h verified manual-flood stale rule; paced 4/min and 24/10min optional station history, unchanged live river heights, verified source and immutable radar/warning restore baselines. Exact source $sha. Do not move or rewrite tag or restore branch." \
+              -f object="$sha" -f type=commit --jq .sha)"
+            test -n "$tag_object"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/tags/$tag" -f sha="$tag_object" >/dev/null
+          fi
+          git fetch --no-tags origin "refs/tags/$tag:refs/tags/$tag"
+          test "$(git cat-file -t refs/tags/$tag)" = tag
+          test "$(git rev-list -n 1 "$tag")" = "$sha"
+          test "$(git ls-remote origin refs/heads/$restore | cut -f1)" = "$sha"
+          echo "FROZEN ANNOTATED TAG $tag AND RESTORE BRANCH $restore AT $sha"
+
+      - name: Publish matching source-verifiable operator restore release
+        env:
+          GH_TOKEN: ${{ secrets.STORMTRACKER_RELEASE_TOKEN || github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v10.2.53"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            test "$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)" = "$tag"
+            echo "Existing release preserved without modification"
+          else
+            gh release create "$tag" --verify-tag \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "StormTracker V10.2.53 — Official Flood Gauge Recovery Restore Point" \
+              --notes "Operator-confirmed working production on 10 November 2026. Immutable-by-policy source snapshot (no rewrite/repoint): commit 1466851327584b62e06172b3aa2c279afd27870e; restore/v10.2.53. Includes corrected manually reported Whyenbah 044154 minor flooding, conservative stale age and exact station matching, four-request-per-minute / 24-per-ten-minute optional BoM history request budget, and existing locally served station location reference. Retains all previous radar, Doppler, warning polygon, cyclone, 3-D, rainfall and incident functions. No runtime data provider or upstream BoM feed is frozen; agency source availability can vary. Historical frozen tags must remain unchanged. For later enhancements branch from this snapshot without modifying it."
+          fi
+          echo "OFFICIAL V10.2.53 RELEASE PUBLISHED"
