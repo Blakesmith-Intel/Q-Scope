@@ -278,7 +278,7 @@ export function createPassiveWindEventInbox({
   const root=createNode(documentRef,"section","qscope-wind-event-inbox");
   root.setAttribute("aria-label","Q-SCOPE experimental radar event queue");
   const heading=createNode(documentRef,"div","qscope-wind-event-header");
-  const title=createNode(documentRef,"strong","", "Q-SCOPE · RADAR EVENTS");
+  const title=createNode(documentRef,"strong","", "Q-SCOPE · RADAR EVENTS · RESEARCH");
   const count=createNode(documentRef,"span","qscope-wind-event-count","");
   heading.append(title,count);
   const controls=createNode(documentRef,"div","qscope-wind-event-controls");
