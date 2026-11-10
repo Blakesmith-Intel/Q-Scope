@@ -28,6 +28,11 @@ def main(site):
       "<title>Q-SCOPE | Persistent Radar Evidence V10.6</title>","operator title")
     b=one(b,"PASSIVE WIND EVENTS · EXPERIMENTAL, NOT OFFICIAL WARNINGS",
       "PERSISTENT WIND EVENTS · EXPERIMENTAL, NOT OFFICIAL WARNINGS","operator header")
+    # The inner script URL is independently cached by the browser. Bump it
+    # alongside the outer iframe so the restored compass is truly loaded.
+    b=one(b,'src="./src/live3d-operational-v9.js?v=',
+      'src="./src/live3d-operational-v9.js?v=v10-6-5-restored-compass-',
+      "preview operator-runtime cache revision")
     if s.count("/preview/wind-hook-v10-5/")!=2:
         raise ValueError("V10.5 source route was changed: cannot safely rebrand.")
     s=s.replace("/preview/wind-hook-v10-5/","/preview/wind-hook-v10-6/")
