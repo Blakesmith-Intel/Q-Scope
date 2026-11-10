@@ -23,9 +23,8 @@ import {OFFICIAL_MAY_2026_STAGES_URL,HISTORICAL_EXACT_ID_EXCEPTIONS,
   stationFloodLevels}
   from "../frontend/src/context-layers/river-flood-thresholds-v1.js";
 
-import {
-  BOM_RIVER_TIDE_GAUGE_QUERY_URL
-} from "../frontend/src/context-layers/river-gauges-v1.js";
+import {QLD_BOM_GAUGE_REFERENCE}
+  from "./qld-bom-gauge-reference-20261110-v1.js";
 
 import {inspectBomRecentWaterLevelTable} from "../frontend/src/context-layers/bom-recent-river-history-v1.js";
 import {parseBoMStationCrossingHeader} from "../frontend/src/context-layers/river-crossing-state-v1.js";
@@ -36,7 +35,7 @@ import {
 
 import {relayOfficialIfdPoint} from "./ifd-on-demand.js";
 import {createRelayEfficiency} from "./relay-efficiency-v1.js";
-import {relayVerifiedRiverGaugeMetadata} from "./river-gauge-metadata-recovery-v1.js";
+
 const relayEfficiency=createRelayEfficiency();
 import {relayQldCrossingHeights} from "./river-crossing-heights-v1.js";
 import {relayRoadOwnershipReports} from "./road-ownership-reports-v1.js";
@@ -595,11 +594,31 @@ function dopplerProduct(incoming) {
     : null;
 }
 
+// Stable station coordinates are deployment-versioned reference data, not a
+// live feed. Never block live river heights on the unavailable BoM GIS host.
+// The original BoM station IDs were audited before this static source was made.
+const QLD_BOM_GAUGE_METADATA_JSON=JSON.stringify(QLD_BOM_GAUGE_REFERENCE);
 function relayRiverGaugeMetadata(request,origin,ctx){
-  return relayVerifiedRiverGaugeMetadata(request,origin,{
-    sourceUrl:BOM_RIVER_TIDE_GAUGE_QUERY_URL,
-    corsHeaders,errorResponse,ctx
-  });
+  const headers=corsHeaders(origin);
+  const reference=QLD_BOM_GAUGE_REFERENCE.stormtrackerReference;
+  headers.set("Content-Type","application/geo+json; charset=utf-8");
+  headers.set("Cross-Origin-Resource-Policy","cross-origin");
+  headers.set("Cache-Control","public, max-age=300");
+  // Explicitly publish provenance and incomplete 2026 BoM audit coverage:
+  // no false full-coverage claim, and never call this 'fresh BoM metadata'.
+  headers.set("X-StormTracker-Metadata-Fallback","1");
+  headers.set("X-StormTracker-Metadata-Source","qld-government-bom-sls-reference");
+  headers.set("X-StormTracker-Metadata-Checked-At",reference.generatedAt);
+  headers.set("X-StormTracker-Reference-Coverage",
+    reference.matchedTotal+"/"+reference.auditedTotal);
+  headers.set("Access-Control-Expose-Headers",
+    [headers.get("Access-Control-Expose-Headers"),
+      "X-StormTracker-Metadata-Fallback",
+      "X-StormTracker-Metadata-Source",
+      "X-StormTracker-Metadata-Checked-At",
+      "X-StormTracker-Reference-Coverage"].filter(Boolean).join(","));
+  return new Response(request.method==="HEAD"?null:QLD_BOM_GAUGE_METADATA_JSON,
+    {status:200,headers});
 }
 
 function riverHeightProductUrls(
