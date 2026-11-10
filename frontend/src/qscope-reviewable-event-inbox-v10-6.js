@@ -401,20 +401,25 @@ export function createPassiveWindEventInbox({
       "Radar signature review priority only · Not a confirmed surface wind gust, tornado, road impact or official BoM warning. Original BoM products remain authoritative.");
     const evidenceList=createNode(documentRef,"div","qscope-wind-event-evidence");
     const measured=observedWindStates.get(record.id);
+    const hasWindEvidence=record.evidence.some(e=>
+      e.category==="strong_radial_signature");
     let observedSection=null;
-    if(measured){
+    if(hasWindEvidence){
       observedSection=createNode(documentRef,"section",
         "qscope-wind-event-observed-gust");
       const heading=createNode(documentRef,"strong","",
-        "BoM surface wind observations · independent of radar");
-      let summary="Checking same-time nearby station gusts…";
-      if(measured.status==="unavailable"){
-        summary="No verified nearby same-time station observation available. "+
+        "BoM observed wind gusts · km/hr · separate from radar");
+      let summary="Automatic station observations are not connected in this "+
+        "research preview. Radar wind remains unverified.";
+      if(measured?.status==="checking"){
+        summary="Checking same-time nearby BoM station observations…";
+      }else if(measured?.status==="unavailable"){
+        summary="No source-verified nearby same-time station reading available. "+
           "This does not rule out damaging winds between stations.";
-      }else if(measured.status==="matched"&&measured.value){
+      }else if(measured?.status==="matched"&&measured.value){
         const x=measured.value;
         const supporting=x.evidenceClass==="nearby-damaging-gust";
-        summary="BoM observed "+Math.round(x.gustKmh)+" km/h 3-second gust at "+
+        summary="BoM observed "+Math.round(x.gustKmh)+" km/hr gust at "+
           String(x.stationName??"station")+" · "+timeAest(x.observedUtc)+
           " · "+Number(x.distanceKm).toFixed(1)+" km from radar event · "+
           Number(x.differenceMinutes).toFixed(1)+" min offset. "+
@@ -422,8 +427,14 @@ export function createPassiveWindEventInbox({
            "Contextual station reading only; cannot confirm this radar event.")+
           " Provisional station data; not an official BoM warning.";
       }
+      const viewSource=createNode(documentRef,"a","qscope-wind-bom-source",
+        "View BoM Queensland observations");
+      viewSource.href=
+        "https://www.bom.gov.au/location/australia/queensland#observations";
+      viewSource.target="_blank";
+      viewSource.rel="noopener noreferrer";
       observedSection.append(heading,
-        createNode(documentRef,"p","",summary));
+        createNode(documentRef,"p","",summary),viewSource);
     }
     const sorted=[...record.evidence].sort((a,b)=>
       CATEGORY_PRIORITY[b.category]-CATEGORY_PRIORITY[a.category] ||
@@ -435,8 +446,8 @@ export function createPassiveWindEventInbox({
         RESEARCH_RADAR_EVENT_TYPES[e.category]?.evidence??e.title);
       const detailsLine=createNode(documentRef,"p","",
         "Radar "+e.radarId+" · "+timeAest(e.frameUtc)+
-        (e.velocityKmh!==null?" · "+Math.abs(e.velocityKmh).toFixed(0)+" km/h radial":"")+
-        (e.radialShearKmh!==null?" · "+Math.abs(e.radialShearKmh).toFixed(0)+" km/h radial shear":""));
+        (e.velocityKmh!==null?" · "+Math.abs(e.velocityKmh).toFixed(0)+" km/hr radial":"")+
+        (e.radialShearKmh!==null?" · "+Math.abs(e.radialShearKmh).toFixed(0)+" km/hr radial shear":""));
       const note=createNode(documentRef,"p","",e.caveat);
       const view=createNode(documentRef,"button","", "View this exact frame");
       view.type="button";

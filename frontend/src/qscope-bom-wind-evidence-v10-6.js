@@ -11,18 +11,6 @@ export const BOM_RESEARCH_WIND_RULES=Object.freeze({
   maxStationsPerEvent:2
 });
 const finite=v=>typeof v==="number"&&Number.isFinite(v);
-function dateFromBoM(value){
-  if(typeof value!=="string"||!/^[0-9]{14}$/.test(value))return null;
-  const year=Number(value.slice(0,4)),month=Number(value.slice(4,6)),
-    day=Number(value.slice(6,8)),hour=Number(value.slice(8,10)),
-    minute=Number(value.slice(10,12)),second=Number(value.slice(12,14));
-  const epoch=Date.UTC(year,month-1,day,hour,minute,second);
-  const d=new Date(epoch);
-  if(d.getUTCFullYear()!==year||d.getUTCMonth()!==month-1||
-     d.getUTCDate()!==day||d.getUTCHours()!==hour||
-     d.getUTCMinutes()!==minute||d.getUTCSeconds()!==second)return null;
-  return d.toISOString();
-}
 export function kilometresApart(a,b){
   const r=Math.PI/180,lat1=a.latitude*r,lat2=b.latitude*r,
     dlat=lat2-lat1,dlon=(b.longitude-a.longitude)*r;
@@ -34,35 +22,54 @@ function validPosition(point){
   return finite(point?.latitude)&&Math.abs(point.latitude)<=90&&
     finite(point?.longitude)&&Math.abs(point.longitude)<=180;
 }
-export function readBoMStationGusts(source,{
-  expectedWmo=null,maxRows=BOM_RESEARCH_WIND_RULES.maxSourceRows
-}={}){
-  const data=source?.observations?.data;
-  if(!Array.isArray(data)||data.length>1000)return null;
-  const samples=[];
-  let name="",wmo=null;
-  for(const item of data.slice(0,maxRows)){
-    if(!item||typeof item!=="object")continue;
-    if(expectedWmo!==null&&String(item.wmo)!==String(expectedWmo))continue;
-    if(wmo!==null&&wmo!==item.wmo)continue; // Never cross-match WMO IDs.
-    const utc=dateFromBoM(item.aifstime_utc);
-    const point={latitude:item.lat,longitude:item.lon};
-    if(!utc||!validPosition(point)||!finite(item.gust_kmh)||
-       item.gust_kmh<0||item.gust_kmh>450)continue;
-    name=String(item.name??"").slice(0,100);
-    wmo=item.wmo;
-    samples.push({
-      source:"BoM",stationName:name,wmo,observedUtc:utc,
-      latitude:point.latitude,longitude:point.longitude,
-      gustKmh:item.gust_kmh,
-      windDir:/^[A-Z]{1,3}$/.test(String(item.wind_dir))?
-        item.wind_dir:null,
-      meanWindKmh:finite(item.wind_spd_kmh)?item.wind_spd_kmh:null,
-      // BoM automatic station observations are subject to later QC.
-      provisional:true
-    });
-  }
-  return samples.length?samples:null;
+// The operator's selected NEW BoM Queensland observations page. This is a
+// human-readable source link; the new site uses separate structured station
+// observations behind it. Never parse map UI HTML or mix WMO and BoM IDs.
+export const BOM_QUEENSLAND_OBSERVATIONS_URL=
+  "https://www.bom.gov.au/location/australia/queensland#observations";
+export const BOM_MODERN_SURFACE_OBSERVATION_PATH=
+  "/observations/latest/{station_id}/atm/surf_air?include_qc_results=false";
+export function formatWindKmh(value){
+  return finite(value)&&value>=0?Math.round(value)+" km/hr":"Unavailable";
+}
+export function readBoMStationGusts(source,{expectedStationId=null}={}){
+  // New BoM location site's station API shape: stn.identity + obs.wind.
+  // BoM station number, e.g. 040913 (returned as 40913), is NOT the
+  // WMO station number (e.g. 94576). No cross-family ID comparisons.
+  const ident=source?.stn?.identity,loc=source?.stn?.location,
+    obs=source?.obs,wind=obs?.wind;
+  const rawId=ident?.bom_stn_num;
+  if(!Number.isInteger(rawId)||rawId<1||rawId>999999||
+     (expectedStationId!==null &&
+      !/^\d{6}$/.test(String(expectedStationId))))
+    return null;
+  const stationId=String(rawId).padStart(6,"0");
+  if(expectedStationId!==null&&stationId!==String(expectedStationId).padStart(6,"0"))
+    return null;
+  const point={latitude:loc?.lat_dec_deg,longitude:loc?.long_dec_deg};
+  const time=obs?.datetime_utc;
+  if(!validPosition(point)||typeof time!=="string"||
+     !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(time)||
+     !Number.isFinite(Date.parse(time))||
+     !finite(wind?.gust_speed_10m_max_mps)||
+     wind.gust_speed_10m_max_mps<0||
+     wind.gust_speed_10m_max_mps>125)return null;
+  const speed=wind.speed_10m_mps;
+  const rawDirection=String(wind.dirn_10m_ord??"");
+  return [{
+    source:"BoM Queensland Observations",
+    sourcePage:BOM_QUEENSLAND_OBSERVATIONS_URL,
+    stationName:String(ident.bom_stn_name??"").slice(0,100),
+    stationId,wmo:Number.isInteger(ident.wmo_stn_id)?ident.wmo_stn_id:null,
+    observedUtc:new Date(time).toISOString(),
+    latitude:point.latitude,longitude:point.longitude,
+    // The new API reports metres per second. Convert once to operator km/hr.
+    gustKmh:Math.round(wind.gust_speed_10m_max_mps*36)/10,
+    meanWindKmh:finite(speed)&&speed>=0&&speed<=125?
+      Math.round(speed*36)/10:null,
+    windDir:/^[A-Z]{1,3}$/.test(rawDirection)?rawDirection:null,
+    provisional:true
+  }];
 }
 export function matchObservedBoMGusts(event,stationSamples,{
   rules=BOM_RESEARCH_WIND_RULES
@@ -111,12 +118,16 @@ export function createBoMWindGustResearchLookup({
   if(typeof fetchStation!=="function")throw new TypeError("BoM feed transport required");
   const cache=new Map(),pending=new Map();
   async function get(station){
-    const key=station.product+":"+station.wmo;
+    const key="modern:"+station.stationId;
     const existing=cache.get(key);
     if(existing&&now()<existing.expires)return existing.samples;
     if(pending.has(key))return pending.get(key);
     const job=Promise.resolve().then(()=>fetchStation(station)).then(raw=>{
-      const samples=readBoMStationGusts(raw,{expectedWmo:station.wmo});
+      const parsed=readBoMStationGusts(raw,{expectedStationId:station.stationId});
+      // Fail closed if the station directory and returned BoM location do
+      // not describe the SAME physical observing site.
+      const samples=parsed&&kilometresApart(station,parsed[0])<=5?
+        parsed:null;
       cache.set(key,{
         samples,expires:now()+rules.stationCacheMs
       });
@@ -127,11 +138,11 @@ export function createBoMWindGustResearchLookup({
   }
   async function lookup(event){
     if(!validPosition(event))return null;
-    // Only fetch at most TWO approved near-station sources on operator
-    // review; no statewide polling, no worker fan-out, no remote URL input.
+    // Only fetch at most TWO VERIFIED new BoM location-site station IDs
+    // on operator review; never a user-supplied URL and no statewide polling.
+    // The site's latest feed cannot time-correlate expired historical events.
     const near=stations.filter(s=>validPosition(s)&&
-      /^[A-Z]{3}[0-9]{5}$/.test(s.product)&&
-      /^[0-9]{5}$/.test(String(s.wmo))&&
+      /^\d{6}$/.test(String(s.stationId))&&
       kilometresApart(event,s)<=rules.maxStationKm)
       .sort((a,b)=>kilometresApart(event,a)-kilometresApart(event,b))
       .slice(0,rules.maxStationsPerEvent);

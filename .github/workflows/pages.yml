@@ -837,7 +837,7 @@ jobs:
             | grep -F 'cameraController.setView({heading:0})' >/dev/null
           curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
             "$base/preview/wind-hook-v10-6/live3d-operational-v9.html" \
-            | grep -F 'v10-6-6-colour-coded-radar-events-' >/dev/null
+            | grep -F 'v10-6-7-modern-bom-kmhr-' >/dev/null
           curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
             "$base/preview/wind-hook-v10-6/BUILD.txt" \
             | grep -F 'Q-SCOPE V10.6.5 RESTORED ORIGINAL TRUE-NORTH COMPASS' >/dev/null
@@ -855,6 +855,16 @@ jobs:
             "$base/preview/wind-hook-v10-6/BUILD.txt" \
             | grep -F 'Q-SCOPE V10.6.6 COLOUR-CODED SOURCE-FAITHFUL WIND HOOK COUPLET' >/dev/null
           echo "PUBLIC Q-SCOPE V10.6.6 3-TIER RESEARCH VISUALS + OFFLINE BOM GUST MATCH POLICY VERIFIED"
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-6/src/qscope-reviewable-event-inbox-v10-6.js" \
+            | grep -F 'km/hr gust at' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-6/src/qscope-bom-wind-evidence-v10-6.js" \
+            | grep -F 'https://www.bom.gov.au/location/australia/queensland#observations' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-6/BUILD.txt" \
+            | grep -F 'Q-SCOPE V10.6.7 SELECTED NEW BOM QUEENSLAND OBSERVATIONS PAGE' >/dev/null
+          echo "PUBLIC Q-SCOPE V10.6.7 MODERN QLD BOM SOURCE AND KM/HR WIND FORMAT VERIFIED"
 
 
 

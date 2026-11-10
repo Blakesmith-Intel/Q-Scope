@@ -145,6 +145,7 @@ try {
       category:"strong_radial_signature",observed_utc:time,
       source_utc:time,radar_id:"66",track_id:"WIND",
       latitude:-26.6,longitude:152.8,
+      velocity_kmh:42,
       caveat:"Research only; radial velocity is not a measured surface gust"
     }],{mode:"doppler",frameUtc:time});
   });
@@ -157,6 +158,17 @@ try {
     /POSSIBLE STRAIGHT-LINE WIND/);
   assert(!/HOOK ECHO/.test(await page.locator(".qscope-wind-event-open").innerText()),
     "Wind-only category must not claim a hook echo");
+  await page.locator(".qscope-wind-event-open").click();
+  assert.equal(await page.locator(".qscope-wind-bom-source").getAttribute("href"),
+    "https://www.bom.gov.au/location/australia/queensland#observations",
+    "The observed-wind source MUST be the operator-selected newer BoM page");
+  assert.match(await page.locator(".qscope-wind-event-observed-gust").innerText(),
+    /km\/hr[\s\S]*not connected/i,
+    "Without a verified live transport no claimed station gust appears");
+  assert.match(await page.locator(".qscope-wind-event-evidence-row").innerText(),
+    /42 km\/hr radial/,
+    "Radar radial observations must use km/hr, not km/h, knots or m/s");
+  await page.locator(".qscope-wind-event-detail-title button").click();
   await page.evaluate(()=>window.ui.clearEvent(window.ui.events[0].id));
   assert.equal(await page.locator(".qscope-wind-event-inbox").isHidden(),true);
   // Orange hook-only evidence is distinct from yellow wind and red combination.
