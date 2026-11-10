@@ -837,7 +837,7 @@ jobs:
             | grep -F 'cameraController.setView({heading:0})' >/dev/null
           curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
             "$base/preview/wind-hook-v10-6/live3d-operational-v9.html" \
-            | grep -F 'v10-6-5-restored-compass-' >/dev/null
+            | grep -F 'v10-6-6-colour-coded-radar-events-' >/dev/null
           curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
             "$base/preview/wind-hook-v10-6/BUILD.txt" \
             | grep -F 'Q-SCOPE V10.6.5 RESTORED ORIGINAL TRUE-NORTH COMPASS' >/dev/null
