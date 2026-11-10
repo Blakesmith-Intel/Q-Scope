@@ -99,6 +99,12 @@ try {
     "Persistent wind-event queue cannot obscure the separate map scale");
   assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#nav"]),0,
     "Alert cannot obscure map navigation controls");
+  assert(Math.abs(g[".qscope-wind-event-inbox"].y-
+    (g["#nav"].y+g["#nav"].height+10))<=2,
+    "Compact event dock must sit directly beneath the radar controls");
+  assert(g[".qscope-wind-event-inbox"].x+
+    g[".qscope-wind-event-inbox"].width<=g["#nav"].x+g["#nav"].width+2,
+    "Compact event dock must align with radar toolbar");
   assert(g.clickable,"Operator MUST be able to actually click the event button");
   assert(g.zIndex>3000,"Event dock must have map-control stacking priority");
 
@@ -124,9 +130,14 @@ try {
     assert.equal(intersection(g[".qscope-wind-event-detail"],g[k]),0,
       "Expanded event evidence cannot obscure "+k);
   }
-  if(g.inboxVisible)assert.equal(
-    intersection(g[".qscope-wind-event-detail"],g[".qscope-wind-event-inbox"]),0,
-    "Expanded evidence should not overlap a still-visible persistent inbox");
+  assert.equal(g.inboxVisible,false,
+    "Opening an event replaces its queue at the same under-toolbar location");
+  assert(Math.abs(g[".qscope-wind-event-detail"].y-
+    (g["#nav"].y+g["#nav"].height+10))<=2,
+    "Expanded evidence must open directly beneath radar controls, not over the scale");
+  assert(g[".qscope-wind-event-detail"].x+
+    g[".qscope-wind-event-detail"].width<=g["#nav"].x+g["#nav"].width+2,
+    "Expanded evidence remains aligned beneath the radar toolbar");
   const closeAction=await page.locator(".qscope-wind-event-detail-title button").boundingBox();
   assert(closeAction,"Expanded review must have its own close action");
   assert(await page.evaluate(()=>{
@@ -160,5 +171,5 @@ try {
   assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#mapScaleBar"]),0,
     "Mode changes cannot cover the real map scale");
   console.log("PASS "+(mobile?"mobile WebKit":"desktop Chromium")+
-    ": real BoM 15-band legend and 9 persistent alert cards do not collide; clickable actions and centred evidence window confirmed");
+    ": real BoM 15-band legend and 9 persistent alert cards clear; compact/expanded events dock under radar controls with reachable actions");
 }finally{await context.close();await browser.close();}
