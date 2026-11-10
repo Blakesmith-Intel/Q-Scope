@@ -809,6 +809,26 @@ jobs:
             | grep -F 'captureResearchSourceThumbnail' >/dev/null
           echo "PUBLIC Q-SCOPE V10.6 SOURCE-EVIDENCE, REVIEWABLE, INTELLIGENT PAUSE QA VERIFIED; ROOT AND V10.3/4/5 UNCHANGED"
 
+          # Operator-reported Q-SCOPE V10.6 overlap: original BoM colour legend
+          # sits at z=3000 and the event tray at z=34 in the same corner.
+          # Publish only the isolated V10.7 collision-corrected preview.
+          new_layout="$(curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors "$base/preview/wind-hook-v10-7/BUILD.txt")"
+          grep -Fq 'Q-SCOPE V10.7 NON-OVERLAP ALERT DOCK' <<< "$new_layout"
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-7/index.html" \
+            | grep -F '<title>Q-SCOPE | Radar Events Layout Research V10.7</title>' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-7/src/live3d-operational-v9.js" \
+            | grep -F 'attachQScopeRadarEventLayout' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-7/src/qscope-event-dock-layout-v10-7.js" \
+            | grep -F 'calculateQScopeEventDock' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-7/src/qscope-event-dock-layout-v10-7.css" \
+            | grep -F 'stormtracker-control-z' >/dev/null
+          echo "PUBLIC Q-SCOPE V10.7 ORIGINAL BoM LEGEND AND STICKY RESEARCH ALERT DOCK ISOLATED; ALL FROZEN REFERENCES KEPT"
+
+
 
 
           for component in \
