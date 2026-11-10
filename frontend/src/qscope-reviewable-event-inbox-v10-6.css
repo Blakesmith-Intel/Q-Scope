@@ -164,9 +164,9 @@
    these rules are the safe fallback if the browser has not measured yet. */
 #mapPanel .qscope-wind-event-inbox {
   box-sizing:border-box;
-  left:12px;
+  left:auto;
   top:70px;
-  right:auto;
+  right:10px;
   bottom:auto;
   z-index:calc(var(--stormtracker-control-z, 3000) + 12);
   max-width:calc(100% - 16px);
@@ -183,12 +183,12 @@
   min-height:42px;
 }
 #mapPanel .qscope-wind-event-detail {
-  /* Safe until the measured control-aware layout runs: the opened review
-     window reserves the scale and legend rather than covering them. */
+  /* Both collapsed and opened event windows belong directly beneath
+     the radar toolbar, not over the lower map scales or attribution. */
   box-sizing:border-box;
   top:64px;
-  left:10px;
-  right:auto;
+  left:auto;
+  right:10px;
   bottom:auto;
   transform:none;
   width:min(500px,calc(100% - 20px));
@@ -199,7 +199,8 @@
 }
 @media(max-width:700px) {
   #mapPanel .qscope-wind-event-inbox {
-    left:8px;
+    left:auto;
+    right:8px;
     top:64px;
     max-width:calc(100% - 16px);
   }
