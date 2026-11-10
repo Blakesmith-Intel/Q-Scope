@@ -386,3 +386,18 @@
 #mapPanel .qscope-wind-event-observed-gust p{
   margin:5px 0 0;font-size:11px;line-height:1.45;
 }
+
+/* V10.6.7: operator-selected new Queensland BoM observations page.
+   The link is trustworthy attribution, not a claim that live retrieval is active. */
+#mapPanel .qscope-wind-bom-source{
+  display:inline-block;
+  margin-top:5px;
+  color:#a5e5ff;
+  text-decoration:underline;
+  text-underline-offset:2px;
+  font-weight:600;
+}
+#mapPanel .qscope-wind-bom-source:focus-visible{
+  outline:2px solid #a5e5ff;
+  outline-offset:3px;
+}
