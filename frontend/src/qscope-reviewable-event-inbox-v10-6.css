@@ -135,6 +135,21 @@
   font-size:11px; line-height:1.4;
   overflow-wrap:anywhere;
 }
+.qscope-wind-event-inbox[data-empty="true"] {
+  max-height:none;
+  width:min(340px,calc(100% - 24px));
+}
+.qscope-wind-event-inbox[data-empty="true"] .qscope-wind-event-list,
+.qscope-wind-event-inbox[data-empty="true"] .qscope-wind-event-status {
+  display:none;
+}
+.qscope-wind-event-inbox[data-empty="true"] .qscope-wind-event-header {
+  padding:6px 9px 3px;
+  border-bottom:none;
+}
+.qscope-wind-event-inbox[data-empty="true"] .qscope-wind-event-controls {
+  padding:3px 9px 7px;
+}
 @media(max-width:700px) {
   .qscope-wind-event-pause-setting {font-size:10px;}
   .qscope-wind-event-inbox { max-height:38vh; }
