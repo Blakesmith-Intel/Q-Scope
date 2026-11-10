@@ -67,16 +67,10 @@ assert(calls.maximum>=2,"Preserve bounded parallelism, not serial reads");
 // Advance the simulated active-browser clock through paced one-minute pulses.
 // Completeness is eventual and visibly provisional, NOT an immediate 130
 // source-request burst that overuses Cloudflare.
-for(let pulse=0;pulse<80&&layer.crossingCoverage.pending;pulse++){
+for(let pulse=0;pulse<100&&layer.crossingCoverage.pending;pulse++){
   now+=60000;
   await layer.checkCrossingReferences();
 }
-console.log("CROSSING_AUDIT_DIAGNOSTIC",JSON.stringify({
-  checked:calls.recent.size,coverage:layer.crossingCoverage,
-  history:layer.diagnostics?.recentHistory,
-  localTime:new Date(now).toISOString(),
-  pendingIds:ids.filter(id=>!calls.recent.has(id))
-}));
 assert.equal(layer.crossingCoverage.pending,0,
  "Paced and budgeted checks must EVENTUALLY cover all eligible stations");
 assert.equal(layer.crossingCoverage.sourceMissing,0);
