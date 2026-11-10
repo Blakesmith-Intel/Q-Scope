@@ -231,11 +231,11 @@ def transform(site: Path):
         "let windHookResearchEnabled = isWindHookQaPreview;",
         "automatic analysis opt-in removal")
     s=replace_once(s,"let windHookResearchSources = null;",
-        "let windHookResearchSources = null;\\nlet windHookResearchCacheAt = 0;",
+        "let windHookResearchSources = null;\nlet windHookResearchCacheAt = 0;",
         "bounded live-source refresh timestamp")
     s=replace_once(s,
         "  if (windHookResearchSources)return windHookResearchSources;",
-        "  if (windHookResearchSources && Date.now()-windHookResearchCacheAt < 4*60000)\\n    return windHookResearchSources;",
+        "  if (windHookResearchSources && Date.now()-windHookResearchCacheAt < 4*60000)\n    return windHookResearchSources;",
         "finite original Doppler history cache lifetime")
     s=replace_once(s,
         "if(windHookResearchSiteKey===siteKey)windHookResearchSources=sources;",
