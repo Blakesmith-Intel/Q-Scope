@@ -149,7 +149,8 @@ try{
   }),/HTTP 502/,"Expired browser gauge catalogue must not be used");
 
   const workerSource=readFileSync(new URL("../../relay/worker.js",import.meta.url),"utf8");
-  assert(workerSource.includes("relayVerifiedRiverGaugeMetadata(request,origin"));
+  assert(workerSource.includes("QLD_BOM_GAUGE_METADATA_JSON"),
+    "The original upstream GIS Worker route must be replaced by a local station reference");
   console.log("PASS BoM source-verified 502 recovery, expiry, invalid upstream, browser reload, live heights, CORS and HEAD");
 }finally{
   if(priorStorage===undefined)delete globalThis.localStorage;

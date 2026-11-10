@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - "relay/worker.js"
+      - "relay/qld-bom-gauge-reference-20261110-v1.js"
       - "relay/relay-efficiency-v1.js"
       - "relay/bom-warning-polygons-v1.js"
       - "relay/bom-warning-gis2web-replica-v1.js"
@@ -42,6 +43,38 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: relay
           command: deploy --config wrangler.jsonc
+      - name: Verify production flood station reference is fast, available, and explicitly incomplete
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const url='https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev/river-gauge-metadata';
+          let response=null,lastError='';
+          const started=Date.now();
+          for(let attempt=0;attempt<3;attempt++){
+            try{
+              response=await fetch(url,{signal:AbortSignal.timeout(10000),
+                headers:{Origin:'https://blakesmith-intel.github.io'},
+                cache:'no-store'});
+              if(!response.ok)throw Error('metadata HTTP '+response.status+' '+(await response.text()).slice(0,140));
+              break;
+            }catch(e){lastError=String(e);response=null;}
+          }
+          assert(response,'Production station reference unavailable: '+lastError);
+          const reference=await response.json();
+          assert.equal(response.headers.get('X-StormTracker-Metadata-Source'),
+            'qld-government-bom-sls-reference');
+          assert.equal(response.headers.get('X-StormTracker-Reference-Coverage'),'1728/1808');
+          assert.equal(response.headers.get('X-StormTracker-Metadata-Fallback'),'1');
+          assert.equal(reference.features?.length,1728);
+          assert.equal(reference.stormtrackerReference?.missingCount,80);
+          assert.equal(response.headers.get('Access-Control-Allow-Origin'),
+            'https://blakesmith-intel.github.io');
+          console.log('QLD_GAUGE_REFERENCE_PRODUCTION_PASS',
+            JSON.stringify({stations:reference.features.length,
+              audited:reference.stormtrackerReference.auditedTotal,
+              elapsedMs:Date.now()-started,
+              source:response.headers.get('X-StormTracker-Metadata-Source')}));
+          NODE
       - name: Verify live official BoM bridge and causeway catalogue and production browser CORS
         run: node scripts/probe-live-qld-crossing-relay-v1.mjs
       - name: Verify official high-resolution BoM WMTS metadata and browser CORS

@@ -429,7 +429,7 @@ async function fetchJson(
 // Metadata used to be re-fetched on every update and cancelled locally at
 // 15 seconds while radar requests were busy. Do not restart or multiply it.
 const verifiedGaugeMetadata=new WeakMap();
-const GAUGE_METADATA_TIMEOUT_MS=60000;
+const GAUGE_METADATA_TIMEOUT_MS=10000; // Local versioned relay reference, no upstream GIS wait.
 const STORED_METADATA_KEY="stormtracker.verified-qld-bom-gauge-metadata.v1";
 const STORED_METADATA_MAX_AGE_MS=14*24*60*60*1000;
 
@@ -473,16 +473,25 @@ async function loadVerifiedGaugeMetadata(fetchImpl,gaugeUrl){
       const get=name=>response.headers?.get?.(name)??null;
       const cached=get("X-StormTracker-Metadata-Fallback")==="1";
       const date=Date.parse(get("X-StormTracker-Metadata-Checked-At")??"");
+      const declaredSource=get("X-StormTracker-Metadata-Source");
       responseMetadata={
         metadataFallback:cached,
-        metadataSource:cached?"cached-verified-bom-worker":"bom-live",
+        metadataSource:declaredSource==="qld-government-bom-sls-reference"
+          ?declaredSource
+          :cached?"cached-verified-bom-worker":"bom-live",
         metadataCheckedAt:Number.isFinite(date)?date:Date.now()
       };
     }).then(payload=>{
     if(!Array.isArray(payload?.features)||
        !filterQueenslandRiverGauges(payload).features.length)
       throw Error("BoM river-gauge metadata returned no verified Queensland gauge locations");
-    const data={payload,...responseMetadata};
+    const reference=payload.stormtrackerReference;
+    const auditedTotal=Number(reference?.auditedTotal);
+    const matchedTotal=Number(reference?.matchedTotal);
+    const metadataCoverage=Number.isInteger(auditedTotal)&&auditedTotal>0&&
+      Number.isInteger(matchedTotal)&&matchedTotal>=0&&matchedTotal<=auditedTotal
+      ?{matched:matchedTotal,total:auditedTotal}:null;
+    const data={payload,...responseMetadata,metadataCoverage};
     verifiedGaugeMetadata.set(fetchImpl,{url:gaugeUrl,data});
     storeVerifiedBoMMetadata(data);
     return data;
@@ -550,11 +559,14 @@ export async function loadRiverGaugeOperationalSnapshot({
     metadataSource:gauges.metadataSource,
     metadataFallback:gauges.metadataFallback,
     metadataCheckedAt:gauges.metadataCheckedAt,
+    metadataCoverage:gauges.metadataCoverage??null,
 
     source:
       "Bureau of Meteorology",
 
     transport:
-      "BoM ArcGIS metadata + StormTracker river-height relay"
+      gauges.metadataSource==="qld-government-bom-sls-reference"
+        ?"Versioned QRA/QLD Government station references + live BoM river heights"
+        :"BoM ArcGIS metadata + StormTracker river-height relay"
   };
 }

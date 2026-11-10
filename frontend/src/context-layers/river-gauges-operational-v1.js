@@ -45,6 +45,7 @@ export function bindRiverGaugeManualRefresh(button, refresh) {
 export function formatFloodGaugeOperatorStatus({
   kind="normal",message="",count,
   partial=false,failedProducts=[],staleOfficial=0,metadataFallback=false,
+  metadataCoverage=null,
   screeningIncomplete=0,historyScreeningAlertsAffected=0,
   historyRetainedStationSamples,historyLoaded,historyFailed,historyNoData,
   historySourceMissing=0
@@ -62,7 +63,13 @@ export function formatFloodGaugeOperatorStatus({
       ` (${failedProducts.length} bulletin product${failedProducts.length===1?"":"s"} unavailable)`:""}`);
   if(staleOfficial>0)issues.push(
     `${staleOfficial} last-confirmed flood stage${staleOfficial===1?"":"s"} with stale observations`);
-  if(metadataFallback)issues.push("station reference recovery in use");
+  if(metadataFallback){
+    const c=metadataCoverage;
+    if(Number.isInteger(c?.matched)&&Number.isInteger(c?.total)&&
+       c.matched>=0&&c.total>c.matched)
+      issues.push(`station locations verified: ${c.matched}/${c.total} (partial coverage)`);
+    else issues.push("station reference recovery in use");
+  }
   // Preserve any otherwise unexplained source warning, but don't colour a
   // routine missing 30–120-minute optional history check amber.
   if(kind==="warning"&&!issues.length&&!gaps&&!historySourceMissing&&
