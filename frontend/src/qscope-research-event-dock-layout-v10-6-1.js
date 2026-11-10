@@ -3,7 +3,8 @@
 // BoM reflectivity/Doppler legend or another visible operator control.
 // Sizing/placement is local DOM work; no radar, Worker or science changes.
 const MARGIN=10, GAP=10;
-const MIN_DOCK_HEIGHT=104;
+// Keep at least one actionable alert card legible below header and controls.
+const MIN_DOCK_HEIGHT=164;
 function clamp(value,min,max){return Math.min(max,Math.max(min,value));}
 function intersects(a,b){
   if(!a||!b)return 0;
@@ -26,30 +27,41 @@ function rectInMap(element,map,win){
 // Reserve the native BoM legend, distance scale and visible map controls.
 // A long event list/evidence record scrolls INSIDE its own fixed footprint.
 function anchoredBelowRadarControls({
-  width,height,nav=null,legend=null,scale=null,truth=null,
+  width,height,nav=null,legend=null,scale=null,truth=null,compass=null,
   obstacles=[],desiredWidth,desiredHeight,capHeight
 }={}) {
   if(!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0)
     return {left:8,top:64,width:320,maxHeight:180,name:"below-radar-controls",collisionArea:0};
   const margin=width<=700?8:MARGIN;
-  const widthSafe=Math.min(desiredWidth,Math.max(0,width-2*margin));
   const navBottom=nav?nav.y+nav.height:50;
   const anchorTop=clamp(navBottom+GAP,margin,Math.max(margin,height-margin));
   const navRight=nav?nav.x+nav.width:width-margin;
   const navLeft=nav?nav.x:margin;
+  // Original operator compass is mounted by the protected camera controller.
+  // Measure the actual control, or reserve its original responsive footprint
+  // until mounted: top 72/right 12 (56x68), mobile top 76/right 8 (48x60).
+  const originalCompass=width<=650
+    ?{x:width-56,y:76,width:48,height:60}
+    :{x:width-68,y:72,width:56,height:68};
+  const north=compass??originalCompass;
+  const sameVerticalBand=north.y<anchorTop+MIN_DOCK_HEIGHT &&
+    north.y+north.height>anchorTop;
+  const rightLimit=sameVerticalBand
+    ?Math.min(navRight,north.x-GAP):navRight;
+  const widthSafe=Math.min(desiredWidth,Math.max(0,rightLimit-margin));
   // The right end of the radar toolbar is the primary anchor. An alternate
   // alignment beneath the SAME toolbar is allowed if another map control
   // occupies the right column. Never move this dock to a lower map corner.
   const placements=[
-    ["below-radar-controls",navRight-widthSafe,0],
+    ["below-radar-controls",rightLimit-widthSafe,0],
     ["below-radar-controls-left",navLeft,1]
   ];
-  const blockers=[legend,scale,truth,
+  const blockers=[legend,scale,truth,north,
     ...obstacles.map(item=>item?.rect??item)].filter(rect=>
       rect&&rect.width>0&&rect.height>0);
   let best=null;
   for(const [name,rawX,priority] of placements){
-    const x=clamp(rawX,margin,Math.max(margin,width-margin-widthSafe));
+    const x=clamp(rawX,margin,Math.max(margin,rightLimit-widthSafe));
     const overlapX=rect=>
       Math.min(x+widthSafe,rect.x+rect.width)-Math.max(x,rect.x)>0;
     const inColumn=blockers.filter(overlapX);
@@ -59,7 +71,7 @@ function anchoredBelowRadarControls({
     // The BoM legend and map scale are never allowed to push the dock down.
     for(let pass=0;pass<inColumn.length;pass++){
       const cover=inColumn.find(rect=>
-        rect!==legend&&rect!==scale&&rect!==truth&&
+        rect!==legend&&rect!==scale&&rect!==truth&&rect!==north&&
         rect.y<=top+GAP&&rect.y+rect.height>top);
       if(!cover)break;
       top=Math.min(height-margin,cover.y+cover.height+GAP);
@@ -93,24 +105,24 @@ function anchoredBelowRadarControls({
 }
 export function chooseQscopeRadarEventDock({
   width,height,contentHeight,legend=null,scale=null,nav=null,truth=null,
-  obstacles=[],narrow=width<=700
+  compass=null,obstacles=[],narrow=width<=700
 }={}) {
   return anchoredBelowRadarControls({
-    width,height,nav,legend,scale,truth,obstacles,
+    width,height,nav,legend,scale,truth,compass,obstacles,
     desiredWidth:narrow?320:360,
     desiredHeight:Math.max(MIN_DOCK_HEIGHT,contentHeight||180),
     capHeight:390
   });
 }
 export function chooseQscopeRadarEvidenceWindow({
-  width,height,legend=null,scale=null,nav=null,truth=null,inbox=null,
-  obstacles=[]
+  width,height,legend=null,scale=null,nav=null,truth=null,compass=null,
+  inbox=null,obstacles=[]
 }={}) {
   // Opening the event is an in-place EXPANSION beneath #nav, not another
   // popup to hunt for. Temporarily conceal the underlying queue in all view
   // sizes; restore it as soon as the review window is closed.
   return {...anchoredBelowRadarControls({
-    width,height,nav,legend,scale,truth,obstacles,
+    width,height,nav,legend,scale,truth,compass,obstacles,
     desiredWidth:500,desiredHeight:520,capHeight:520
   }),hideInbox:true};
 }
@@ -123,6 +135,7 @@ export function attachQscopeResearchEventDock({
   const named=[
     ["#legendDock",true],["#nav",true],
     ["#mapTruthLabel",false],["#mapScaleBar",true],
+    ["#stormTrackerNorthCompass",true],
     ["#mapTools",true],
     ["#multiRadarPanel",true],["#mapMeasurePanel",true],
     ["#cycloneForecastQaPanel",true],
@@ -141,15 +154,17 @@ export function attachQscopeResearchEventDock({
     const get=selector=>rectInMap(
       targets.find(v=>v.selector===selector)?.element,map,win);
     const legend=get("#legendDock"),nav=get("#nav"),truth=get("#mapTruthLabel"),
-      scale=get("#mapScaleBar");
+      scale=get("#mapScaleBar"),
+      compass=rectInMap(map.querySelector("#stormTrackerNorthCompass"),map,win);
     const obstacles=targets.filter(v=>
-      !["#legendDock","#nav","#mapTruthLabel","#mapScaleBar"].includes(v.selector))
+      !["#legendDock","#nav","#mapTruthLabel","#mapScaleBar",
+        "#stormTrackerNorthCompass"].includes(v.selector))
       .map(v=>({rect:rectInMap(v.element,map,win),critical:v.critical}))
       .filter(v=>v.rect);
     const desired=Math.max(MIN_DOCK_HEIGHT,inbox.scrollHeight+2);
     const position=chooseQscopeRadarEventDock({
       width:r.width,height:r.height,contentHeight:desired,
-      legend,scale,nav,truth,obstacles,narrow:r.width<=700
+      legend,scale,nav,truth,compass,obstacles,narrow:r.width<=700
     });
     // No absolute bottom/right anchoring: it caused the BoM legend to sit
     // directly across the event's open/clear actions in the V10.6 photo.
@@ -166,7 +181,7 @@ export function attachQscopeResearchEventDock({
     // Opening the evidence panel must not simply cover map controls;
     // place it independently and constrain its scroll height.
     const review=chooseQscopeRadarEvidenceWindow({
-      width:r.width,height:r.height,legend,scale,nav,truth,obstacles
+      width:r.width,height:r.height,legend,scale,nav,truth,compass,obstacles
     });
     details.style.bottom="auto";details.style.right="auto";
     details.style.transform="none";
@@ -204,6 +219,13 @@ export function attachQscopeResearchEventDock({
     mutation?.observe(item.element,{
       attributes:true,attributeFilter:["hidden","open","class","data-mode"]
     });
+  // Compass can mount after the inbox; watch only its direct insertion/removal.
+  const compassMutation=typeof win.MutationObserver==="function"
+    ?new win.MutationObserver(records=>{
+      if(records.some(record=>[...record.addedNodes,...record.removedNodes]
+        .some(node=>node?.id==="stormTrackerNorthCompass")))schedule();
+    }):null;
+  compassMutation?.observe(map,{childList:true});
   win.addEventListener("resize",schedule,{passive:true});
   win.addEventListener("orientationchange",schedule,{passive:true});
   schedule();
@@ -212,6 +234,7 @@ export function attachQscopeResearchEventDock({
     destroy(){
       dead=true;
       watcher?.disconnect();mutation?.disconnect();
+      compassMutation?.disconnect();
       win.removeEventListener("resize",schedule);
       win.removeEventListener("orientationchange",schedule);
     }

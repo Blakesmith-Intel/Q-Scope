@@ -19,6 +19,7 @@ const html='<!doctype html><html><head>'+
   '<main id="mapPanel" style="position:relative;overflow:hidden;isolation:isolate;height:'+(mobile?"500px":"780px")+
   ';width:'+(mobile?"390px":"920px")+';--stormtracker-control-z:3000">'+
   '<div id="nav" style="position:absolute;z-index:3000;top:6px;right:6px;display:flex;background:#0b2432;padding:4px"><button>Controls</button><button>Radar site</button><button>Reset view</button></div>'+
+  '<button id="stormTrackerNorthCompass" type="button" aria-label="Compass: align map to true north" style="position:absolute;top:'+(mobile?'76px':'72px')+';right:'+(mobile?'8px':'12px')+';width:'+(mobile?'48px':'56px')+';height:'+(mobile?'60px':'68px')+';z-index:38;background:#152d3b;color:#fff">NORTH</button>'+
   '<section id="legendDock" class="card" data-mode="rain"><div id="legend" class="weather-legend-rain"><strong>BoM rain radar · reflectivity (dBZ)</strong>'+
   '<div class="intensity-scale">'+Array.from({length:15},(_,i)=>'<span><i style="background:hsl('+i*23+' 80% 50%)"></i>'+(12+i*4)+'</span>').join("")+'</div></div></section>'+
   '<div id="mapScaleBar" role="status" aria-label="Map scale" style="position:absolute;z-index:3000;left:8px;bottom:62px;width:140px;height:32px;background:#142b3a">20 km <span style="display:block;width:90px;border-bottom:3px solid #fff"></span></div>'+
@@ -32,7 +33,7 @@ function intersection(a,b){
 }
 async function geometry(){
  return page.evaluate(()=>{
-   const selectors=[".qscope-wind-event-inbox",".qscope-wind-event-detail","#legendDock","#mapScaleBar","#nav",".qscope-wind-event-open","#mapPanel"];
+   const selectors=[".qscope-wind-event-inbox",".qscope-wind-event-detail","#legendDock","#mapScaleBar","#stormTrackerNorthCompass","#nav",".qscope-wind-event-open","#mapPanel"];
    const result={};
    for(const s of selectors){
      const el=document.querySelector(s);
@@ -68,6 +69,9 @@ try {
     ]);
     const m=document.querySelector("#mapPanel");
     window.visits=[];
+    window.compassClicks=0;
+    m.querySelector("#stormTrackerNorthCompass").addEventListener("click",
+      ()=>{window.compassClicks++});
     window.researchInbox=createPassiveWindEventInbox({
       container:m,documentRef:document,storage:null,
       onNavigate:async(event,evidence)=>{
@@ -88,15 +92,27 @@ try {
         caveat:"Experimental only; not an official BoM warning."
       }],{mode:"rain",frameUtc:time});
     };
-    window.addEvent();
     window.placement.reposition();
   },preview);
+  await page.waitForTimeout(160);
+  assert.equal(await page.locator(".qscope-wind-event-inbox").isHidden(),true,
+    "Zero viewable events must leave the entire under-toolbar region clear");
+  assert.equal(await page.locator("#stormTrackerNorthCompass").isVisible(),true);
+  await page.locator("#stormTrackerNorthCompass").click();
+  assert.equal(await page.evaluate(()=>window.compassClicks),1,
+    "Original compass remains clickable when no alerts are present");
+  await page.evaluate(()=>{
+    window.addEvent();
+    window.placement.reposition();
+  });
   await page.waitForTimeout(160);
   let g=await geometry();
   assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#legendDock"]),0,
     "One pending alert cannot overlap the existing BoM legend");
   assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#mapScaleBar"]),0,
     "Persistent wind-event queue cannot obscure the separate map scale");
+  assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#stormTrackerNorthCompass"]),0,
+    "Persistent radar-event queue cannot obscure the true-north compass");
   assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#nav"]),0,
     "Alert cannot obscure map navigation controls");
   assert(Math.abs(g[".qscope-wind-event-inbox"].y-
@@ -105,6 +121,24 @@ try {
   assert(g[".qscope-wind-event-inbox"].x+
     g[".qscope-wind-event-inbox"].width<=g["#nav"].x+g["#nav"].width+2,
     "Compact event dock must align with radar toolbar");
+  if(!g.clickable){
+    const details=await page.evaluate(()=>{
+      const button=document.querySelector(".qscope-wind-event-open");
+      const dock=document.querySelector(".qscope-wind-event-inbox");
+      const r=button.getBoundingClientRect();
+      const target=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+      const dockRect=dock.getBoundingClientRect();
+      const nav=document.querySelector("#nav").getBoundingClientRect();
+      return {button:[r.x,r.y,r.width,r.height],
+        target:target?.outerHTML?.slice(0,260)??null,
+        eventVisibility:getComputedStyle(dock).visibility,
+        eventDisplay:getComputedStyle(dock).display,
+        dock:[dockRect.x,dockRect.y,dockRect.width,dockRect.height],
+        nav:[nav.x,nav.y,nav.width,nav.height],
+        placement:dock.dataset.placement,hidden:dock.hidden};
+    });
+    console.error("Q-SCOPE EVENT HIT TARGET",JSON.stringify(details));
+  }
   assert(g.clickable,"Operator MUST be able to actually click the event button");
   assert(g.zIndex>3000,"Event dock must have map-control stacking priority");
 
@@ -120,13 +154,15 @@ try {
   assert(g.clickable,"Top actionable event survives scrollable multi-event queue");
   assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#mapScaleBar"]),0,
     "Long persistent wind-event list cannot obscure the map scale");
+  assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#stormTrackerNorthCompass"]),0,
+    "Nine queued alerts cannot obscure the true-north compass");
   assert(await page.locator(".qscope-wind-event-list").evaluate(x=>
     getComputedStyle(x).overflowY==="auto"),"Long event queue scrolls rather than covering legend");
   await page.locator(".qscope-wind-event-open").first().click();
   await page.waitForTimeout(160);
   assert.equal(await page.evaluate(()=>window.visits.length),1);
   g=await geometry();
-  for(const k of ["#legendDock","#mapScaleBar","#nav"]){
+  for(const k of ["#legendDock","#mapScaleBar","#stormTrackerNorthCompass","#nav"]){
     assert.equal(intersection(g[".qscope-wind-event-detail"],g[k]),0,
       "Expanded event evidence cannot obscure "+k);
   }
@@ -136,8 +172,11 @@ try {
     (g["#nav"].y+g["#nav"].height+10))<=2,
     "Expanded evidence must open directly beneath radar controls, not over the scale");
   assert(g[".qscope-wind-event-detail"].x+
-    g[".qscope-wind-event-detail"].width<=g["#nav"].x+g["#nav"].width+2,
-    "Expanded evidence remains aligned beneath the radar toolbar");
+    g[".qscope-wind-event-detail"].width<=g["#stormTrackerNorthCompass"].x-8,
+    "Expanded evidence retains a dedicated compass gutter beneath the toolbar");
+  await page.locator("#stormTrackerNorthCompass").click();
+  assert.equal(await page.evaluate(()=>window.compassClicks),2,
+    "North compass remains clickable even with expanded radar-event evidence");
   const closeAction=await page.locator(".qscope-wind-event-detail-title button").boundingBox();
   assert(closeAction,"Expanded review must have its own close action");
   assert(await page.evaluate(()=>{
@@ -170,6 +209,16 @@ try {
     "Doppler legend resizing cannot cover persistent event queue");
   assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#mapScaleBar"]),0,
     "Mode changes cannot cover the real map scale");
+  await page.evaluate(()=>{
+    for(const event of window.researchInbox.events)
+      window.researchInbox.clearEvent(event.id);
+  });
+  await page.waitForTimeout(50);
+  assert.equal(await page.locator(".qscope-wind-event-inbox").isHidden(),true,
+    "Clearing the last historical/pending event removes the dock entirely");
+  await page.locator("#stormTrackerNorthCompass").click();
+  assert.equal(await page.evaluate(()=>window.compassClicks),3,
+    "Original true-north control remains fully operable after clearing events");
   console.log("PASS "+(mobile?"mobile WebKit":"desktop Chromium")+
     ": real BoM 15-band legend and 9 persistent alert cards clear; compact/expanded events dock under radar controls with reachable actions");
 }finally{await context.close();await browser.close();}
