@@ -183,16 +183,16 @@
   min-height:42px;
 }
 #mapPanel .qscope-wind-event-detail {
-  /* Intentional operator-requested review window, not a new passive dock.
-     Centred on the map, above the legend; fully scrollable and dismissible. */
+  /* Safe until the measured control-aware layout runs: the opened review
+     window reserves the scale and legend rather than covering them. */
   box-sizing:border-box;
-  top:50%;
-  left:50%;
+  top:64px;
+  left:10px;
   right:auto;
   bottom:auto;
-  transform:translate(-50%,-50%);
+  transform:none;
   width:min(500px,calc(100% - 20px));
-  max-height:calc(100% - 24px);
+  max-height:min(55%,520px);
   z-index:calc(var(--stormtracker-control-z, 3000) + 13);
   overflow-y:auto;
   overscroll-behavior:contain;
@@ -210,6 +210,6 @@
   }
   #mapPanel .qscope-wind-event-detail {
     width:calc(100% - 16px);
-    max-height:calc(100% - 20px);
+    max-height:min(52%,520px);
   }
 }
