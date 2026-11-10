@@ -1045,7 +1045,7 @@ grep -Fq '<title>Q-SCOPE | Persistent Wind & Hook Event Research V10.6</title>' 
 grep -Fq 'Q-SCOPE PERSISTENT RESEARCH EVENTS V10.6' "$review_next/BUILD.txt"
 grep -Fq 'Q-SCOPE V10.6.1 MAP LEGEND / ALERT COLLISION REPAIR' "$review_next/BUILD.txt"
 grep -Fq 'attachQscopeResearchEventDock' "$review_next/src/live3d-operational-v9.js"
-grep -Fq 'qscope-v10-6-1-legend-clear' "$review_next/index.html"
+grep -Fq 'qscope-v10-6-2-scale-safe-review' "$review_next/index.html"
 grep -Fq 'onNewEvent:pauseForGenuineNewResearchEvent' "$review_next/src/live3d-operational-v9.js"
 grep -Fq 'captureResearchSourceThumbnail' "$review_next/src/live3d-operational-v9.js"
 grep -Fq 'Q-SCOPE PASSIVE WIND/HOOK RESEARCH V10.5' "_site/preview/wind-hook-v10-5/BUILD.txt"
