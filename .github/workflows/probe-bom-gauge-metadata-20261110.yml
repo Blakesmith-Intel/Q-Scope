@@ -20,7 +20,19 @@ jobs:
             outFields:"bom_stn_num,awrc_stateid,name,lat,long,state,location_types,forecast_site_classification,basin,agency,featreal",
             returnGeometry:"true",outSR:"4326",f:"geojson"
           });
+          const qra='https://gisservices.qra.qld.gov.au/arcgis/rest/services/FWIN/BoM_SLS_Gauges/FeatureServer/0/query';
+          const qraParams=new URLSearchParams({where:'1=1',
+            outFields:'Bureau_Number,Agency_Number,Station_Name,State,Basin,Bureau_Latitude__4_decimal_plac,Bureau_Longitude__4_decimal_pla,Bureau_updated_Latitude__6_deci,Bureau_updated_Longitude__6_dec,Schedule_2___Forecast_location,Schedule_3___Information_locati,Schedule_4___Data_locations,Gauge__Type',
+            returnGeometry:'true',outSR:'4326',f:'geojson'});
+          const qld='https://spatial-gis.information.qld.gov.au/arcgis/rest/services/FloodCheck/FloodWarningNetworkBOM/MapServer/0/query';
+          const qldParams=new URLSearchParams({where:'1=1',outFields:'*',
+            returnGeometry:'true',outSR:'4326',f:'geojson',resultRecordCount:'5'});
           const jobs=[
+            ['QRA BoM SLS full',qra+'?'+qraParams],
+            ['QRA BoM SLS count',qra+'?where=1%3D1&returnCountOnly=true&f=json'],
+            ['QRA BoM SLS sample',qra+'?'+qraParams+'&resultRecordCount=5'],
+            ['QLD FloodCheck BoM sample',qld+'?'+qldParams],
+            ['QLD FloodCheck BoM count',qld+'?where=1%3D1&returnCountOnly=true&f=json'],
             ['FeatureServer original full',root+'/FeatureServer/5/query?'+params],
             ['MapServer same-layer full',root+'/MapServer/5/query?'+params],
             ['FeatureServer 10-gauge',root+'/FeatureServer/5/query?'+params+'&resultRecordCount=10'],
