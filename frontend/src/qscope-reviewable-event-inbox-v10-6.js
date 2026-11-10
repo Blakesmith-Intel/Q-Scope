@@ -286,10 +286,13 @@ function signatureIdentity(doc,presentation,kind) {
 export function createPassiveWindEventInbox({
   container, documentRef=globalThis.document,
   storage=globalThis.localStorage, onNewEvent=()=>{}, onNavigate=async()=>({ok:false,
-    message:"Radar frame navigation is unavailable."})
+    message:"Radar frame navigation is unavailable."}),
+  // Optional vetted transport. No BoM calls without a verified source.
+  lookupObservedWind=null
 }={}) {
   if(!container||!documentRef)throw new TypeError("Research inbox needs a map container.");
   const ledger=createResearchRadarEventLedger({storage});
+  const observedWindStates=new Map();
   let openEventId="",showHistory=false,destroyed=false;
   let pauseOnNewEvent=false;
   try { pauseOnNewEvent=storage?.getItem(Q_SCOPE_PAUSE_PREFERENCE_KEY)==="true"; }
@@ -354,6 +357,26 @@ export function createPassiveWindEventInbox({
     const updated=ledger.get(id);
     const best=bestEvidence(updated);
     if(best)void focusEvidence(updated,best);
+    if(typeof lookupObservedWind==="function"&&
+       updated.evidence.some(e=>e.category==="strong_radial_signature")&&
+       !observedWindStates.has(id)){
+      observedWindStates.set(id,{status:"checking"});
+      renderDetails();
+      // Source lookup is ON-DEMAND only, once for a reviewed event. Never
+      // interpret the absence of an AWS gust as an all-clear.
+      Promise.resolve().then(()=>lookupObservedWind(snapshotEvent(updated)))
+        .then(value=>{
+          if(destroyed)return;
+          observedWindStates.set(id,{
+            status:value?"matched":"unavailable",value:value??null
+          });
+          if(openEventId===id)renderDetails();
+        }).catch(()=>{
+          if(destroyed)return;
+          observedWindStates.set(id,{status:"unavailable",value:null});
+          if(openEventId===id)renderDetails();
+        });
+    }
   }
   function renderDetails(){
     const record=ledger.get(openEventId);
@@ -377,6 +400,31 @@ export function createPassiveWindEventInbox({
     const sourceNote=createNode(documentRef,"p","",
       "Radar signature review priority only · Not a confirmed surface wind gust, tornado, road impact or official BoM warning. Original BoM products remain authoritative.");
     const evidenceList=createNode(documentRef,"div","qscope-wind-event-evidence");
+    const measured=observedWindStates.get(record.id);
+    let observedSection=null;
+    if(measured){
+      observedSection=createNode(documentRef,"section",
+        "qscope-wind-event-observed-gust");
+      const heading=createNode(documentRef,"strong","",
+        "BoM surface wind observations · independent of radar");
+      let summary="Checking same-time nearby station gusts…";
+      if(measured.status==="unavailable"){
+        summary="No verified nearby same-time station observation available. "+
+          "This does not rule out damaging winds between stations.";
+      }else if(measured.status==="matched"&&measured.value){
+        const x=measured.value;
+        const supporting=x.evidenceClass==="nearby-damaging-gust";
+        summary="BoM observed "+Math.round(x.gustKmh)+" km/h 3-second gust at "+
+          String(x.stationName??"station")+" · "+timeAest(x.observedUtc)+
+          " · "+Number(x.distanceKm).toFixed(1)+" km from radar event · "+
+          Number(x.differenceMinutes).toFixed(1)+" min offset. "+
+          (supporting?"Nearby supporting observation; attribution unconfirmed.":
+           "Contextual station reading only; cannot confirm this radar event.")+
+          " Provisional station data; not an official BoM warning.";
+      }
+      observedSection.append(heading,
+        createNode(documentRef,"p","",summary));
+    }
     const sorted=[...record.evidence].sort((a,b)=>
       CATEGORY_PRIORITY[b.category]-CATEGORY_PRIORITY[a.category] ||
       Date.parse(b.frameUtc)-Date.parse(a.frameUtc));
@@ -416,8 +464,9 @@ export function createPassiveWindEventInbox({
     clear.addEventListener("click",()=>{
       ledger.clear(record.id);openEventId="";render();
     });
-    details.append(headingLine,identity,meta,sourceNote,evidenceList,
-      locationStatus,clear);
+    details.append(headingLine,identity,meta,sourceNote);
+    if(observedSection)details.append(observedSection);
+    details.append(evidenceList,locationStatus,clear);
   }
   function render(){
     if(destroyed)return;
