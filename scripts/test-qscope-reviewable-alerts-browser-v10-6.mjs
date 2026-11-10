@@ -163,7 +163,7 @@ try {
     "https://www.bom.gov.au/location/australia/queensland#observations",
     "The observed-wind source MUST be the operator-selected newer BoM page");
   assert.match(await page.locator(".qscope-wind-event-observed-gust").innerText(),
-    /km\/hr.*not connected/i,
+    /km\/hr[\s\S]*not connected/i,
     "Without a verified live transport no claimed station gust appears");
   assert.match(await page.locator(".qscope-wind-event-evidence-row").innerText(),
     /42 km\/hr radial/,
