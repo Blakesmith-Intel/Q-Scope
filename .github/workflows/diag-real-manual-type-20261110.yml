@@ -1,0 +1,43 @@
+name: Diagnostic BoM real Manual heading and relay cache
+on:
+  push:
+    branches: [fix/whyenbah-real-bom-type-20261110]
+    paths: [.github/workflows/diag-real-manual-type-20261110.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "24"}
+      - name: Inspect single BoM source and one current cached relay bundle
+        run: |
+          node --input-type=module <<'NODE'
+          import {parseRiverHeightTable} from './frontend/src/context-layers/river-height-bulletin-v1.js';
+          import assert from 'node:assert/strict';
+          const url='https://www.bom.gov.au/fwo/IDQ60293.html';
+          const t0=Date.now();
+          const resp=await fetch(url,{signal:AbortSignal.timeout(25000)});
+          assert.equal(resp.status,200);
+          const html=await resp.text();
+          const rows=[...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)];
+          const which=rows.findIndex(x=>/Balonne River at Whyenbah/i.test(x[1]));
+          const cells=t=>[...t.matchAll(/<t[hd]\b[^>]*>([\s\S]*?)<\/t[hd]>/gi)]
+            .map(x=>x[1].replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim());
+          console.log('DIRECT',{ms:Date.now()-t0,rows:rows.length,whyRow:which,
+            headerOptions:rows.slice(0,12).map(r=>cells(r[1])).filter(r=>r.includes('Station Name')||r.some(x=>/station/i.test(x))).slice(0,4),
+            whyCells:which>=0?cells(rows[which][1]):null,
+            sourceParsed:parseRiverHeightTable(html,'IDQ60293').filter(x=>/whyenbah/i.test(x.stationName))});
+          const cachedUrl='https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev/river-height-bulletins';
+          const b=await fetch(cachedUrl,{signal:AbortSignal.timeout(20000)});
+          const data=await b.json();
+          console.log('RELAY',{status:b.status,
+            why:(data.products??[]).flatMap(p=>p.observations??[])
+             .filter(x=>/whyenbah/i.test(x.stationName)),
+            date:b.headers.get('date'),age:b.headers.get('age'),
+            cache:b.headers.get('x-stormtracker-relay-cache')});
+          NODE
