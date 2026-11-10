@@ -470,7 +470,7 @@ jobs:
           # Read-only user guide must be part of the existing sidebar header,
           # not a floating overlay or anything inside the Cesium map panel.
           grep -Fq 'id="operatorGuideLink"' <<< "$rainfall_html"
-          grep -Fq 'https://github.com/Blakesmith-Intel/StormTracker/blob/main/docs/OPERATOR_GUIDE_CURRENT.md' <<< "$rainfall_html"
+          grep -Fq 'https://github.com/Blakesmith-Intel/Q-Scope/blob/main/docs/OPERATOR_GUIDE_CURRENT.md' <<< "$rainfall_html"
           grep -Fq 'target="_blank" rel="noopener noreferrer"' <<< "$rainfall_html"
           guide_css="$(curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors "$base/src/single-interface-v1.css")"
           grep -Fq '#controlSidebar > .dashboard-heading .operator-guide-link' <<< "$guide_css"
@@ -1660,10 +1660,10 @@ jobs:
           grep -Fq 'Tidal screening, statewide' docs/OPERATOR_GUIDE_CURRENT.md
           grep -Fq 'coastalGaugeTidalCoverage' frontend/src/context-layers/river-flood-signals-v1.js
           grep -Fq 'coastalTidalCoverage' frontend/src/context-layers/river-gauge-layer-v1.js
-          grep -Fq 'href="https://github.com/Blakesmith-Intel/StormTracker/blob/main/docs/OPERATOR_GUIDE_CURRENT.md"' frontend/live3d-operational-v9.html
+          grep -Fq 'href="https://github.com/Blakesmith-Intel/Q-Scope/blob/main/docs/OPERATOR_GUIDE_CURRENT.md"' frontend/live3d-operational-v9.html
           # Confirm the newly accepted tidal-screening source is on the actual
           # published GitHub Pages site, not merely present in a green PR build.
-          base="https://blakesmith-intel.github.io/StormTracker"
+          base="https://blakesmith-intel.github.io/Q-Scope"
           verified=false
           for attempt in $(seq 1 12); do
             live_source="$(curl --fail --silent --show-error --location --max-time 15 "$base/src/context-layers/river-flood-signals-v1.js?release=$release_sha&check=$attempt" || true)"
@@ -1718,7 +1718,7 @@ jobs:
           # The deploy job has already passed tests, published and independently
           # verified Pages. Confirm the *actual served* current report modules,
           # not merely the original source or immutable V10.2.0 BUILD marker.
-          base="https://blakesmith-intel.github.io/StormTracker"
+          base="https://blakesmith-intel.github.io/Q-Scope"
           verified=false
           for attempt in $(seq 1 14); do
             ui="$(curl -fsSL --max-time 15 "$base/live3d-operational-v9.html?seal=$release_sha&check=$attempt" || true)"
@@ -1776,7 +1776,7 @@ jobs:
           # Validate the published HTML/module chain, not just the checkout.
           # BoM does not need to have an active warning to pass this release:
           # source unavailable/cancelled with zero polygons is an honest state.
-          base="https://blakesmith-intel.github.io/StormTracker"
+          base="https://blakesmith-intel.github.io/Q-Scope"
           relay="https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev/bom-official-warning-polygons"
           verified=false
           for attempt in $(seq 1 16); do
@@ -1845,7 +1845,7 @@ jobs:
           # Validate the published HTML/module chain, not just the checkout.
           # BoM does not need to have an active warning to pass this release:
           # source unavailable/cancelled with zero polygons is an honest state.
-          base="https://blakesmith-intel.github.io/StormTracker"
+          base="https://blakesmith-intel.github.io/Q-Scope"
           relay="https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev/bom-official-warning-polygons"
           verified=false
           for attempt in $(seq 1 16); do
@@ -1907,7 +1907,7 @@ jobs:
           # Confirm Pages and existing Worker both serve the new code.
           # BoM may cancel or revise IDQ21033 during deployment; never require
           # active warning geometry or a particular live issue timestamp.
-          base="https://blakesmith-intel.github.io/StormTracker"
+          base="https://blakesmith-intel.github.io/Q-Scope"
           relay="https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev/bom-official-warning-polygons"
           verified=false
           for attempt in $(seq 1 18); do
@@ -1965,7 +1965,7 @@ jobs:
           node frontend/tests/run-official-bom-warning-polygons-bees-dick-v1-tests.mjs
           # No requirement for a currently active thunderstorm: verify the
           # published status logic rather than invent a synthetic live polygon.
-          base="https://blakesmith-intel.github.io/StormTracker"
+          base="https://blakesmith-intel.github.io/Q-Scope"
           verified=false
           for attempt in $(seq 1 15); do
             ui="$(curl -fsSL --max-time 15 "$base/live3d-operational-v9.html?status=$release_sha-$attempt" || true)"
@@ -2060,7 +2060,7 @@ jobs:
           if [ -n "$prior_tag" ] || [ -n "$prior_restore" ]; then
             test "$prior_tag" = "$prior_restore" || { echo 'Older cyclone release refs disagree; refuse new seal'; exit 1; }
           fi
-          base="https://blakesmith-intel.github.io/StormTracker"
+          base="https://blakesmith-intel.github.io/Q-Scope"
           published=false
           for attempt in $(seq 1 10); do
             query="?radarRelease=$release_sha&verify=$attempt"
@@ -2130,7 +2130,7 @@ jobs:
           if [ -n "$prior_tag" ] || [ -n "$prior_restore" ]; then
             test "$prior_tag" = "$prior_restore" || { echo 'Previous radar release refs disagree; refuse new seal'; exit 1; }
           fi
-          base="https://blakesmith-intel.github.io/StormTracker"
+          base="https://blakesmith-intel.github.io/Q-Scope"
           published=false
           for attempt in $(seq 1 10); do
             query="?radarRelease=$release_sha&verify=$attempt"
@@ -2203,7 +2203,7 @@ jobs:
           previous_restore="$(git ls-remote origin 'refs/heads/restore/v10.2.39' | cut -f1)"
           test -n "$previous_tag" && test "$previous_tag" = "$previous_restore" ||
             { echo "Refuse seal: previous radar tag/restore do not match"; exit 1; }
-          base="https://blakesmith-intel.github.io/StormTracker"
+          base="https://blakesmith-intel.github.io/Q-Scope"
           published=false
           for attempt in $(seq 1 12); do
             query="?wmtsFix=$release_sha&try=$attempt"
@@ -2276,7 +2276,7 @@ jobs:
           previous_restore="$(git ls-remote origin 'refs/heads/restore/v10.2.40' | cut -f1)"
           test -n "$previous_tag" && test "$previous_tag" = "$previous_restore" ||
             { echo "Prior immutable radar refs disagree; refuse camera release seal"; exit 1; }
-          base="https://blakesmith-intel.github.io/StormTracker"
+          base="https://blakesmith-intel.github.io/Q-Scope"
           published=false
           for attempt in $(seq 1 12); do
             query="?cameraRelease=$release_sha&attempt=$attempt"
@@ -2355,7 +2355,7 @@ jobs:
           old_restore="$(git ls-remote origin 'refs/heads/restore/v10.2.41' | cut -f1)"
           test -n "$old_tag" && test "$old_tag" = "$old_restore" ||
             { echo "Refuse freeze: previous sealed release refs mismatch"; exit 1; }
-          base="https://blakesmith-intel.github.io/StormTracker"
+          base="https://blakesmith-intel.github.io/Q-Scope"
           published=false
           for attempt in $(seq 1 12); do
             query="?acceptedFreeze=$release_sha&attempt=$attempt"

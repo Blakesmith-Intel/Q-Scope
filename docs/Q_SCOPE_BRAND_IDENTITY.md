@@ -23,9 +23,17 @@ for the official source. No official endorsement is claimed.
 - Rename the public application identity **only after** assembling and testing
   the original accepted site from the source-pinned build. The two production
   HTML files are the only deployed runtime files modified by the brand overlay.
-- Preserve the existing address
-  https://blakesmith-intel.github.io/StormTracker/ and every API endpoint,
-  cache key, source identifier, storage key and Code/CI path for compatibility.
+- The repository and GitHub Pages project path were renamed from
+  `Blakesmith-Intel/StormTracker` to `Blakesmith-Intel/Q-Scope` on
+  **10 November 2026**. The new canonical public URL is
+  **https://blakesmith-intel.github.io/Q-Scope/** (capital S, lowercase cope).
+  Old GitHub *repository* links may redirect; do not rely on the previous
+  GitHub *Pages* path redirecting.
+- Preserve every existing agency source URL, Cloudflare Worker endpoint,
+  source identifier, application storage key and cache protocol that is used
+  to retrieve or correlate data. These are not public brand identifiers.
+- Keep pinned V10.3 and archived research routes under the same relative
+  `preview/` paths at the new `/Q-Scope/` project address.
 - Preserve experimental V10.3 wind/hook and historical radar previews as
   explicitly separate, source-pinned research artefacts. Their historical
   internal titles do not indicate live production.
@@ -41,7 +49,7 @@ Never modify the source commit, tags or restore branch. Future platform
 enhancements are new changes with full regression, publication checks and
 operator acceptance.
 
-**Not included here:** repository rename, URL redirection/domain purchase,
+**Not included here:** custom-domain purchase or an automatic redirect from the retired Pages URL,
 new Cloudflare route/worker, logo artwork, color-system redesign, changes to
 severe-weather scientific thresholds or promotion of unvalidated radar
 wind/hook alerts. These are separately reviewed decisions.
