@@ -267,7 +267,19 @@ export function planBoMStationTableLookups(features,{
     const staleFlood=needsHistory&&!fresh&&
       ["minor","moderate","major"].includes(
         String(p.STORMTRACKER_FLOOD_CLASS??"").toLowerCase());
-    const priority=staleFlood?-1:needsHistory&&fresh?0:
+    // Source-verified ABOVE-minor stations and reached published crossings
+    // must receive optional history FIRST. Lower-height inland rate checks
+    // and reference discovery remain eligible but cannot crowd them out.
+    const measuredStage=observedFloodClass(p.STORMTRACKER_HEIGHT_METRES,
+      stationFloodLevels(feature));
+    const reportedStage=String(p.STORMTRACKER_FLOOD_CLASS??"").toLowerCase();
+    const alreadyFlooding=["minor","moderate","major"].includes(measuredStage)||
+      ["minor","moderate","major"].includes(reportedStage);
+    const crossingReached=Boolean(publishedCrossingForFeature(feature,crossingCatalogue)&&
+      p.STORMTRACKER_HEIGHT_METRES>=
+        publishedCrossingForFeature(feature,crossingCatalogue).heightMetres);
+    const priority=alreadyFlooding?-4:crossingReached?-3:
+      staleFlood?-2:needsHistory&&fresh?0:
       needsCrossing&&fresh&&noStage&&noPublishedCrossing&&tendency==="rising"?1:
       needsCrossing&&fresh&&noStage&&noPublishedCrossing&&
         p.STORMTRACKER_HEIGHT_METRES>=1.5?2:

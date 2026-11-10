@@ -1,10 +1,10 @@
 // Latest verified BoM height per station ID, independent of flood classes.
 // A replayed CDN bulletin or failed refresh must NEVER roll back a more recent
 // measured height. This browser cache holds source records, not inferred data.
-import {parseQueenslandObservationTime,FLOOD_STAGE_MAX_AGE_MS} from "./river-flood-signals-v1.js?v=9.13.2";
+import {parseQueenslandObservationTime,floodStageEvidenceMaxAge} from "./river-flood-signals-v1.js?v=9.13.2";
 
 export const LATEST_RIVER_GAUGE_STORAGE_KEY="stormtracker.qld-latest-river-gauge.v1";
-const MAX_AGE_MS=FLOOD_STAGE_MAX_AGE_MS;
+// Only source-verified above-minor manual flood observations get a 48h cap.
 const MAX_STATIONS=1500;
 function sourceTime(f,now){
   const p=f?.properties??{};
@@ -18,7 +18,7 @@ function acceptable(id,entry,now){
      !Array.isArray(f.geometry.coordinates) ||
      !f.geometry.coordinates.every(Number.isFinite) ||
      !Number.isFinite(at) || at<=0 || at>now+5*60000 ||
-     now-at>MAX_AGE_MS ||
+     now-at>floodStageEvidenceMaxAge(f) ||
      !Number.isFinite(f.properties?.STORMTRACKER_HEIGHT_METRES))return null;
   return {observedAt:at,feature:f};
 }

@@ -34,6 +34,8 @@ import {
   retainLatestGaugeObservations
 } from "./river-gauge-latest-v1.js?v=20261019-fresh-observation-v1";
 
+import {createRiverHistoryBudget} from "./river-history-request-budget-v1.js?v=20261110-paced-worker-budget-v1";
+
 import {
   recentFloodHistoryCandidate,
   recentFloodHistoryGap,
@@ -442,6 +444,28 @@ export function createRiverGaugeLayer({
   // Record attempted stations for diagnostics, not as a permanent retry ban.
   const recentAttempted = new Set();
   const recentNextAttemptAt = new Map();
+  // Source-confirmed station retry cooldowns survive tab reloads, so the
+  // same no-data/failed table does not cost a fresh Worker request each time.
+  const recentRetryStoreKey="stormtracker.qld-river-history-next-attempt.v1";
+  try{
+    const saved=JSON.parse(storage?.getItem(recentRetryStoreKey)??"{}");
+    for(const [id,nextAt] of Object.entries(saved).slice(0,2000)){
+      const when=Number(nextAt);
+      if(/^bom:\d{6}$/.test(id)&&Number.isFinite(when)&&
+         when>now()&&when<=now()+6*60*60*1000)
+        recentNextAttemptAt.set(id,when);
+    }
+  }catch{/* Disabled/corrupt storage must not block the flood layer. */}
+  function persistRecentCooldowns(){
+    try{
+      const at=now(),entries=[...recentNextAttemptAt.entries()]
+        .filter(([id,when])=>/^bom:\d{6}$/.test(id)&&
+          Number.isFinite(when)&&when>at&&when<=at+6*60*60*1000)
+        .slice(-2000);
+      storage?.setItem(recentRetryStoreKey,JSON.stringify(Object.fromEntries(entries)));
+    }catch{/* In-memory cooldown still prevents duplicate requests. */}
+  }
+  const recentHistoryBudget=createRiverHistoryBudget();
   let recentLoading = null;
   let crossingScanTimer=null;
   // Optional historical station pages must never flood the relay or hold up
@@ -478,12 +502,19 @@ export function createRiverGaugeLayer({
     const list=planBoMStationTableLookups(features,{
       history,plotCrossings,crossingCatalogue,nowMs
     });
-    // All BoM stations with a current reported height are eligible.
-    // Crossing discovery does not depend on the bulletin saying "rising".
-    // A previously failed or insufficient station becomes eligible again
-    // after its own cooldown. Cap each pass without increasing concurrency.
+    // Important flood-stage / missing-rise history is already sorted ahead
+    // of routine crossing discovery. Do not mistake the optional queue for a
+    // prerequisite to rendering current BoM flood conditions.
+    const budget=recentHistoryBudget.allowance(nowMs);
+    if(!budget.count){
+      if(list.length)scheduleCrossingScan(Math.max(0,budget.nextAt-nowMs));
+      return null;
+    }
+    // Preserve the historical 64 hard safety limit, but consume no more than
+    // FOUR requests in one paced pulse, max 24 per ten-minute browser window.
+    // Same-station verified history and crossing metadata are reused.
     const candidates=list.filter(item=>nowMs >= (recentNextAttemptAt.get(item.id)??0))
-      .slice(0,64);
+      .slice(0,64).slice(0,budget.count);
     if(!candidates.length){
       // A station-specific cooldown is not an exclusion from future scans.
       const next=list.reduce((min,item)=>
@@ -492,11 +523,13 @@ export function createRiverGaugeLayer({
         scheduleCrossingScan(Math.max(3000,next-nowMs));
       return null;
     }
+    recentHistoryBudget.consume(candidates.length,nowMs);
     recentLoading=(async()=>{
       let success=0,failures=0,noData=0,lastFailureScope=null;
+      let serviceFailures=0;
       const tableHeightUpdates=new Map();
-      // Four simultaneous reads on the EXISTING BoM relay, rather than
-      // 64 serial waits. Keep four simultaneous requests, 64 stations/pass.
+      // One bounded pulse: up to four concurrent reads on the EXISTING
+      // relay; never start a second pulse sooner than 60 seconds.
       for(let i=0;i<candidates.length;i+=4){
        if(now()<recentRelayBlockedUntil)break;
        await Promise.all(candidates.slice(i,i+4).map(async target=>{
@@ -520,7 +553,9 @@ export function createRiverGaugeLayer({
             // BoM explicitly has no recent usable measurements for this
             // station. Not a gateway failure, warning log, or false "safe".
             noData++;
-            recentNextAttemptAt.set(target.id,now()+15*60*1000);
+            // A valid empty source is not an outage. Give a manual or quiet
+            // station time to gain real observations before asking again.
+            recentNextAttemptAt.set(target.id,now()+60*60*1000);
             return;
           }
           const existing=new Map((history[target.id]??[])
@@ -542,6 +577,7 @@ export function createRiverGaugeLayer({
         }catch(error){
           failures++;
           const scope=classifyBoMRecentHistoryFailure(error);
+          if(scope==="service")serviceFailures++;
           // A failed SINGLE station is not evidence that all 1,000+ BoM
           // stations are unavailable. Only explicit upstream rate limiting
           // pauses the shared queue; every other error retries by station.
@@ -561,6 +597,12 @@ export function createRiverGaugeLayer({
         }
        }));
       }
+      // Repeated genuine relay/upstream failures back off the whole optional
+      // queue briefly instead of burning request allowance on more stations.
+      // One isolated station 502/503 is NOT a statewide service failure.
+      if(serviceFailures>=3&&success===0)
+        recentRelayBlockedUntil=Math.max(recentRelayBlockedUntil,now()+5*60*1000);
+      persistRecentCooldowns();
       if(success||candidates.some(item=>plotCrossings[item.id])){
         if(tableHeightUpdates.size){
           latestSourceFeatures=latestSourceFeatures.map(f=>
@@ -601,7 +643,10 @@ export function createRiverGaugeLayer({
         historyScreeningAlertsAffected:coverage.affectedActiveSignals,
         historySourceMissing:coverage.missingSource,
         recentHistory:{loaded:success,failed:failures,noData,
-          attempted:recentAttempted.size,screeningIncomplete:coverage.incomplete,
+          attempted:recentAttempted.size,
+          pulseRequests:candidates.length,
+          windowRequests:recentHistoryBudget.allowance(now()).spent,
+          screeningIncomplete:coverage.incomplete,
           affectedActiveSignals:coverage.affectedActiveSignals,
           retainedStationSamples:Object.keys(history).length,
           missingSource:coverage.missingSource,blockedUntil:recentRelayBlockedUntil}};
@@ -651,9 +696,10 @@ export function createRiverGaugeLayer({
         const earliest=Math.min(...remaining.map(item=>
           recentNextAttemptAt.get(item.id)??now()));
         const nextDue=Math.max(now(),earliest);
-        const delay=now()<recentRelayBlockedUntil
-          ?Math.max(0,recentRelayBlockedUntil-now()):nextDue-now();
-        scheduleCrossingScan(delay);
+        const budget=recentHistoryBudget.allowance(now());
+        // Respect BOTH station cooldown and the global Worker spend budget.
+        const nextAt=Math.max(nextDue,budget.nextAt,recentRelayBlockedUntil);
+        scheduleCrossingScan(Math.max(0,nextAt-now()));
       }
     }
   }

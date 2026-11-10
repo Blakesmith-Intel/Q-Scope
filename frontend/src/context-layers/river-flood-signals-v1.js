@@ -12,6 +12,29 @@ export const FLOOD_SIGNAL_MAX_AGE_MS = 90 * 60 * 1000;
 // Manual/event-only gauges may stop publishing after a flood recedes. Expired
 // evidence removes the icon, but NEVER establishes that the water is safe.
 export const FLOOD_STAGE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+// Manually read BoM river gauges can publish less frequently than telemetry.
+// Extend ONLY an explicitly BoM-identified, same-station, same-datum,
+ // ABOVE-minor *reported* flood observation to 48h, visibly stale.
+// This never extends rapid-rise evidence, below-minor status, or a conflicting
+// stage: it is last-reported flood context, NOT current water-level assurance.
+export const MANUAL_FLOOD_STAGE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
+export function floodStageEvidenceMaxAge(feature){
+  const p=feature?.properties??{};
+  if(p.STORMTRACKER_REPORTING_MODE!=="manual" ||
+     !/^IDQ602(?:8[5-9]|9[0-6])$/.test(String(p.STORMTRACKER_SOURCE_PRODUCT??"")) ||
+     p.STORMTRACKER_IDENTITY_WARNING ||
+     p.STORMTRACKER_STATION_TABLE_CONFLICT) return FLOOD_STAGE_MAX_AGE_MS;
+  const id=String(feature?.id??"");
+  const native=String(p.bom_stn_num??"");
+  if(!/^bom:\d{6}$/.test(id)||!/^\d{1,6}$/.test(native)||
+     native.padStart(6,"0")!==id.slice(4))return FLOOD_STAGE_MAX_AGE_MS;
+  const measured=observedFloodClass(
+    p.STORMTRACKER_HEIGHT_METRES,stationFloodLevels(feature));
+  const reported=String(p.STORMTRACKER_FLOOD_CLASS??"").toLowerCase().trim();
+  return measured===reported && ["minor","moderate","major"].includes(reported)
+    ?MANUAL_FLOOD_STAGE_MAX_AGE_MS:FLOOD_STAGE_MAX_AGE_MS;
+}
+
 // Compare genuine readings separated by 30–120 minutes. The actual elapsed
 // time determines the hourly rate; never invent or interpolate observations.
 export const FLOOD_SIGNAL_MIN_INTERVAL_MS = 30 * 60 * 1000;
@@ -343,7 +366,7 @@ export function evaluateFloodSignal(feature,history={},nowMs=Date.now()){
     return {show:false,reason:"Conflicting BoM and mapped station IDs"};
   if(!Number.isFinite(observed)||observed<=0||
       observed>nowMs+5*60000||
-      nowMs-observed>FLOOD_STAGE_MAX_AGE_MS)
+      nowMs-observed>floodStageEvidenceMaxAge(feature))
     return {show:false,reason:"Flood observation expired; latest level unknown"};
   // Both exact-station BoM sources disproved a cached flood reading.
   // Retire its map marker instead of showing a lingering neutral symbol.
