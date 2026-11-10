@@ -231,3 +231,17 @@
 #mapPanel .qscope-wind-event-detail[data-severity="hook"] { border-color:#ff994e; }
 #mapPanel .qscope-wind-event-detail[data-severity="couplet"] { border-color:#ed5c70; }
 .qscope-wind-event-card .qscope-wind-event-open { font-weight:650;line-height:1.4; }
+
+/* The explanatory status paragraph was covering the first clickable event
+   when a narrow dock constrained its flex children. Research status is already
+   stated in the header and in the opened evidence. Prioritise real actions. */
+#mapPanel .qscope-wind-event-inbox .qscope-wind-event-status {
+  display:none !important;
+}
+#mapPanel .qscope-wind-event-inbox .qscope-wind-event-header,
+#mapPanel .qscope-wind-event-inbox .qscope-wind-event-controls {
+  flex:0 0 auto;
+}
+#mapPanel .qscope-wind-event-inbox .qscope-wind-event-list {
+  flex:1 1 auto; min-height:0; overflow-y:auto;
+}
