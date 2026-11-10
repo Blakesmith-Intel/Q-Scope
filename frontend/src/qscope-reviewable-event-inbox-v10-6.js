@@ -466,7 +466,14 @@ export function createPassiveWindEventInbox({
     get events(){return ledger.list({includeAcknowledged:true});},
     get visible(){return !root.hidden;},
     openEvent:id=>openRecord(id),
-    clearEvent:id=>{const ok=ledger.clear(id);if(ok)render();return ok;},
+    clearEvent:id=>{
+      const ok=ledger.clear(id);
+      if(ok){
+        if(openEventId===id)openEventId="";
+        render();
+      }
+      return ok;
+    },
     destroy(){destroyed=true;root.remove();details.remove();}
   };
 }
