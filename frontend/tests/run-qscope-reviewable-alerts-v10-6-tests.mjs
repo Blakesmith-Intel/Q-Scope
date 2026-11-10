@@ -3,7 +3,8 @@ import {readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import {
   createPassiveWindEventInbox,createResearchRadarEventLedger,
-  Q_SCOPE_PAUSE_PREFERENCE_KEY,Q_SCOPE_EVENT_STORAGE_KEY
+  Q_SCOPE_PAUSE_PREFERENCE_KEY,Q_SCOPE_EVENT_STORAGE_KEY,
+  RESEARCH_RADAR_EVENT_TYPES,radarEventPresentation
 } from "../src/qscope-reviewable-event-inbox-v10-6.js";
 import {captureResearchSourceThumbnail} from "../src/qscope-source-evidence-thumbnail-v10-6.js";
 import {dopplerMapCoordinateToLonLat} from "../src/bom-doppler-georef-v1.js";
@@ -138,9 +139,15 @@ const ui=createPassiveWindEventInbox({
   }
 });
 assert.equal(ui.pauseOnNewEvent,false,"Intelligent pause defaults OFF");
+assert.equal(map.children[0].hidden,true,
+  "No pending/history events means the entire radar event window is absent");
+assert.equal(map.children[1].hidden,true,
+  "No stale evidence popup when no event exists");
 ui.setPauseOnNewEvent(true);
 assert.equal(store2.getItem(Q_SCOPE_PAUSE_PREFERENCE_KEY),"true");
 ui.observe([withSnapshot],{mode:"rain",frameUtc:t});
+assert.equal(map.children[0].hidden,false,
+  "A new radar event makes the passive inbox immediately visible");
 assert.equal(seen.length,1,"One new pending event requests one optional pause");
 assert.equal(navigated.length,0,"No camera navigation on passive detection");
 ui.observe([withSnapshot],{mode:"rain",frameUtc:t});
@@ -150,15 +157,24 @@ assert.equal(seen.length,1,"More evidence for same event never triggers pause");
 assert.equal(ui.pendingCount,1,"Multi-type event remains a single card");
 const event=ui.events[0];
 assert.equal(event.evidence.length,2);
+assert.equal(radarEventPresentation(event).severity,"hook",
+  "Mixed hook and radial wind evidence remains a single orange hook event");
+assert.match(radarEventPresentation(event).summary,/HOOK ECHO.*WIND SIGNATURE/);
+assert.equal(map.children[0].children[2].children[0].dataset.severity,"hook",
+  "Pending card displays the highest matched radar review category");
 ui.openEvent(event.id);
 assert.equal(ui.pendingCount,0,"Click acknowledges pending state");
 assert.equal(navigated.length,1,"Click, not detection, triggers frame navigation");
 assert.equal(map.children[1].hidden,false,"Evidence window remains open after failure");
+assert.equal(map.children[1].dataset.severity,"hook",
+  "Expanded evidence retains the orange hook category");
 const figures=doc.nodes.filter(x=>x.className==="qscope-wind-evidence-snapshot");
 assert(figures.length>=1,"Saved source evidence is visible after BoM frame expiry");
 ui.observe([alert("hook_shape_only",t)],{mode:"rain",frameUtc:t});
 assert.equal(seen.length,1,"Acknowledged alerts cannot auto-pause again");
 ui.clearEvent(event.id);
+assert.equal(map.children[0].hidden,true,
+  "Clearing the final viewable event hides the entire dock again");
 ui.observe([withSnapshot],{mode:"rain",frameUtc:t});
 assert.equal(seen.length,1,"Cleared archived source scan cannot revive");
 const resume=createPassiveWindEventInbox({
@@ -169,6 +185,20 @@ assert.equal(resume.pauseOnNewEvent,true,
   "User preference survives reload independently of alerts");
 assert.equal(resume.pendingCount,0);
 ui.destroy();resume.destroy();
+
+for(const [category,severity,label] of [
+  ["strong_radial_signature","wind","POSSIBLE STRAIGHT-LINE WIND"],
+  ["hook_shape_only","hook","HOOK ECHO"],
+  ["tornadic_candidate","couplet","HOOK + VELOCITY COUPLET"]
+]) {
+ const record={id:"fixture",evidence:[{category,frameUtc:t}]};
+ assert.equal(radarEventPresentation(record).severity,severity);
+ assert(radarEventPresentation(record).summary.includes(label));
+ assert(RESEARCH_RADAR_EVENT_TYPES[category].evidence.includes("unverified")||
+   RESEARCH_RADAR_EVENT_TYPES[category].evidence.includes("not confirmed"),
+   "Radar classification must not claim a confirmed tornado or surface gust");
+}
+
 const build=readFileSync(fileURLToPath(new URL("../../scripts/build-current-site.sh",import.meta.url)),"utf8");
 assert.match(build,/wind-hook-v10-6/);
 console.log("PASS Q-SCOPE V10.6 source-faithful evidence crops, thumbnail safety, persistent review, and one-time opt-in pause control");
