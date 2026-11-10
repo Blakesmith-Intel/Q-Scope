@@ -151,7 +151,7 @@ if (passiveRadarInbox) {
 // Prevent an older asynchronous radar-image load''',
       "research dock placement after inbox exists")
     a=one(a,"qscope-v10-6-persistent-evidence",
-      "qscope-v10-6-4-compass-safe-severity","browser iframe cache refresh")
+      "qscope-v10-6-5-restored-compass","browser iframe cache refresh")
     for forbidden in ["enableWindHookResearch", "windHookResearchQaControl",
                       "syncSevereStormAlerts(", "syncIndependentDopplerResearch("]:
         if forbidden in s:raise ValueError(f"Unwanted legacy research UI source: {forbidden}")
