@@ -9,12 +9,13 @@ export const V10_HIGH_RADIAL_KMH = 60;
 export const V10_ROTATION_PAIR_KMH = 40;
 export const V10_VERIFIED_RADARS = Object.freeze(["08", "50", "66"]);
 const MAX_PAIR_MINUTES = 8;
-const MAX_ARC_GAP_MINUTES = 15;
+const MAX_ARC_GAP_MINUTES = 8; // Missing nominal intermediate scans cannot establish persistence.
 const TRUSTED_TIME_BASIS = new Set([
   "bom-history-filename-utc", "bom-ftp-filename-utc",
   "bom-latest-filename-utc", "bom-latest-source-utc"
 ]);
 const MAX_RADIAL_SAMPLES = 250000;
+const MAX_TRACK_RADIAL_SAMPLES = 4096; // Fail closed on unbounded decoders.
 
 export function classifyObservedBoMGust(gustKmh) {
   if (!Number.isFinite(gustKmh) || gustKmh < 0) return null;
@@ -63,6 +64,7 @@ function collectMatchedSamples(frame, result, dopplerState) {
     if (Number.isInteger(id) && id > 0) labelToTrack.set(id, track.track_id);
   }
   const groups = new Map();
+  const validRecords = [], countsByRadar = new Map();
   for (const record of dopplerState?.records ?? []) {
     const radarId = String(record.radarId ?? "");
     const diff = Math.abs(Date.parse(record.observedUtc) - Date.parse(frame.observedUtc)) / 60000;
@@ -76,6 +78,15 @@ function collectMatchedSamples(frame, result, dopplerState) {
         !Array.isArray(record.samples) ||
         record.samples.length > MAX_RADIAL_SAMPLES ||
         !Number.isFinite(diff) || diff > MAX_PAIR_MINUTES) continue;
+    validRecords.push(record);
+    countsByRadar.set(radarId,(countsByRadar.get(radarId)??0)+1);
+  }
+  // A decoder can emit multiple source files for one radar. Never silently
+  // pool different UTC scans into a synthetic single observation. Reject the
+  // ambiguous radar entirely for this assessment, even if one looks stronger.
+  for(const record of validRecords){
+    const radarId=String(record.radarId);
+    if(countsByRadar.get(radarId)!==1)continue;
     const seenPixel = new Set();
     for (const sample of record.samples) {
       const velocity = Number(sample.velocity_kmh);
@@ -102,38 +113,61 @@ function collectMatchedSamples(frame, result, dopplerState) {
   }
   return groups;
 }
-function highRadialCluster(group) {
-  const high = group.samples.filter(s => Math.abs(s.velocity) >= V10_HIGH_RADIAL_KMH);
-  for (const pivot of high) {
-    const close = high.filter(s => distanceKm(s, pivot) <= 5);
-    const aligned = close.filter(s => Math.sign(s.velocity) === Math.sign(pivot.velocity));
-    const opposed = group.samples.filter(s =>
-      Math.sign(s.velocity) === -Math.sign(pivot.velocity) &&
-      Math.abs(s.velocity) >= V10_ROTATION_PAIR_KMH &&
-      distanceKm(s, pivot) <= 8);
-    if (aligned.length >= 3 && aligned.length / close.length >= .8 &&
-        opposed.length === 0) {
-      return {
-        strongest: aligned.reduce((a, b) =>
-          Math.abs(a.velocity) >= Math.abs(b.velocity) ? a : b),
-        count: aligned.length
-      };
+function localIndex(samples){
+  const cells=new Map();
+  const key=(ix,iy)=>ix+":"+iy;
+  const coords=p=>{
+    const x=p.longitude*111.32*Math.cos(p.latitude*Math.PI/180);
+    const y=p.latitude*111.32;
+    return {x,y,ix:Math.floor(x/2),iy:Math.floor(y/2)};
+  };
+  for(const sample of samples){
+    const p=coords(sample),id=key(p.ix,p.iy);
+    if(!cells.has(id))cells.set(id,[]);
+    cells.get(id).push(sample);
+  }
+  return {
+    within(pivot,radiusKm){
+      const p=coords(pivot),range=Math.ceil(radiusKm/2)+1;
+      const matches=[];
+      for(let dx=-range;dx<=range;dx++)for(let dy=-range;dy<=range;dy++){
+        for(const s of cells.get(key(p.ix+dx,p.iy+dy))??[])
+          if(distanceKm(s,pivot)<=radiusKm)matches.push(s);
+      }
+      return matches;
     }
+  };
+}
+function highRadialCluster(group) {
+  if(group.samples.length>MAX_TRACK_RADIAL_SAMPLES)return null;
+  const high=group.samples.filter(s=>Math.abs(s.velocity)>=V10_HIGH_RADIAL_KMH);
+  const highIndex=localIndex(high);
+  const allIndex=localIndex(group.samples);
+  for(const pivot of high){
+    const close=highIndex.within(pivot,5);
+    const aligned=close.filter(s=>Math.sign(s.velocity)===Math.sign(pivot.velocity));
+    if(aligned.length<3||aligned.length/close.length<.8)continue;
+    const opposed=allIndex.within(pivot,8).filter(s=>
+      Math.sign(s.velocity)===-Math.sign(pivot.velocity) &&
+      Math.abs(s.velocity)>=V10_ROTATION_PAIR_KMH);
+    if(opposed.length===0) return {
+      strongest:aligned.reduce((a,b)=>Math.abs(a.velocity)>=Math.abs(b.velocity)?a:b),
+      count:aligned.length
+    };
   }
   return null;
 }
-function closeRotationCouplet(group) {
-  const towards = group.samples.filter(s => s.velocity <= -V10_ROTATION_PAIR_KMH);
-  const away = group.samples.filter(s => s.velocity >= V10_ROTATION_PAIR_KMH);
-  if (towards.length < 2 || away.length < 2) return null;
-  for (const a of towards) {
-    const aNear = towards.filter(s => distanceKm(s, a) <= 3);
-    if (aNear.length < 2) continue;
-    for (const b of away) {
-      if (distanceKm(a, b) > 8) continue;
-      const bNear = away.filter(s => distanceKm(s, b) <= 3);
-      if (bNear.length < 2) continue;
-      return { deltaKmh: b.velocity - a.velocity, towards:a, away:b };
+function closeRotationCouplet(group){
+  if(group.samples.length>MAX_TRACK_RADIAL_SAMPLES)return null;
+  const towards=group.samples.filter(s=>s.velocity<=-V10_ROTATION_PAIR_KMH);
+  const away=group.samples.filter(s=>s.velocity>=V10_ROTATION_PAIR_KMH);
+  if(towards.length<2||away.length<2)return null;
+  const towardsIndex=localIndex(towards),awayIndex=localIndex(away);
+  for(const a of towards){
+    if(towardsIndex.within(a,3).length<2)continue;
+    for(const b of awayIndex.within(a,8)){
+      if(awayIndex.within(b,3).length<2)continue;
+      return {deltaKmh:b.velocity-a.velocity,towards:a,away:b};
     }
   }
   return null;
