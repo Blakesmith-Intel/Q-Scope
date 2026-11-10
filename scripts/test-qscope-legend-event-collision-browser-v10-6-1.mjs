@@ -21,6 +21,7 @@ const html='<!doctype html><html><head>'+
   '<div id="nav" style="position:absolute;z-index:3000;top:6px;right:6px;display:flex;background:#0b2432;padding:4px"><button>Controls</button><button>Radar site</button><button>Reset view</button></div>'+
   '<section id="legendDock" class="card" data-mode="rain"><div id="legend" class="weather-legend-rain"><strong>BoM rain radar · reflectivity (dBZ)</strong>'+
   '<div class="intensity-scale">'+Array.from({length:15},(_,i)=>'<span><i style="background:hsl('+i*23+' 80% 50%)"></i>'+(12+i*4)+'</span>').join("")+'</div></div></section>'+
+  '<div id="mapScaleBar" role="status" aria-label="Map scale" style="position:absolute;z-index:3000;left:8px;bottom:62px;width:140px;height:32px;background:#142b3a">20 km <span style="display:block;width:90px;border-bottom:3px solid #fff"></span></div>'+
   '<div id="mapTruthLabel" style="position:absolute;left:8px;bottom:28px;z-index:3000">Measured BoM reflectivity</div>'+
   '</main></body></html>';
 await page.route(url,route=>route.fulfill({status:200,contentType:"text/html",body:html}));
@@ -31,7 +32,7 @@ function intersection(a,b){
 }
 async function geometry(){
  return page.evaluate(()=>{
-   const selectors=[".qscope-wind-event-inbox","#legendDock","#nav",".qscope-wind-event-open","#mapPanel"];
+   const selectors=[".qscope-wind-event-inbox",".qscope-wind-event-detail","#legendDock","#mapScaleBar","#nav",".qscope-wind-event-open","#mapPanel"];
    const result={};
    for(const s of selectors){
      const el=document.querySelector(s);
@@ -48,6 +49,7 @@ async function geometry(){
    const inbox=document.querySelector(".qscope-wind-event-inbox");
    result.position=inbox?.dataset.placement??"";
    result.zIndex=inbox?Number(getComputedStyle(inbox).zIndex):null;
+   result.inboxVisible=inbox?getComputedStyle(inbox).visibility!=="hidden":false;
    return result;
  });
 }
@@ -93,6 +95,8 @@ try {
   let g=await geometry();
   assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#legendDock"]),0,
     "One pending alert cannot overlap the existing BoM legend");
+  assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#mapScaleBar"]),0,
+    "Persistent wind-event queue cannot obscure the separate map scale");
   assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#nav"]),0,
     "Alert cannot obscure map navigation controls");
   assert(g.clickable,"Operator MUST be able to actually click the event button");
@@ -108,10 +112,29 @@ try {
   assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#legendDock"]),0,
     "Event list with 9 stored cases remains clear of BoM legend");
   assert(g.clickable,"Top actionable event survives scrollable multi-event queue");
+  assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#mapScaleBar"]),0,
+    "Long persistent wind-event list cannot obscure the map scale");
   assert(await page.locator(".qscope-wind-event-list").evaluate(x=>
     getComputedStyle(x).overflowY==="auto"),"Long event queue scrolls rather than covering legend");
   await page.locator(".qscope-wind-event-open").first().click();
+  await page.waitForTimeout(160);
   assert.equal(await page.evaluate(()=>window.visits.length),1);
+  g=await geometry();
+  for(const k of ["#legendDock","#mapScaleBar","#nav"]){
+    assert.equal(intersection(g[".qscope-wind-event-detail"],g[k]),0,
+      "Expanded event evidence cannot obscure "+k);
+  }
+  if(g.inboxVisible)assert.equal(
+    intersection(g[".qscope-wind-event-detail"],g[".qscope-wind-event-inbox"]),0,
+    "Expanded evidence should not overlap a still-visible persistent inbox");
+  const closeAction=await page.locator(".qscope-wind-event-detail-title button").boundingBox();
+  assert(closeAction,"Expanded review must have its own close action");
+  assert(await page.evaluate(()=>{
+    const btn=document.querySelector(".qscope-wind-event-detail-title button");
+    const r=btn.getBoundingClientRect();
+    const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+    return hit===btn||btn.contains(hit);
+  }),"Expanded evidence close action must remain clickable");
   const details=await page.locator(".qscope-wind-event-detail").boundingBox();
   const map=await page.locator("#mapPanel").boundingBox();
   assert(details&&details.x>=map.x-1&&details.y>=map.y-1 &&
@@ -120,6 +143,10 @@ try {
     "Evidence review window must fit inside available map canvas");
   assert.equal(await page.locator(".qscope-wind-event-detail:not([hidden])").count(),1);
   await page.locator(".qscope-wind-event-detail-title button").click();
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator(".qscope-wind-event-inbox").evaluate(
+    x=>getComputedStyle(x).visibility),"visible",
+    "Closing expanded evidence restores the pending event queue");
   await page.evaluate(()=>{
     const legend=document.querySelector("#legendDock");
     legend.dataset.mode="wind";
@@ -130,6 +157,8 @@ try {
   g=await geometry();
   assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#legendDock"]),0,
     "Doppler legend resizing cannot cover persistent event queue");
+  assert.equal(intersection(g[".qscope-wind-event-inbox"],g["#mapScaleBar"]),0,
+    "Mode changes cannot cover the real map scale");
   console.log("PASS "+(mobile?"mobile WebKit":"desktop Chromium")+
     ": real BoM 15-band legend and 9 persistent alert cards do not collide; clickable actions and centred evidence window confirmed");
 }finally{await context.close();await browser.close();}
