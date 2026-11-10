@@ -826,6 +826,23 @@ jobs:
             | grep -F 'Q-SCOPE V10.6.1 MAP LEGEND / ALERT COLLISION REPAIR' >/dev/null
           echo "PUBLIC Q-SCOPE V10.6.1 RESPONSIVE NON-OVERLAPPING RADAR EVENT DOCK VERIFIED"
 
+          # The original compass was NOT present in V10.3 source used by the
+          # V10.6 research build. Verify the actually published module plus
+          # controller mount, separately from any event inbox/layout fixture.
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-6/src/live3d-operational-v9.js" \
+            | grep -F 'mountNorthCompass({' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-6/src/north-compass-v1.js" \
+            | grep -F 'cameraController.setView({heading:0})' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-6/live3d-operational-v9.html" \
+            | grep -F 'v10-6-5-restored-compass-' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-6/BUILD.txt" \
+            | grep -F 'Q-SCOPE V10.6.5 RESTORED ORIGINAL TRUE-NORTH COMPASS' >/dev/null
+          echo "PUBLIC Q-SCOPE V10.6.5 FUNCTIONAL NORTH COMPASS CODE VERIFIED; PRODUCTION ROOT IMMUTABLE"
+
 
 
 

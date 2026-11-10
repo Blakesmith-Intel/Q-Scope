@@ -19,7 +19,7 @@ const html='<!doctype html><html><head>'+
   '<main id="mapPanel" style="position:relative;overflow:hidden;isolation:isolate;height:'+(mobile?"500px":"780px")+
   ';width:'+(mobile?"390px":"920px")+';--stormtracker-control-z:3000">'+
   '<div id="nav" style="position:absolute;z-index:3000;top:6px;right:6px;display:flex;background:#0b2432;padding:4px"><button>Controls</button><button>Radar site</button><button>Reset view</button></div>'+
-  '<button id="stormTrackerNorthCompass" type="button" aria-label="Compass: align map to true north" style="position:absolute;top:'+(mobile?'76px':'72px')+';right:'+(mobile?'8px':'12px')+';width:'+(mobile?'48px':'56px')+';height:'+(mobile?'60px':'68px')+';z-index:38;background:#152d3b;color:#fff">NORTH</button>'+
+
   '<section id="legendDock" class="card" data-mode="rain"><div id="legend" class="weather-legend-rain"><strong>BoM rain radar · reflectivity (dBZ)</strong>'+
   '<div class="intensity-scale">'+Array.from({length:15},(_,i)=>'<span><i style="background:hsl('+i*23+' 80% 50%)"></i>'+(12+i*4)+'</span>').join("")+'</div></div></section>'+
   '<div id="mapScaleBar" role="status" aria-label="Map scale" style="position:absolute;z-index:3000;left:8px;bottom:62px;width:140px;height:32px;background:#142b3a">20 km <span style="display:block;width:90px;border-bottom:3px solid #fff"></span></div>'+
@@ -58,20 +58,42 @@ try {
   const packed=await (await page.request.get(base+preview.slice(1)+"src/live3d-operational-v9.js")).text();
   assert(packed.includes("attachQscopeResearchEventDock"),
     "Full Q-SCOPE preview must use actual responsive event layout");
+  assert(packed.includes("mountNorthCompass({") &&
+    packed.includes('from "./north-compass-v1.js?v=v10-6-5-operational-compass"'),
+    "Actual V10.6 package must mount original controller-powered compass");
   const layoutScript=await (await page.request.get(
     base+preview.slice(1)+"src/qscope-research-event-dock-layout-v10-6-1.js")).text();
   assert(layoutScript.includes("chooseQscopeRadarEventDock"));
   await page.goto(url,{waitUntil:"load"});
   await page.evaluate(async preview=>{
-    const [{createPassiveWindEventInbox}, {attachQscopeResearchEventDock}]=await Promise.all([
+    const [{createPassiveWindEventInbox},{attachQscopeResearchEventDock},
+      {mountNorthCompass}]=await Promise.all([
       import(preview+"src/qscope-reviewable-event-inbox-v10-6.js"),
-      import(preview+"src/qscope-research-event-dock-layout-v10-6-1.js")
+      import(preview+"src/qscope-research-event-dock-layout-v10-6-1.js"),
+      import(preview+"src/north-compass-v1.js")
     ]);
     const m=document.querySelector("#mapPanel");
     window.visits=[];
+    // Mount the ORIGINAL operational compass module, NOT a fixture icon.
+    // Its camera-controller click must preserve centre/range/pitch.
     window.compassClicks=0;
-    m.querySelector("#stormTrackerNorthCompass").addEventListener("click",
-      ()=>{window.compassClicks++});
+    window.cameraState={
+      heading:Math.PI/2,longitude:153.4,latitude:-27.6,
+      range:85000,pitch:-0.48
+    };
+    const controller={
+      getState:()=>({...window.cameraState}),
+      setView:patch=>{
+        window.compassClicks++;
+        Object.assign(window.cameraState,patch);
+      }
+    };
+    window.realCompass=mountNorthCompass({
+      cameraController:controller,mapPanel:m,documentRef:document,windowRef:window
+    });
+    if(window.realCompass.element.id!=="stormTrackerNorthCompass")
+      throw Error("Original true-north compass component was not mounted");
+    window.realCompass.update();
     window.researchInbox=createPassiveWindEventInbox({
       container:m,documentRef:document,storage:null,
       onNavigate:async(event,evidence)=>{
@@ -101,6 +123,10 @@ try {
   await page.locator("#stormTrackerNorthCompass").click();
   assert.equal(await page.evaluate(()=>window.compassClicks),1,
     "Original compass remains clickable when no alerts are present");
+  assert.equal(await page.evaluate(()=>window.cameraState.heading),0,
+    "Compass click actually realigns the original map camera due north");
+  assert.equal(await page.evaluate(()=>window.cameraState.range),85000,
+    "Compass preserves selected zoom and viewpoint");
   await page.evaluate(()=>{
     window.addEvent();
     window.placement.reposition();

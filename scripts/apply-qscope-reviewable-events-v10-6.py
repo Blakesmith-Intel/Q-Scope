@@ -28,9 +28,31 @@ def main(site):
       "<title>Q-SCOPE | Persistent Radar Evidence V10.6</title>","operator title")
     b=one(b,"PASSIVE WIND EVENTS · EXPERIMENTAL, NOT OFFICIAL WARNINGS",
       "PERSISTENT WIND EVENTS · EXPERIMENTAL, NOT OFFICIAL WARNINGS","operator header")
+    # The inner script URL is independently cached by the browser. Bump it
+    # alongside the outer iframe so the restored compass is truly loaded.
+    b=one(b,'src="./src/live3d-operational-v9.js?v=',
+      'src="./src/live3d-operational-v9.js?v=v10-6-5-restored-compass-',
+      "preview operator-runtime cache revision")
     if s.count("/preview/wind-hook-v10-5/")!=2:
         raise ValueError("V10.5 source route was changed: cannot safely rebrand.")
     s=s.replace("/preview/wind-hook-v10-5/","/preview/wind-hook-v10-6/")
+    # The preview originates from pinned V10.3 before true-north compass
+    # existed. Fix the BUILD, not the event panel CSS. Mount the exact
+    # operational compass on the original map-camera controller here.
+    if "mountNorthCompass" in s or "north-compass-v1.js" in s:
+        raise ValueError("Pinned V10.3 compass absence contract changed; inspect source")
+    s=one(s,
+      "// The verified browser-source QA viewer must never call Cesium.camera.flyTo;",
+      '''// The original operator compass must be present in V10.6 even with
+// NO radar alerts. It is a camera controller tool, independent of the inbox.
+mountNorthCompass({
+  cameraController:mapCamera,
+  mapPanel:document.getElementById("mapPanel")
+});
+
+// The verified browser-source QA viewer must never call Cesium.camera.flyTo;''',
+      "restore working north compass immediately after camera creation")
+    s='import {mountNorthCompass} from "./north-compass-v1.js?v=v10-6-5-operational-compass";\\n'.replace('\\n', '\n')+s
     s=one(s,
       'import { createPassiveWindEventInbox } from "./qscope-passive-wind-inbox-v10-5.js";',
       '''import { createPassiveWindEventInbox } from "./qscope-reviewable-event-inbox-v10-6.js?v=source-retention";
@@ -134,7 +156,7 @@ if (passiveRadarInbox) {
 // Prevent an older asynchronous radar-image load''',
       "research dock placement after inbox exists")
     a=one(a,"qscope-v10-6-persistent-evidence",
-      "qscope-v10-6-4-compass-safe-severity","browser iframe cache refresh")
+      "qscope-v10-6-5-restored-compass","browser iframe cache refresh")
     for forbidden in ["enableWindHookResearch", "windHookResearchQaControl",
                       "syncSevereStormAlerts(", "syncIndependentDopplerResearch("]:
         if forbidden in s:raise ValueError(f"Unwanted legacy research UI source: {forbidden}")
@@ -145,6 +167,7 @@ if (passiveRadarInbox) {
     with (site/"BUILD.txt").open("a",encoding="utf-8") as handle:
         handle.write("Q-SCOPE PERSISTENT RESEARCH EVENTS V10.6 — TRUE-SOURCE CROP + OPT-IN SINGLE NEW-EVENT PAUSE + OPERATOR FRAME CONTROL; NO OPERATIONAL ALERTS\n")
         handle.write("Q-SCOPE V10.6.1 MAP LEGEND / ALERT COLLISION REPAIR — DYNAMIC RESPONSIVE OPERATOR-CLICKABLE INBOX; NO WEATHER OR DATA CHANGES\\n")
+        handle.write("\nQ-SCOPE V10.6.5 RESTORED ORIGINAL TRUE-NORTH COMPASS — V10.6 PREVIEW ONLY, INDEPENDENT OF RADAR EVENTS\n")
 
 if __name__=="__main__":
     args=ArgumentParser()
