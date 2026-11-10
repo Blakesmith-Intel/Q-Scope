@@ -49,9 +49,15 @@ function recordFor(records,radarId,utc) {
 }
 function nativePoints(record,at,rules) {
  const seenCoordinates=new Set(),seenPixelIndices=new Set(),out=[];
+ // Cheap degree bounding box first: no worker calls and no unnecessary
+ // geodesic/trig work for the hundreds of thousands of unrelated source pixels.
+ const maxLat=rules.supportRadiusKm/111.32;
+ const maxLon=maxLat/Math.max(0.25,Math.cos(at.latitude*Math.PI/180));
  for(const s of record.samples) {
    if(!loc(s)||!valid(s.velocity_kmh)||s.velocity_kmh===0||
       Math.abs(s.velocity_kmh)>rules.radialMaxKmh||
+      Math.abs(s.latitude-at.latitude)>maxLat||
+      Math.abs(s.longitude-at.longitude)>maxLon||
       km(s,at)>rules.supportRadiusKm)continue;
    const coord=s.latitude.toFixed(6)+":"+s.longitude.toFixed(6);
    if(seenCoordinates.has(coord))continue;
