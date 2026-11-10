@@ -26,7 +26,7 @@ function mercatorPixel(frame,longitude,latitude){
 function sourceCrop(source,coords,doc){
   if(!coords || !source || !Number.isInteger(source.width) ||
      !Number.isInteger(source.height) ||
-     !source.data || !Number.isInteger(coords.col) ||
+     (!source.data && !source.categories) || !Number.isInteger(coords.col) ||
      !Number.isInteger(coords.row) ||
      coords.col<0||coords.row<0 ||
      coords.col>=source.width||coords.row>=source.height)return null;
