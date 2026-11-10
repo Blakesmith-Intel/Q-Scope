@@ -214,3 +214,20 @@
     max-height:min(52%,520px);
   }
 }
+
+/* V10.6.4 research-only signature priorities; preserve original BoM palettes.
+   Completely omit the zero-event dock; never mask true-north compass. */
+#mapPanel .qscope-wind-event-inbox[hidden] { display:none !important; }
+.qscope-wind-event-card[data-severity="wind"] .qscope-wind-event-open,
+.qscope-wind-event-evidence-row[data-severity="wind"] { border-left:4px solid #f5d45c; }
+.qscope-wind-event-card[data-severity="hook"] .qscope-wind-event-open,
+.qscope-wind-event-evidence-row[data-severity="hook"] { border-left:4px solid #ff994e; }
+.qscope-wind-event-card[data-severity="couplet"] .qscope-wind-event-open,
+.qscope-wind-event-evidence-row[data-severity="couplet"] { border-left:4px solid #ed5c70; }
+.qscope-wind-event-card[data-severity="wind"] .qscope-wind-event-open { color:#ffe7a1; }
+.qscope-wind-event-card[data-severity="hook"] .qscope-wind-event-open { color:#ffbd86; }
+.qscope-wind-event-card[data-severity="couplet"] .qscope-wind-event-open { color:#ff9bac; }
+#mapPanel .qscope-wind-event-detail[data-severity="wind"] { border-color:#f5d45c; }
+#mapPanel .qscope-wind-event-detail[data-severity="hook"] { border-color:#ff994e; }
+#mapPanel .qscope-wind-event-detail[data-severity="couplet"] { border-color:#ed5c70; }
+.qscope-wind-event-card .qscope-wind-event-open { font-weight:650;line-height:1.4; }
