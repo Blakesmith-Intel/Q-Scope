@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {
- chooseQscopeRadarEventDock
+ chooseQscopeRadarEventDock,chooseQscopeRadarEvidenceWindow
 } from "../src/qscope-research-event-dock-layout-v10-6-1.js";
 function overlap(a,b){
  return Math.max(0,Math.min(a.left+a.width,b.x+b.width)-Math.max(a.left,b.x))*
@@ -52,3 +52,28 @@ const missing=chooseQscopeRadarEventDock({width:900,height:800,contentHeight:200
 assert(Number.isFinite(missing.top) && Number.isFinite(missing.left),
  "Hidden initial legend cannot cause NaN coordinates");
 console.log("PASS Q-SCOPE event docking avoids original BoM legend/nav on screenshot-sized desktop, mobile, and constrained layouts");
+
+const scale={x:10,y:692,width:154,height:34};
+const legend={x:545,y:610,width:365,height:115};
+const nav={x:380,y:10,width:530,height:42};
+const review=chooseQscopeRadarEvidenceWindow({
+ width:920,height:780,legend,scale,nav,
+ inbox:{x:10,y:432,width:360,height:255}
+});
+assert(review.maxHeight>=160,"Expanded review needs readable scroll area");
+assert.equal(overlap(review,legend),0,"Expanded review cannot cover BoM legend");
+assert.equal(overlap(review,scale),0,"Expanded review cannot cover geodesic map scale");
+assert.equal(overlap(review,nav),0,"Expanded review cannot cover navigation");
+assert(!review.hideInbox,"Desktop must retain the separate pending inbox");
+const mobileReview=chooseQscopeRadarEvidenceWindow({
+ width:390,height:500,
+ legend:{x:129,y:370,width:255,height:82},
+ scale:{x:8,y:444,width:140,height:30},
+ nav:{x:5,y:4,width:380,height:40},
+ inbox:{x:8,y:140,width:320,height:210}
+});
+assert(mobileReview.hideInbox,"On narrow maps the pending queue steps aside during review");
+assert(mobileReview.maxHeight>=160,"Narrow evidence window stays readable");
+assert.equal(overlap(mobileReview,{x:129,y:370,width:255,height:82}),0);
+assert.equal(overlap(mobileReview,{x:8,y:444,width:140,height:30}),0);
+console.log("PASS Q-SCOPE expanded research review reserves BoM legend and map scale on desktop/mobile");
