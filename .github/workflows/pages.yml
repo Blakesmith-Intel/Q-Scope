@@ -809,6 +809,24 @@ jobs:
             | grep -F 'captureResearchSourceThumbnail' >/dev/null
           echo "PUBLIC Q-SCOPE V10.6 SOURCE-EVIDENCE, REVIEWABLE, INTELLIGENT PAUSE QA VERIFIED; ROOT AND V10.3/4/5 UNCHANGED"
 
+          # User-confirmed V10.6 radar legend overlap: published research
+          # alert actions must be separately positioned from the native
+          # BoM reflectivity/Doppler legend on all screens.
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-6/src/qscope-research-event-dock-layout-v10-6-1.js" \
+            | grep -F 'chooseQscopeRadarEventDock' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-6/src/live3d-operational-v9.js" \
+            | grep -F 'attachQscopeResearchEventDock' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-6/src/qscope-reviewable-event-inbox-v10-6.css" \
+            | grep -F 'V10.6.1 operator-reported map-control collision fix' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-6/BUILD.txt" \
+            | grep -F 'Q-SCOPE V10.6.1 MAP LEGEND / ALERT COLLISION REPAIR' >/dev/null
+          echo "PUBLIC Q-SCOPE V10.6.1 RESPONSIVE NON-OVERLAPPING RADAR EVENT DOCK VERIFIED"
+
+
 
 
           for component in \
