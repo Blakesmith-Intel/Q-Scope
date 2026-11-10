@@ -79,6 +79,11 @@ try {
     "One event window rather than two transient frame alerts");
   assert.equal(await page.locator(".qscope-wind-event-card").getAttribute("data-severity"),
     "couplet","Combined hook/couplet case uses highest radar review priority");
+  assert.equal(await page.locator(
+    '.qscope-wind-event-open .qscope-wind-signature-identity[data-severity="couplet"]'
+    ).count(),1,"Alert must display the red combined-signature visual identity");
+  assert.equal(await page.locator(".qscope-wind-card-source").count(),1,
+    "The only visual radar image is the genuine retained source scan crop");
   assert.match(await page.locator(".qscope-wind-event-open").innerText(),
     /HOOK \+ VELOCITY COUPLET.*HIGH-PRIORITY REVIEW/);
   assert.equal(await page.evaluate(()=>window.newEvents.length),1,
@@ -103,6 +108,10 @@ try {
   assert.equal(await page.locator(".qscope-wind-event-evidence-row").count(),2);
   assert.equal(await page.locator(".qscope-wind-event-detail").getAttribute("data-severity"),
     "couplet","Opened review retains experimental red coupled-signature priority");
+  assert.equal(await page.locator(
+    '.qscope-wind-event-detail .qscope-wind-signature-identity[data-severity="couplet"]'
+    ).count(),1,
+    "Expanded review displays the same combined Doppler/hook signature as its card");
   assert.equal(await page.locator(
     '.qscope-wind-event-evidence-row[data-severity="hook"]').count(),1);
   assert.equal(await page.locator(
@@ -141,6 +150,9 @@ try {
   });
   assert.equal(await page.locator(".qscope-wind-event-card").getAttribute("data-severity"),
     "wind");
+  assert.equal(await page.locator(
+    '.qscope-wind-event-open .qscope-wind-signature-emblem').innerText(),"≋",
+    "Standalone radial wind signature must use the yellow wind pictogram");
   assert.match(await page.locator(".qscope-wind-event-open").innerText(),
     /POSSIBLE STRAIGHT-LINE WIND/);
   assert(!/HOOK ECHO/.test(await page.locator(".qscope-wind-event-open").innerText()),
@@ -159,6 +171,9 @@ try {
   });
   assert.equal(await page.locator(".qscope-wind-event-card").getAttribute("data-severity"),
     "hook");
+  assert.equal(await page.locator(
+    '.qscope-wind-event-open .qscope-wind-signature-emblem').innerText(),"↶",
+    "Standalone hook echo must use the orange rotating-storm pictogram");
   assert.match(await page.locator(".qscope-wind-event-open").innerText(),
     /HOOK ECHO.*ELEVATED REVIEW/);
   await page.evaluate(()=>window.ui.clearEvent(window.ui.events[0].id));

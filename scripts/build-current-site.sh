@@ -1033,6 +1033,7 @@ cp "frontend/src/qscope-reviewable-event-inbox-v10-6.css" "$review_next/src/"
 cp "frontend/src/qscope-source-evidence-thumbnail-v10-6.js" "$review_next/src/"
 cp "frontend/src/qscope-intelligent-pause-v10-6.js" "$review_next/src/"
 cp "frontend/src/qscope-research-event-dock-layout-v10-6-1.js" "$review_next/src/"
+cp "frontend/src/qscope-bom-wind-evidence-v10-6.js" "$review_next/src/"
 # This research chain originated before the operator compass existed.
 # Restore the REAL camera-controller compass only in this V10.6 preview.
 cp "frontend/src/north-compass-v1.js" "$review_next/src/"
@@ -1046,15 +1047,18 @@ node --check "$review_next/src/qscope-reviewable-event-inbox-v10-6.js"
 node --check "$review_next/src/qscope-source-evidence-thumbnail-v10-6.js"
 node --check "$review_next/src/qscope-intelligent-pause-v10-6.js"
 node --check "$review_next/src/qscope-research-event-dock-layout-v10-6-1.js"
+node --check "$review_next/src/qscope-bom-wind-evidence-v10-6.js"
+node frontend/tests/run-qscope-bom-wind-evidence-v10-6-tests.mjs
 node frontend/tests/run-qscope-event-dock-placement-v10-6-1-tests.mjs
 node frontend/tests/run-qscope-reviewable-alerts-v10-6-tests.mjs
 grep -Fq '<title>Q-SCOPE | Persistent Wind & Hook Event Research V10.6</title>' "$review_next/index.html"
 grep -Fq 'Q-SCOPE PERSISTENT RESEARCH EVENTS V10.6' "$review_next/BUILD.txt"
 grep -Fq 'Q-SCOPE V10.6.1 MAP LEGEND / ALERT COLLISION REPAIR' "$review_next/BUILD.txt"
 grep -Fq 'attachQscopeResearchEventDock' "$review_next/src/live3d-operational-v9.js"
-grep -Fq 'qscope-v10-6-5-restored-compass' "$review_next/index.html"
-grep -Fq 'v10-6-5-restored-compass-' "$review_next/live3d-operational-v9.html"
+grep -Fq 'qscope-v10-6-6-visual-wind-events' "$review_next/index.html"
+grep -Fq 'v10-6-6-colour-coded-radar-events-' "$review_next/live3d-operational-v9.html"
 grep -Fq 'Q-SCOPE V10.6.5 RESTORED ORIGINAL TRUE-NORTH COMPASS' "$review_next/BUILD.txt"
+grep -Fq 'Q-SCOPE V10.6.6 COLOUR-CODED SOURCE-FAITHFUL WIND HOOK COUPLET' "$review_next/BUILD.txt"
 grep -Fq 'onNewEvent:pauseForGenuineNewResearchEvent' "$review_next/src/live3d-operational-v9.js"
 grep -Fq 'captureResearchSourceThumbnail' "$review_next/src/live3d-operational-v9.js"
 grep -Fq 'Q-SCOPE PASSIVE WIND/HOOK RESEARCH V10.5' "_site/preview/wind-hook-v10-5/BUILD.txt"

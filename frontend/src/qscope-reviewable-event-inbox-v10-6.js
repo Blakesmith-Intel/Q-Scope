@@ -264,13 +264,35 @@ function eventHeading(e) {
   const presentation=radarEventPresentation(e);
   return presentation.summary+" · "+presentation.priority;
 }
+const RADAR_SIGNATURE_GLYPHS=Object.freeze({
+  wind:"≋",hook:"↶",couplet:"⟳"
+});
+function signatureIdentity(doc,presentation,kind) {
+  const bar=createNode(doc,"div","qscope-wind-signature-identity");
+  bar.dataset.severity=presentation.severity;
+  const emblem=createNode(doc,"span","qscope-wind-signature-emblem",
+    RADAR_SIGNATURE_GLYPHS[presentation.severity]);
+  emblem.setAttribute("aria-hidden","true");
+  const summary=createNode(doc,"div","qscope-wind-signature-summary");
+  summary.append(
+    createNode(doc,"strong","",
+      presentation.summary+" · "+presentation.priority),
+    createNode(doc,"span","qscope-wind-signature-priority",
+      "EXPERIMENTAL RADAR SIGNATURE · NOT AN OFFICIAL BOM WARNING")
+  );
+  bar.append(emblem,summary);
+  return bar;
+}
 export function createPassiveWindEventInbox({
   container, documentRef=globalThis.document,
   storage=globalThis.localStorage, onNewEvent=()=>{}, onNavigate=async()=>({ok:false,
-    message:"Radar frame navigation is unavailable."})
+    message:"Radar frame navigation is unavailable."}),
+  // Optional vetted transport. No BoM calls without a verified source.
+  lookupObservedWind=null
 }={}) {
   if(!container||!documentRef)throw new TypeError("Research inbox needs a map container.");
   const ledger=createResearchRadarEventLedger({storage});
+  const observedWindStates=new Map();
   let openEventId="",showHistory=false,destroyed=false;
   let pauseOnNewEvent=false;
   try { pauseOnNewEvent=storage?.getItem(Q_SCOPE_PAUSE_PREFERENCE_KEY)==="true"; }
@@ -335,6 +357,26 @@ export function createPassiveWindEventInbox({
     const updated=ledger.get(id);
     const best=bestEvidence(updated);
     if(best)void focusEvidence(updated,best);
+    if(typeof lookupObservedWind==="function"&&
+       updated.evidence.some(e=>e.category==="strong_radial_signature")&&
+       !observedWindStates.has(id)){
+      observedWindStates.set(id,{status:"checking"});
+      renderDetails();
+      // Source lookup is ON-DEMAND only, once for a reviewed event. Never
+      // interpret the absence of an AWS gust as an all-clear.
+      Promise.resolve().then(()=>lookupObservedWind(snapshotEvent(updated)))
+        .then(value=>{
+          if(destroyed)return;
+          observedWindStates.set(id,{
+            status:value?"matched":"unavailable",value:value??null
+          });
+          if(openEventId===id)renderDetails();
+        }).catch(()=>{
+          if(destroyed)return;
+          observedWindStates.set(id,{status:"unavailable",value:null});
+          if(openEventId===id)renderDetails();
+        });
+    }
   }
   function renderDetails(){
     const record=ledger.get(openEventId);
@@ -351,12 +393,38 @@ export function createPassiveWindEventInbox({
       openEventId="";renderDetails();render();
     });
     headingLine.append(label,dismiss);
+    const identity=signatureIdentity(documentRef,presentation,"detail");
     const meta=createNode(documentRef,"p","",
       "Recorded "+timeAest(record.firstUtc)+"–"+timeAest(record.latestUtc)+
       " · "+record.latitude.toFixed(3)+"°, "+record.longitude.toFixed(3)+"°");
     const sourceNote=createNode(documentRef,"p","",
       "Radar signature review priority only · Not a confirmed surface wind gust, tornado, road impact or official BoM warning. Original BoM products remain authoritative.");
     const evidenceList=createNode(documentRef,"div","qscope-wind-event-evidence");
+    const measured=observedWindStates.get(record.id);
+    let observedSection=null;
+    if(measured){
+      observedSection=createNode(documentRef,"section",
+        "qscope-wind-event-observed-gust");
+      const heading=createNode(documentRef,"strong","",
+        "BoM surface wind observations · independent of radar");
+      let summary="Checking same-time nearby station gusts…";
+      if(measured.status==="unavailable"){
+        summary="No verified nearby same-time station observation available. "+
+          "This does not rule out damaging winds between stations.";
+      }else if(measured.status==="matched"&&measured.value){
+        const x=measured.value;
+        const supporting=x.evidenceClass==="nearby-damaging-gust";
+        summary="BoM observed "+Math.round(x.gustKmh)+" km/h 3-second gust at "+
+          String(x.stationName??"station")+" · "+timeAest(x.observedUtc)+
+          " · "+Number(x.distanceKm).toFixed(1)+" km from radar event · "+
+          Number(x.differenceMinutes).toFixed(1)+" min offset. "+
+          (supporting?"Nearby supporting observation; attribution unconfirmed.":
+           "Contextual station reading only; cannot confirm this radar event.")+
+          " Provisional station data; not an official BoM warning.";
+      }
+      observedSection.append(heading,
+        createNode(documentRef,"p","",summary));
+    }
     const sorted=[...record.evidence].sort((a,b)=>
       CATEGORY_PRIORITY[b.category]-CATEGORY_PRIORITY[a.category] ||
       Date.parse(b.frameUtc)-Date.parse(a.frameUtc));
@@ -396,8 +464,9 @@ export function createPassiveWindEventInbox({
     clear.addEventListener("click",()=>{
       ledger.clear(record.id);openEventId="";render();
     });
-    details.append(headingLine,meta,sourceNote,evidenceList,
-      locationStatus,clear);
+    details.append(headingLine,identity,meta,sourceNote);
+    if(observedSection)details.append(observedSection);
+    details.append(evidenceList,locationStatus,clear);
   }
   function render(){
     if(destroyed)return;
@@ -418,10 +487,26 @@ export function createPassiveWindEventInbox({
       const presentation=radarEventPresentation(record);
       const item=createNode(documentRef,"article","qscope-wind-event-card");
       item.dataset.severity=presentation.severity;
-      const open=createNode(documentRef,"button","qscope-wind-event-open",
-        eventHeading(record)+" · "+record.evidence.length+
-        (record.evidence.length===1?" observation":" observations")+
+      const open=createNode(documentRef,"button","qscope-wind-event-open");
+      const identity=signatureIdentity(documentRef,presentation,"compact");
+      const eventMeta=createNode(documentRef,"span","qscope-wind-card-meta",
+        record.evidence.length+
+        (record.evidence.length===1?" radar observation":" radar observations")+
         " · "+timeAest(record.latestUtc));
+      open.append(identity,eventMeta);
+      // Use the ACTUAL retained scan crop, never illustrative radar pixels,
+      // fake arrows or AI imagery masquerading as an observed signature.
+      const original=[...record.evidence]
+        .sort((a,b)=>CATEGORY_PRIORITY[b.category]-CATEGORY_PRIORITY[a.category])
+        .find(e=>e.snapshot)?.snapshot??null;
+      if(original){
+        open.dataset.hasSnapshot="true";
+        const sourceThumb=createNode(documentRef,"img","qscope-wind-card-source");
+        sourceThumb.src=original.dataUrl;
+        sourceThumb.alt="Retained real source radar scan for an observation in this grouped event";
+        sourceThumb.loading="lazy";
+        open.appendChild(sourceThumb);
+      }
       open.type="button";
       open.addEventListener("click",()=>openRecord(record.id));
       const clear=createNode(documentRef,"button","qscope-wind-event-dismiss",

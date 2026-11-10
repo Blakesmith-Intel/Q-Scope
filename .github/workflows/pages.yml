@@ -842,6 +842,19 @@ jobs:
             "$base/preview/wind-hook-v10-6/BUILD.txt" \
             | grep -F 'Q-SCOPE V10.6.5 RESTORED ORIGINAL TRUE-NORTH COMPASS' >/dev/null
           echo "PUBLIC Q-SCOPE V10.6.5 FUNCTIONAL NORTH COMPASS CODE VERIFIED; PRODUCTION ROOT IMMUTABLE"
+          # Experimental V10.6.6: source-faithful visual priorities are
+          # packaged; BoM station matcher is research-only until a verified
+          # read-only observation route is separately accepted.
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-6/src/qscope-reviewable-event-inbox-v10-6.css" \
+            | grep -F 'V10.6.6 operator-approved Q-SCOPE wind event visual identity' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-6/src/qscope-bom-wind-evidence-v10-6.js" \
+            | grep -F 'matchObservedBoMGusts' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-6/BUILD.txt" \
+            | grep -F 'Q-SCOPE V10.6.6 COLOUR-CODED SOURCE-FAITHFUL WIND HOOK COUPLET' >/dev/null
+          echo "PUBLIC Q-SCOPE V10.6.6 3-TIER RESEARCH VISUALS + OFFLINE BOM GUST MATCH POLICY VERIFIED"
 
 
 
