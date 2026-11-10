@@ -113,3 +113,49 @@ assert.equal(overlap(compactWithScale,{x:129,y:370,width:255,height:82}),0,
 assert.equal(overlap(compactWithScale,{x:8,y:444,width:140,height:30}),0,
  "Compact event list cannot intrude into distance scale");
 console.log("PASS Q-SCOPE both wind event sizes dock directly under radar controls");
+
+
+const compassDesktop={x:852,y:72,width:56,height:68};
+const compactCompass=chooseQscopeRadarEventDock({
+ width:920,height:780,nav,legend,scale,
+ contentHeight:320,compass:compassDesktop
+});
+const expandedCompass=chooseQscopeRadarEvidenceWindow({
+ width:920,height:780,nav,legend,scale,
+ compass:compassDesktop
+});
+for(const p of [compactCompass,expandedCompass]) {
+ assert.equal(overlap(p,compassDesktop),0,
+   "Never cover original true-north compass beneath radar toolbar");
+ assert(p.top===nav.y+nav.height+10,
+   "Compass avoidance must keep event anchored directly under radar controls");
+ assert(p.left+p.width<=compassDesktop.x-10,
+   "Event right edge must leave an independent compass gutter");
+}
+const compactMobileCompass={x:334,y:76,width:48,height:60};
+const m0=chooseQscopeRadarEventDock({
+ width:390,height:500,
+ nav:{x:5,y:4,width:380,height:40},
+ legend:{x:129,y:370,width:255,height:82},
+ scale:{x:8,y:444,width:140,height:30},
+ compass:compactMobileCompass,
+ contentHeight:350
+});
+const m1=chooseQscopeRadarEvidenceWindow({
+ width:390,height:500,
+ nav:{x:5,y:4,width:380,height:40},
+ legend:{x:129,y:370,width:255,height:82},
+ scale:{x:8,y:444,width:140,height:30},
+ compass:compactMobileCompass
+});
+for(const p of [m0,m1]) {
+ assert.equal(overlap(p,compactMobileCompass),0);
+ assert.equal(p.top,54,"Mobile events remain directly beneath the toolbar");
+ assert(p.width>=260,"Small-screen content remains readable after protecting compass");
+}
+const beforeCompassReady=chooseQscopeRadarEventDock({
+ width:920,height:780,nav,legend,scale,contentHeight:320
+});
+assert.equal(overlap(beforeCompassReady,compassDesktop),0,
+ "Compass is protected even before its dynamically mounted button exists");
+console.log("PASS measured and late-mounted original north compass fully unobstructed in both event states");
