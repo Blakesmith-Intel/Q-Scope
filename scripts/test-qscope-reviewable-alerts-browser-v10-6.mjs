@@ -63,7 +63,8 @@ try {
   },{modulePath,reset});
   await load();
   await setup(true);
-  assert.equal(await page.locator(".qscope-wind-event-inbox").evaluate(x=>x.hidden),true);
+  assert.equal(await page.locator(".qscope-wind-event-inbox").evaluate(x=>x.dataset.empty),"true",
+    "Compact monitor remains visible to set pause preference before detections");
   assert.equal(await page.locator(".storm-severe-alert-dock").evaluate(x=>
     getComputedStyle(x).display),"none","Old frame-based alert UI must never flash");
   const pref=page.locator(".qscope-wind-event-pause-setting input");
