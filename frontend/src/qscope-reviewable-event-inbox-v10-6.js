@@ -496,12 +496,14 @@ export function createPassiveWindEventInbox({
       open.append(identity,eventMeta);
       // Use the ACTUAL retained scan crop, never illustrative radar pixels,
       // fake arrows or AI imagery masquerading as an observed signature.
-      const original=bestEvidence(record)?.snapshot;
+      const original=[...record.evidence]
+        .sort((a,b)=>CATEGORY_PRIORITY[b.category]-CATEGORY_PRIORITY[a.category])
+        .find(e=>e.snapshot)?.snapshot??null;
       if(original){
         open.dataset.hasSnapshot="true";
         const sourceThumb=createNode(documentRef,"img","qscope-wind-card-source");
         sourceThumb.src=original.dataUrl;
-        sourceThumb.alt="Retained source radar image at the detected time";
+        sourceThumb.alt="Retained real source radar scan for an observation in this grouped event";
         sourceThumb.loading="lazy";
         open.appendChild(sourceThumb);
       }
