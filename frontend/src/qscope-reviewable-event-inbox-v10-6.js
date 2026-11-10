@@ -365,8 +365,12 @@ export function createPassiveWindEventInbox({
     if(destroyed)return;
     const pending=ledger.list();
     const listed=ledger.list({includeAcknowledged:showHistory});
-    root.hidden=pending.length===0 && ledger.archivedCount===0 &&
-      !showHistory && !openEventId;
+    // A compact 0-event monitor must remain accessible so the operator can
+    // select Pause on new event BEFORE the first storm signature arrives.
+    // No map layer or frame-dependent dock is ever switched on.
+    root.hidden=false;
+    root.dataset.empty=String(pending.length===0 &&
+      ledger.archivedCount===0 && !showHistory && !openEventId);
     count.textContent=String(pending.length)+" awaiting review";
     historyButton.textContent=showHistory?"Hide history":
       "History ("+ledger.archivedCount+")";
