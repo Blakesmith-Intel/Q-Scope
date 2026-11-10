@@ -984,6 +984,16 @@ grep -Fq 'EXPERIMENTAL V10.3 wind-hook original radar QA source f3a07688ca02f5f0
 grep -Fq '<title>Q-SCOPE | Queensland Situational Awareness</title>' "_site/index.html"
 grep -Fq 'Q-SCOPE QUEENSLAND OPERATOR BRANDING' "_site/BUILD.txt"
 test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 4
-node --check "$wind_next/src/live3d-operational-v9.js"
+echo "Q_SCOPE_RESEARCH_RUNTIME_PARSE_START"
+if node --check "$wind_next/src/live3d-operational-v9.js"; then
+  echo "Q_SCOPE_RESEARCH_RUNTIME_PARSE_SUCCESS"
+else
+  code=$?
+  echo "::error::Q-SCOPE research preview runtime failed node --check (exit $code)"
+  file "$wind_next/src/live3d-operational-v9.js"
+  wc -c "$wind_next/src/live3d-operational-v9.js"
+  node --check "$wind_next/src/live3d-operational-v9.js" 2>&1 || true
+  exit 1
+fi
 
 
