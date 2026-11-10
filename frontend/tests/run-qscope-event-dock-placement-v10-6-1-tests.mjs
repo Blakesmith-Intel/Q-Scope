@@ -45,8 +45,8 @@ const blocked=chooseQscopeRadarEventDock({
   truth:{x:8,y:746,width:170,height:25},
   obstacles:[{rect:{x:10,y:360,width:360,height:350},critical:true}]
 });
-assert(blocked.name!=="lower-left",
- "Nearby map popup forces alert into another non-overlapping placement");
+assert(blocked.name.startsWith("below-radar-controls"),
+ "Event inbox must stay attached directly beneath the radar toolbar");
 assert.equal(overlap(blocked,{x:545,y:610,width:365,height:115}),0);
 const missing=chooseQscopeRadarEventDock({width:900,height:800,contentHeight:200});
 assert(Number.isFinite(missing.top) && Number.isFinite(missing.left),
@@ -64,7 +64,7 @@ assert(review.maxHeight>=160,"Expanded review needs readable scroll area");
 assert.equal(overlap(review,legend),0,"Expanded review cannot cover BoM legend");
 assert.equal(overlap(review,scale),0,"Expanded review cannot cover geodesic map scale");
 assert.equal(overlap(review,nav),0,"Expanded review cannot cover navigation");
-assert(!review.hideInbox,"Desktop must retain the separate pending inbox");
+assert(review.hideInbox,"Opening evidence replaces the inbox in the same anchored position");
 const mobileReview=chooseQscopeRadarEvidenceWindow({
  width:390,height:500,
  legend:{x:129,y:370,width:255,height:82},
@@ -77,3 +77,39 @@ assert(mobileReview.maxHeight>=160,"Narrow evidence window stays readable");
 assert.equal(overlap(mobileReview,{x:129,y:370,width:255,height:82}),0);
 assert.equal(overlap(mobileReview,{x:8,y:444,width:140,height:30}),0);
 console.log("PASS Q-SCOPE expanded research review reserves BoM legend and map scale on desktop/mobile");
+
+
+function assertBelowRadarControls(p,nav,description){
+ assert.equal(p.top,nav.y+nav.height+10,
+   description+": window must start immediately BELOW the radar controls");
+ assert(p.left+p.width<=nav.x+nav.width+1,
+   description+": window must be right-aligned to the radar controls");
+ assert(p.name.startsWith("below-radar-controls"),
+   description+": not a free-floating map window");
+}
+for(const c of cases) {
+ const compact=chooseQscopeRadarEventDock(c);
+ const expanded=chooseQscopeRadarEvidenceWindow({
+   ...c,scale:{x:10,y:c.height-88,width:146,height:28}
+ });
+ assertBelowRadarControls(compact,c.nav,c.name+" compact");
+ assertBelowRadarControls(expanded,c.nav,c.name+" expanded");
+ assert.equal(overlap(expanded,c.legend),0,c.name+": expanded vs BoM legend");
+ assert.equal(overlap(expanded,{x:10,y:c.height-88,width:146,height:28}),0,
+    c.name+": expanded vs map distance scale");
+}
+assertBelowRadarControls(review,nav,"Photographed desktop expanded");
+const mobileNav={x:5,y:4,width:380,height:40};
+assertBelowRadarControls(mobileReview,mobileNav,"Mobile expanded");
+const compactWithScale=chooseQscopeRadarEventDock({
+ width:390,height:500,nav:mobileNav,
+ legend:{x:129,y:370,width:255,height:82},
+ scale:{x:8,y:444,width:140,height:30},
+ contentHeight:600
+});
+assertBelowRadarControls(compactWithScale,mobileNav,"9 mobile event cards");
+assert.equal(overlap(compactWithScale,{x:129,y:370,width:255,height:82}),0,
+ "Compact event list cannot intrude into lower right legend");
+assert.equal(overlap(compactWithScale,{x:8,y:444,width:140,height:30}),0,
+ "Compact event list cannot intrude into distance scale");
+console.log("PASS Q-SCOPE both wind event sizes dock directly under radar controls");
