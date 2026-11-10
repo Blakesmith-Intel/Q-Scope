@@ -769,6 +769,29 @@ jobs:
             | grep -F '/preview/wind-hook-v10-4/' >/dev/null
           echo "PUBLIC Q-SCOPE V10.4 EXPERIMENTAL QA ONLY; PRIOR V10.3 AND LIVE ROOT RETAINED"
 
+          # Q-SCOPE V10.5: passive/event-retained evidence notifications.
+          # Published only under the experimental preview, never promoted
+          # to a BoM warning or the accepted operational root.
+          passive_preview="$(curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors "$base/preview/wind-hook-v10-5/BUILD.txt")"
+          grep -Fq 'Q-SCOPE PASSIVE WIND/HOOK RESEARCH V10.5' <<< "$passive_preview"
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-5/index.html" \
+            | grep -F '<title>Q-SCOPE | Passive Wind & Hook Event Research V10.5</title>' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-5/src/qscope-passive-wind-inbox-v10-5.js" \
+            | grep -F 'createPassiveWindEventInbox' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-5/src/qscope-passive-wind-inbox-v10-5.css" \
+            | grep -F '.qscope-wind-event-inbox' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-5/src/live3d-operational-v9.js" \
+            | grep -F 'queuePassiveResearchPair("rain",i)' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/preview/wind-hook-v10-5/src/live3d-operational-v9.js" \
+            | grep -F 'navigateToPassiveResearchEvidence' >/dev/null
+          echo "PUBLIC Q-SCOPE V10.5 PASSIVE EXPERIMENTAL RESEARCH NOTIFICATIONS VERIFIED; ORIGINAL ROOT AND V10.3/4 UNCHANGED"
+
+
           for component in \
             'src/responsive-memory-diagnostics-v1.js|Memory diagnostics' \
             'src/context-layers/basemap-manager-v1.js|GLOBAL_SATELLITE_FALLBACK' \
