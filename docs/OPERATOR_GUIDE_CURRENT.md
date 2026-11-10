@@ -1,13 +1,18 @@
-# StormTracker — current operator guide
+# Q-SCOPE — current operator guide
+
+**Platform:** Q-SCOPE — *Queensland Situational Awareness*. Formerly StormTracker. The existing `/StormTracker/` web address, GitHub repository, relay names and older release references are retained for continuity. Q-SCOPE is an independent situational-awareness viewer, **not** an official Queensland Government, BoM or emergency-service warning authority.
+
+**Accepted recovery source:** [V10.2.53 official flood-gauge recovery release](https://github.com/Blakesmith-Intel/StormTracker/releases/tag/v10.2.53) · [Frozen source branch](https://github.com/Blakesmith-Intel/StormTracker/tree/restore/v10.2.53). The public name change is presentation-only and does not rewrite this frozen source or alter historical science, warning, flood or incident controls.
+
 **Edition:** 3 November 2026 | **Applies to:** **V10.2.51 officially frozen six-scan BoM rain radar source baseline**, retaining all accepted warning polygons, Doppler, flood/rainfall, 3-D and other layers.
 **Open:** https://blakesmith-intel.github.io/StormTracker/  
 **Technical handover:** [DEVELOPMENT_HANDOVER_CURRENT.md](DEVELOPMENT_HANDOVER_CURRENT.md)
 **Frozen release:** [V10.2.51 official baseline](PRODUCTION_BASELINE_V10.2.51.md) · [V10.2.51 release notes](RELEASE_NOTES_V10.2.51.md) · [Restore instructions](BASELINE_RESTORE.md) · [Quick reference](OPERATOR_QUICK_REFERENCE_V10.2.46.md) · [Shareable PDF](STORMTRACKER_LAYERS_INFORMATION.pdf). All future development starts from V10.2.51; earlier frozen releases remain untouched. The quick reference PDF remains the earlier general feature overview.
 
 
-> **Purpose and safety:** StormTracker brings together official source observations and selected public incident information for situational awareness. It is **not** a Bureau of Meteorology (BoM) warning service, an incident dispatch system, or a replacement for agency procedures. For warnings, evacuation advice and operational decisions, consult the original issuing authority. Some displays (3-D clouds, storm tracks, projected cones and rapid-rise arrows) are estimates and **not official warnings**.
+> **Purpose and safety:** Q-SCOPE brings together official source observations and selected public incident information for situational awareness. It is **not** a Bureau of Meteorology (BoM) warning service, an incident dispatch system, or a replacement for agency procedures. For warnings, evacuation advice and operational decisions, consult the original issuing authority. Some displays (3-D clouds, storm tracks, projected cones and rapid-rise arrows) are estimates and **not official warnings**.
 
-**Finding this guide from the map:** select the small **Operator guide ↗** text link in the existing StormTracker sidebar heading. It opens this up-to-date guide in a separate browser tab and leaves the active weather map, controls and information panels unchanged.
+**Finding this guide from the map:** select the small **Operator guide ↗** text link in the existing Q-SCOPE sidebar heading. It opens this up-to-date guide in a separate browser tab and leaves the active weather map, controls and information panels unchanged.
 
 **Public information sheet:** [StormTracker — layers and features (PDF)](STORMTRACKER_LAYERS_INFORMATION.pdf) — a concise shareable overview for new users. This is a guide to features, not a live weather bulletin.
 
@@ -55,7 +60,7 @@ If already viewing the latest radar frame, automatic refresh advances to the new
 
 ## At a glance
 
-1. Open the [StormTracker map](https://blakesmith-intel.github.io/StormTracker/) in a current desktop or mobile browser.
+1. Open the [Q-SCOPE map](https://blakesmith-intel.github.io/StormTracker/) in a current desktop or mobile browser.
 2. Choose a radar from the selector at the top of the map. **Brisbane (Mt Stapylton)** is the initial site.
 3. Expand **Radar & Storm Analysis** to load radar playback, select tracks or inspect the +90-minute cone.
 4. Expand **Severe Weather** for BoM warnings, flood gauges and the inline cyclone panel; **Rainfall Observations** for station totals/AEP; and **Community Impacts** for road closures, power outages and QFD incidents. Incident overlays are normally off on page load.
@@ -66,7 +71,7 @@ If something is missing or looks wrong, check the time shown for that **specific
 
 ### Menu layout — V10.2.35
 
-The original incident-counter shortcuts for **Power outages** and **Road closures** remain visible beneath the StormTracker heading, including existing customer counts, source-check timestamps and council explorers. They do not independently switch a map layer on/off.
+The original incident-counter shortcuts for **Power outages** and **Road closures** remain visible beneath the Q-SCOPE heading, including existing customer counts, source-check timestamps and council explorers. They do not independently switch a map layer on/off.
 
 Four **independent top-level expandable sections** are collapsed by default. Opening or closing a section only changes the displayed controls; **all enabled map layers, pending source checks, selections, reports and refresh schedules stay unchanged**. The existing Operator guide ↗ link remains in the header.
 
