@@ -35,7 +35,8 @@ function normaliseEvidence(alert, context) {
       !finite(alert.longitude) || !finite(alert.latitude) ||
       Math.abs(alert.latitude) > 85 || Math.abs(alert.longitude) > 180 ||
       !validUtc(context.frameUtc) || !validUtc(alert.observed_utc)) return null;
-  const radarId = String(alert.radar_id ?? context.radarId ?? "");
+  const radarId = String(alert.radar_id ?? context.radarId ??
+    (context.mode === "rain" ? "reflectivity" : ""));
   if (!radarId || !/^[0-9A-Za-z-]{1,20}$/.test(radarId)) return null;
   // An event's navigation must always point to a scan we really displayed
   // or decoded. No inferred/nearest frame is silently presented as original.
