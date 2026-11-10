@@ -7,8 +7,24 @@ import {
 } from "../src/qscope-reviewable-event-inbox-v10-6.js";
 import {captureResearchSourceThumbnail} from "../src/qscope-source-evidence-thumbnail-v10-6.js";
 import {dopplerMapCoordinateToLonLat} from "../src/bom-doppler-georef-v1.js";
+import {shouldPauseForNewResearchEvent,FRESH_RESEARCH_EVENT_MAX_AGE_MS} from "../src/qscope-intelligent-pause-v10-6.js";
 
 const t="2026-11-10T05:00:00Z",t2="2026-11-10T05:05:00Z";
+const nowMs=Date.parse(t2);
+assert.equal(shouldPauseForNewResearchEvent({
+  event:{latestUtc:t},nowMs,isPlaying:true,isResearch:true
+}),true,"Fresh genuine research event can interrupt playback when opted in");
+for(const policy of [
+  {isPlaying:false,isResearch:true},
+  {isPlaying:true,isResearch:false},
+  {isPlaying:true,isResearch:true,isHidden:true},
+  {isPlaying:true,isResearch:true,isNavigating:true},
+  {isPlaying:true,isResearch:true,nowMs:Date.parse(t)+FRESH_RESEARCH_EVENT_MAX_AGE_MS+1},
+  {isPlaying:true,isResearch:true,nowMs:Date.parse(t)-1000}
+])assert.equal(shouldPauseForNewResearchEvent({
+  event:{latestUtc:t},nowMs,...policy
+}),false,"No pauses for inactive, old, hidden or user-reviewed evidence");
+
 const alert=(category,time=t)=>({
   category,observed_utc:time,source_utc:time,
   radar_id:"66",track_id:"ST-TEST",longitude:153.1,latitude:-27.45,
