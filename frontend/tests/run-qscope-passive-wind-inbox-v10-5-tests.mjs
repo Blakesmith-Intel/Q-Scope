@@ -33,7 +33,7 @@ const ctx=(utc,mode="rain",radarId="66")=>({mode,frameUtc:utc,radarId});
 const reflectivityOnly=createResearchRadarEventLedger();
 const noWindId=alert("hook_shape_only",t1);
 delete noWindId.radar_id;
-assert.equal(reflectivityOnly.ingest([noWindId],ctx(t1)),1);
+assert.equal(reflectivityOnly.ingest([noWindId],{mode:"rain",frameUtc:t1}),1);
 assert.equal(reflectivityOnly.list()[0].evidence[0].radarId,"reflectivity");
 const storage=fakeStorage();
 const ledger=createResearchRadarEventLedger({storage});
