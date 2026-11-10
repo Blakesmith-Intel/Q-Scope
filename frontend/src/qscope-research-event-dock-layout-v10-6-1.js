@@ -64,7 +64,8 @@ export function chooseQscopeRadarEventDock({
       const h=Math.min(hMax,maxHeight);
       top=legend.y-GAP-h;
     } else {
-      // Stack above the legend where their horizontal footprints overlap.
+      // No actual legend height? "above-legend" becomes a normal top-right
+      // candidate rather than yielding a NaN top position.
       const sameColumn=legend &&
         Math.min(x+dockWidth,legend.x+legend.width)-
         Math.max(x,legend.x)>0;
