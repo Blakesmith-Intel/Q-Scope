@@ -21,128 +21,98 @@ function rectInMap(element,map,win){
   return {x:r.left-parent.left,y:r.top-parent.top,
     width:r.width,height:r.height};
 }
-function candidate(name,x,y,width,height,preferred,obstacles,originalHeight) {
-  const rect={x,y,width,height};
-  const overlap=obstacles.reduce((a,entry)=>a+intersects(rect,entry.rect)*
-    (entry.critical?4:1),0);
-  const truncated=Math.max(0,originalHeight-height);
-  const tooSmall=height<MIN_DOCK_HEIGHT ? 100000:0;
-  // A collision is more damaging than showing fewer rows in a scrollable
-  // alert queue; all rows remain in the DOM and keyboard reachable.
-  return {...rect,name,score:overlap*30+truncated*14+preferred+tooSmall};
-}
-export function chooseQscopeRadarEventDock({
-  width,height,contentHeight,legend=null,nav=null,truth=null,obstacles=[],
-  narrow=width<=700
+// Both forms of the research event UI live immediately UNDER the real radar
+// controls (#nav). No free-floating dock and no separate centred modal.
+// Reserve the native BoM legend, distance scale and visible map controls.
+// A long event list/evidence record scrolls INSIDE its own fixed footprint.
+function anchoredBelowRadarControls({
+  width,height,nav=null,legend=null,scale=null,truth=null,
+  obstacles=[],desiredWidth,desiredHeight,capHeight
 }={}) {
   if(!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0)
-    return {left:10,top:70,width:320,maxHeight:180,name:"fallback"};
-  const margin=narrow?8:MARGIN;
-  const dockWidth=Math.min(narrow?320:360,Math.max(120,width-2*margin));
-  const hMax=Math.min(Math.max(MIN_DOCK_HEIGHT,contentHeight||180),
-    390,Math.max(MIN_DOCK_HEIGHT,height-2*margin));
-  const topLimit=clamp(Math.max(60,nav?nav.y+nav.height+GAP:60),
-    margin,Math.max(margin,height-120));
-  const bottomLimit=Math.max(59,truth?height-truth.y+GAP:59);
-  const usable=Math.max(0,height-topLimit-bottomLimit);
-  const xLeft=margin,xRight=Math.max(margin,width-margin-dockWidth);
-  const all=[];
-  const visible=obstacles.filter(x=>x&&x.rect&&x.rect.width>0&&x.rect.height>0);
-  if(legend)visible.push({rect:legend,critical:true});
-  if(nav)visible.push({rect:nav,critical:true});
-  if(truth)visible.push({rect:truth,critical:false});
-  const endsAtLegend=Boolean(legend&&legend.y>topLimit+MIN_DOCK_HEIGHT);
-  for(const [name,x,bias] of [
-    ["lower-left",xLeft,0],["upper-left",xLeft,12],
-    ["above-legend",xRight,22],["upper-right",xRight,36],
-    ["lower-right",xRight,48]
-  ]) {
-    let maxHeight=usable;
-    let top;
-    if(name==="above-legend" && endsAtLegend) {
-      maxHeight=Math.min(maxHeight,legend.y-topLimit-GAP);
-      const h=Math.min(hMax,maxHeight);
-      top=legend.y-GAP-h;
-    } else {
-      // No actual legend height? "above-legend" becomes a normal top-right
-      // candidate rather than yielding a NaN top position.
-      const sameColumn=legend &&
-        Math.min(x+dockWidth,legend.x+legend.width)-
-        Math.max(x,legend.x)>0;
-      if(name.startsWith("upper") && sameColumn)
-        maxHeight=Math.min(maxHeight,legend.y-topLimit-GAP);
-      const h=Math.min(hMax,maxHeight);
-      top=name.startsWith("lower")?height-bottomLimit-h:topLimit;
+    return {left:8,top:64,width:320,maxHeight:180,name:"below-radar-controls",collisionArea:0};
+  const margin=width<=700?8:MARGIN;
+  const widthSafe=Math.min(desiredWidth,Math.max(0,width-2*margin));
+  const navBottom=nav?nav.y+nav.height:50;
+  const anchorTop=clamp(navBottom+GAP,margin,Math.max(margin,height-margin));
+  const navRight=nav?nav.x+nav.width:width-margin;
+  const navLeft=nav?nav.x:margin;
+  // The right end of the radar toolbar is the primary anchor. An alternate
+  // alignment beneath the SAME toolbar is allowed if another map control
+  // occupies the right column. Never move this dock to a lower map corner.
+  const placements=[
+    ["below-radar-controls",navRight-widthSafe,0],
+    ["below-radar-controls-left",navLeft,1]
+  ];
+  const blockers=[legend,scale,truth,
+    ...obstacles.map(item=>item?.rect??item)].filter(rect=>
+      rect&&rect.width>0&&rect.height>0);
+  let best=null;
+  for(const [name,rawX,priority] of placements){
+    const x=clamp(rawX,margin,Math.max(margin,width-margin-widthSafe));
+    const overlapX=rect=>
+      Math.min(x+widthSafe,rect.x+rect.width)-Math.max(x,rect.x)>0;
+    const inColumn=blockers.filter(overlapX);
+    let top=anchorTop;
+    // When an operator expands a radar/menu popup directly below the
+    // toolbar, step below it only if it occupies the first part of this dock.
+    // The BoM legend and map scale are never allowed to push the dock down.
+    for(let pass=0;pass<inColumn.length;pass++){
+      const cover=inColumn.find(rect=>
+        rect!==legend&&rect!==scale&&rect!==truth&&
+        rect.y<=top+GAP&&rect.y+rect.height>top);
+      if(!cover)break;
+      top=Math.min(height-margin,cover.y+cover.height+GAP);
     }
-    const actualHeight=Math.max(0,Math.min(hMax,maxHeight));
-    if(actualHeight<=0)continue;
-    const safeTop=clamp(top,margin,Math.max(margin,height-margin-actualHeight));
-    all.push(candidate(name,x,safeTop,dockWidth,actualHeight,
-      bias,visible,hMax));
+    let available=Math.max(0,Math.min(capHeight,height-margin-top));
+    let collisionArea=0;
+    for(const rect of inColumn){
+      if(rect.y>=top)
+        available=Math.min(available,Math.max(0,rect.y-top-GAP));
+      else if(rect.y+rect.height>top){
+        available=0;
+        collisionArea+=intersects(
+          {x,y:top,width:widthSafe,height:Math.min(capHeight,height-top)},rect);
+      }
+    }
+    const maxHeight=Math.max(0,Math.min(
+      Number.isFinite(desiredHeight)?desiredHeight:capHeight,available));
+    const result={
+      left:Math.round(x),top:Math.round(top),
+      width:Math.round(widthSafe),maxHeight:Math.floor(maxHeight),
+      name,collisionArea
+    };
+    // A second alignment is only used if it offers materially more
+    // usable space. Prefer consistent right alignment below the toolbar.
+    const score=collisionArea*1000+Math.max(0,MIN_DOCK_HEIGHT-maxHeight)*50+
+      Math.max(0,(desiredHeight??capHeight)-maxHeight)+priority*20;
+    if(!best||score<best.score)best={...result,score};
   }
-  all.sort((a,b)=>a.score-b.score);
-  const best=all[0]??{
-    name:"fallback",x:margin,y:topLimit,width:dockWidth,
-    height:Math.max(MIN_DOCK_HEIGHT,usable)
-  };
-  return {
-    left:Math.round(best.x),top:Math.round(best.y),
-    width:Math.round(best.width),maxHeight:Math.round(best.height),
-    name:best.name,collisionArea:visible.reduce(
-      (sum,v)=>sum+intersects(best,v.rect),0)
-  };
+  const {score,...answer}=best;
+  return answer;
 }
-
-/* An opened evidence window is NOT the compact pending-event dock.
-   Allocate its own geometry without covering either the BoM palette or
-   the independent geodesic map scale. Prefer keeping the queue visible;
-   on a genuinely narrow canvas, temporarily step it aside until Close.
-   The event ledger and all pending alerts remain intact. */
+export function chooseQscopeRadarEventDock({
+  width,height,contentHeight,legend=null,scale=null,nav=null,truth=null,
+  obstacles=[],narrow=width<=700
+}={}) {
+  return anchoredBelowRadarControls({
+    width,height,nav,legend,scale,truth,obstacles,
+    desiredWidth:narrow?320:360,
+    desiredHeight:Math.max(MIN_DOCK_HEIGHT,contentHeight||180),
+    capHeight:390
+  });
+}
 export function chooseQscopeRadarEvidenceWindow({
   width,height,legend=null,scale=null,nav=null,truth=null,inbox=null,
   obstacles=[]
 }={}) {
-  if(!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0)
-    return {left:8,top:64,width:320,maxHeight:180,hideInbox:false};
-  const margin=width<=700?8:MARGIN;
-  const panelWidth=Math.min(500,Math.max(0,width-2*margin));
-  const top=clamp(Math.max(60,nav?nav.y+nav.height+GAP:60),margin,
-    Math.max(margin,height-margin));
-  const availableHeight=Math.max(0,Math.min(520,height-top-margin));
-  const blockers=[legend,scale,nav,truth,
-    ...obstacles.filter(x=>x&&x.rect).map(x=>x.rect)].filter(Boolean);
-  const xs=[width-margin-panelWidth,margin,(width-panelWidth)/2];
-  function find(includeInbox) {
-    let best=null;
-    for(let i=0;i<xs.length;i++){
-      const x=clamp(xs[i],margin,Math.max(margin,width-margin-panelWidth));
-      let h=availableHeight;
-      const visible=includeInbox&&inbox?[...blockers,inbox]:blockers;
-      for(const rect of visible){
-        if(rect.width<=0||rect.height<=0||
-          Math.min(x+panelWidth,rect.x+rect.width)<=Math.max(x,rect.x))
-          continue;
-        if(rect.y+rect.height<=top)continue;
-        if(rect.y<=top){h=0;break;}
-        h=Math.min(h,rect.y-GAP-top);
-      }
-      h=Math.max(0,h);
-      const proposed={left:Math.round(x),top:Math.round(top),
-        width:Math.round(panelWidth),maxHeight:Math.floor(h),
-        name:["upper-right","upper-left","upper-centre"][i]};
-      if(!best || proposed.maxHeight>best.maxHeight ||
-        (proposed.maxHeight===best.maxHeight && i<best.priority))
-        best={...proposed,priority:i};
-    }
-    return best;
-  }
-  // Do not sacrifice the ability to read and close a review window merely
-  // to keep a second queue on-screen. It is restored as soon as review closes.
-  const minimum=Math.min(160,availableHeight);
-  const withQueue=find(true);
-  const hideInbox=Boolean(inbox&&(!withQueue||withQueue.maxHeight<minimum));
-  const chosen=hideInbox?find(false):withQueue;
-  return {...chosen,hideInbox};
+  // Opening the event is an in-place EXPANSION beneath #nav, not another
+  // popup to hunt for. Temporarily conceal the underlying queue in all view
+  // sizes; restore it as soon as the review window is closed.
+  return {...anchoredBelowRadarControls({
+    width,height,nav,legend,scale,truth,obstacles,
+    desiredWidth:500,desiredHeight:520,capHeight:520
+  }),hideInbox:true};
 }
 
 export function attachQscopeResearchEventDock({
@@ -179,8 +149,7 @@ export function attachQscopeResearchEventDock({
     const desired=Math.max(MIN_DOCK_HEIGHT,inbox.scrollHeight+2);
     const position=chooseQscopeRadarEventDock({
       width:r.width,height:r.height,contentHeight:desired,
-      legend,nav,truth,obstacles:[...obstacles,...(scale?[{rect:scale,critical:true}]:[])],
-      narrow:r.width<=700
+      legend,scale,nav,truth,obstacles,narrow:r.width<=700
     });
     // No absolute bottom/right anchoring: it caused the BoM legend to sit
     // directly across the event's open/clear actions in the V10.6 photo.
@@ -196,16 +165,8 @@ export function attachQscopeResearchEventDock({
     }
     // Opening the evidence panel must not simply cover map controls;
     // place it independently and constrain its scroll height.
-    // Measure even while temporarily visibility:hidden, otherwise the next
-    // unrelated resize would reveal the queue and reintroduce the collision.
-    const queueBox=inbox.getBoundingClientRect();
-    const inboxRect=queueBox.width>0&&queueBox.height>0?{
-      x:queueBox.left-r.left,y:queueBox.top-r.top,
-      width:queueBox.width,height:queueBox.height
-    }:null;
     const review=chooseQscopeRadarEvidenceWindow({
-      width:r.width,height:r.height,legend,scale,nav,truth,
-      inbox:inboxRect,obstacles
+      width:r.width,height:r.height,legend,scale,nav,truth,obstacles
     });
     details.style.bottom="auto";details.style.right="auto";
     details.style.transform="none";
