@@ -92,7 +92,16 @@ jobs:
           grep -Fq 'v9.20.1-secondary-3d-fix' _site/live3d-operational-v9.html
           test -f _site/preview/incremental-3d/BUILD.txt
           grep -Fq 'EXPERIMENTAL incremental 3-D QA' _site/preview/incremental-3d/BUILD.txt
-          test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 3
+          test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 4
+          # V10.4 is an ADDITIONAL opt-in research path; all three earlier
+          # original-source QA previews must survive with their exact markers.
+          test -s _site/preview/wind-hook-v10-4/BUILD.txt
+          grep -Fq 'Q-SCOPE WIND / HOOK RESEARCH V10.4' _site/preview/wind-hook-v10-4/BUILD.txt
+          grep -Fq 'Q-SCOPE</strong><span>WIND / HOOK RESEARCH' _site/preview/wind-hook-v10-4/live3d-operational-v9.html
+          grep -Fq 'ADJACENCY_KM = 1.5' _site/preview/wind-hook-v10-4/src/doppler-persistence-v10-3.js
+          grep -Fq 'MAX_ARC_GAP_MINUTES = 8' _site/preview/wind-hook-v10-4/src/severe-storm-v10.js
+          ! grep -Fq 'assessV10RadarFrame' _site/src/live3d-operational-v9.js
+
           test -s _site/preview/wind-hook-v10-3/BUILD.txt
           grep -Fq 'f3a07688ca02f5f0234ae6425fc1177722518c53' _site/preview/wind-hook-v10-3/BUILD.txt
           test -s _site/preview/wind-hook-v10-3/assets/v10-tornado.svg
