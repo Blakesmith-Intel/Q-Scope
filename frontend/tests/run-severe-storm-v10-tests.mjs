@@ -238,4 +238,48 @@ test("research pin colours and icons are category specific and not official aler
     new URL("../../scripts/build-current-site.sh",import.meta.url)),"utf8");
   assert.match(build,/wind-hook-v10-3/);
 });
+test("two source files from same radar cannot be merged into one scan",()=>{
+  const prev=fixture("2026-10-08T04:00:00Z","arc");
+  const now=fixture("2026-10-08T04:05:00Z","arc");
+  const realNow=radar(now.frame,couplet).records[0];
+  const realPrev=radar(prev.frame,couplet).records[0];
+  const duplicate={...realNow,observedUtc:"2026-10-08T04:04:00Z"};
+  const out=assessV10RadarFrame({
+    frame:now.frame,result:now.result,
+    previousFrame:prev.frame,previousResult:prev.result,
+    dopplerState:{records:[realNow,duplicate]},
+    previousDopplerState:{records:[realPrev]}
+  });
+  assert.equal(out.alerts.some(a=>a.category==="tornadic_candidate"),false,
+    "Unresolved conflicting same-radar source timestamps cannot form red candidate");
+  assert.equal(out.alerts.some(a=>a.category==="hook_shape_only"),true,
+    "Genuine two-frame reflectivity hook may remain orange without safe wind");
+});
+test("missing intermediate scan fails closed for all research signal tiers",()=>{
+  const prev=fixture("2026-10-08T04:00:00Z","arc");
+  const now=fixture("2026-10-08T04:10:00Z","arc");
+  const result=assessV10RadarFrame({
+    frame:now.frame,result:now.result,
+    previousFrame:prev.frame,previousResult:prev.result,
+    dopplerState:radar(now.frame,couplet),
+    previousDopplerState:radar(prev.frame,couplet)
+  });
+  assert.equal(result.alerts.length,0,
+    "A skipped intermediate five-minute observation cannot be called two consecutive scans");
+});
+test("independent source scan times are mandatory for persistent yellow candidate",()=>{
+  const prev=fixture("2026-10-08T04:00:00Z");
+  const now=fixture("2026-10-08T04:05:00Z");
+  const current=radar(now.frame,radial);
+  const reused={records:[{
+    ...current.records[0], observedUtc:"2026-10-08T04:05:00Z"
+  }]};
+  const result=assessV10RadarFrame({
+    frame:now.frame,result:now.result,
+    previousFrame:prev.frame,previousResult:prev.result,
+    dopplerState:current,previousDopplerState:reused
+  });
+  assert.equal(result.alerts.some(a=>a.type==="wind"),false);
+});
+
 console.log(count+" V10 storm research contract tests passed.");
