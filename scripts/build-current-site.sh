@@ -949,3 +949,14 @@ grep -Fq 'hide-controls-full-map-v1' "_site/index.html"
 printf '%s\n' 'FLOOD RECOVERY V10.2.9 — SOURCE-VERIFIED BELOW-MINOR CLEAR + STATION PRE-RISE REFERENCE 2026-10-24' >> _site/BUILD.txt
 
 printf '%s\n' 'FLOOD CROSSING REPORT V10.2.10 — SOURCE-ID ONLY MODERATE MAJOR BRIDGE CAUSEWAY REFERENCES 2026-10-24' >> _site/BUILD.txt
+
+# Q-SCOPE is ONLY the external platform identity. Apply last to the verified
+# public root, after pinned science overlays and legacy-preview copies. Never
+# modify the V10.2.53 source tag, QA preview, API endpoints or CSS control IDs.
+python3 scripts/apply-qscope-branding-v1.py --site _site
+grep -Fq '<title>Q-SCOPE | Queensland Situational Awareness</title>' _site/index.html
+grep -Fq '<strong>Q-SCOPE</strong><span>QLD Situational Awareness</span>' _site/live3d-operational-v9.html
+grep -Fq 'Q-SCOPE QUEENSLAND OPERATOR BRANDING' _site/BUILD.txt
+grep -Fq 'RIVER_HISTORY_WINDOW_LIMIT = 24' _site/src/context-layers/river-history-request-budget-v1.js
+grep -Fq 'MANUAL_FLOOD_STAGE_MAX_AGE_MS' _site/src/context-layers/river-flood-signals-v1.js
+
