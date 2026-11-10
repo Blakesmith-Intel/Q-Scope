@@ -10,10 +10,14 @@ const page=await context.newPage();
 const url="http://127.0.0.1:8137/";
 const moduleUrl="/preview/wind-hook-v10-5/src/qscope-passive-wind-inbox-v10-5.js";
 const cssUrl="/preview/wind-hook-v10-5/src/qscope-passive-wind-inbox-v10-5.css";
+const fixtureUrl=url+"qscope-passive-inbox-fixture.html";
+await page.route(fixtureUrl,route=>route.fulfill({
+  status:200,contentType:"text/html",
+  body:'<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="'+cssUrl+'"></head>'+
+    '<body style="margin:0;background:#0b1f2b"><main id="mapPanel" style="position:relative;height:100vh;width:100vw;overflow:hidden"></main></body></html>'
+}));
 const makeDocument=async()=>{
-  await page.goto(url+"BUILD.txt",{waitUntil:"domcontentloaded"});
-  await page.setContent('<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="'+cssUrl+'"></head>'+
-    '<body style="margin:0;background:#0b1f2b"><main id="mapPanel" style="position:relative;height:100vh;width:100vw;overflow:hidden"></main></body></html>');
+  await page.goto(fixtureUrl,{waitUntil:"load"});
   await page.locator("link[rel=stylesheet]").first().waitFor({state:"attached"});
 };
 try{
