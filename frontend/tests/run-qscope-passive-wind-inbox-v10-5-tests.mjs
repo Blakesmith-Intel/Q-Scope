@@ -93,6 +93,7 @@ function node(tag){
     setAttribute(k,v){this.attributes[k]=v;},
     addEventListener(name,fn){this.listeners[name]=fn;},
     append(...parts){this.children.push(...parts);},
+    appendChild(part){this.children.push(part);return part;},
     replaceChildren(...parts){this.children=[...parts];},
     remove(){this.removed=true;},
     click(){const fn=this.listeners.click;if(fn)fn();}
