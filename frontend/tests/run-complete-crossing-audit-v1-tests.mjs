@@ -71,6 +71,12 @@ for(let pulse=0;pulse<80&&layer.crossingCoverage.pending;pulse++){
   now+=60000;
   await layer.checkCrossingReferences();
 }
+console.log("CROSSING_AUDIT_DIAGNOSTIC",JSON.stringify({
+  checked:calls.recent.size,coverage:layer.crossingCoverage,
+  history:layer.diagnostics?.recentHistory,
+  localTime:new Date(now).toISOString(),
+  pendingIds:ids.filter(id=>!calls.recent.has(id))
+}));
 assert.equal(layer.crossingCoverage.pending,0,
  "Paced and budgeted checks must EVENTUALLY cover all eligible stations");
 assert.equal(layer.crossingCoverage.sourceMissing,0);
