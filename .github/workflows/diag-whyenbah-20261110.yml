@@ -1,0 +1,55 @@
+name: One-off Whyenbah and live station omission diagnostic
+on:
+  push:
+    branches: [fix/flood-history-paced-whyenbah-20261110]
+    paths: [.github/workflows/diag-whyenbah-20261110.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Probe one already-approved river-height bundle and one direct source
+        run: |
+          node --input-type=module <<'NODE'
+          import {joinRiverGaugeObservations} from './frontend/src/context-layers/river-gauge-observations-v1.js';
+          import {QLD_BOM_GAUGE_REFERENCE} from './relay/qld-bom-gauge-reference-20261110-v1.js';
+          import {parseRiverHeightBulletin} from './frontend/src/context-layers/river-height-bulletin-v1.js';
+          const base='https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev';
+          const source='https://www.bom.gov.au/fwo/IDQ60293.html';
+          const calls=[['bundle',base+'/river-height-bulletins'],
+                       ['original-BoM-IDQ60293',source]];
+          await Promise.all(calls.map(async([name,url])=>{
+            const start=Date.now();
+            try{
+              const response=await fetch(url,{signal:AbortSignal.timeout(30000)});
+              const body=await response.text();
+              console.log('source',name,'status',response.status,'elapsed',Date.now()-start,'bytes',body.length);
+              if(!response.ok)return;
+              if(name==='bundle'){
+                const b=JSON.parse(body);
+                const join=joinRiverGaugeObservations({gauges:QLD_BOM_GAUGE_REFERENCE,bulletins:b});
+                const stations=b.products.flatMap(p=>p.observations??[]);
+                console.log(JSON.stringify({products:b.products.map(p=>[p.product,p.observations?.length]),
+                  failed:b.failed,partial:b.partial,matched:join.matchedCount,totalObservations:join.totalObservations,
+                  stationNames:stations.filter(o=>/whyenbah/i.test(o.stationName)),
+                  unmatchedWhyenbah:join.unmatchedObservations.filter(o=>/whyenbah/i.test(o.stationName)),
+                  joinedWhyenbah:join.payload.features.filter(f=>['bom:044154','bom:544018'].includes(f.id))
+                }));
+              }else{
+                const parsed=parseRiverHeightBulletin({html:body,sourceProduct:'IDQ60293'});
+                console.log(JSON.stringify({totalParsed:parsed.length,
+                  whyenbah:parsed.filter(o=>/whyenbah/i.test(o.stationName)),
+                  context:body.toLowerCase().includes('whyenbah')
+                    ?body.slice(Math.max(0,body.toLowerCase().indexOf('whyenbah')-200),body.toLowerCase().indexOf('whyenbah')+400):null
+                }));
+              }
+            }catch(e){console.log('source error',name,String(e));}
+          }));
+          NODE
