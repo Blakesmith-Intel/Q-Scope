@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
+      - uses: actions/checkout@v4
       - name: Probe exact original BoM source and same-source MapServer independently
         run: |
           node --input-type=module <<'NODE'
@@ -50,5 +51,61 @@ jobs:
                 bytes:raw.length,features:p.features?.length??null,count:p.count??null,
                 type:p.type??null,error:p.error?.message??null,preview:raw.slice(0,100)}));
             }catch(e){console.log(JSON.stringify({name,elapsedMs:Date.now()-began,error:String(e)}));}
+          }));
+          NODE
+      - name: Compare official Queensland gauge networks with BoM 2026 audit
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFileSync} from "node:fs";
+          const audit=JSON.parse(readFileSync("docs/BOM_2026_GAUGE_COVERAGE_AUDIT.json","utf8"));
+          const original=new Set(audit.stations.map(s=>s.station));
+          const providers=[
+            {name:"QRA_SLS",url:"https://gisservices.qra.qld.gov.au/arcgis/rest/services/FWIN/BoM_SLS_Gauges/FeatureServer/0/query",
+              fields:"Bureau_Number,Agency_Number,Station_Name,State,Basin,Bureau_updated_Latitude__6_deci,Bureau_updated_Longitude__6_dec,Schedule_2___Forecast_location,Schedule_3___Information_locati,Schedule_4___Data_locations,Gauge__Type",
+              id:"Bureau_Number"},
+            {name:"QLD_FloodCheck",url:"https://spatial-gis.information.qld.gov.au/arcgis/rest/services/FloodCheck/FloodWarningNetworkBOM/MapServer/0/query",
+              fields:"gaugeno,stn_name,basin,agency,instrument_type",id:"gaugeno"}
+          ];
+          const all={};
+          await Promise.all(providers.map(async provider=>{
+            const rows=[];
+            for (const offset of [0,2000]){
+              const params=new URLSearchParams({where:"1=1",
+                outFields:provider.fields,returnGeometry:"true",outSR:"4326",f:"geojson",
+                resultOffset:String(offset),resultRecordCount:"2000",
+                orderByFields:provider.name==="QRA_SLS"?"OBJECTID":"objectid"});
+              const started=Date.now();
+              const response=await fetch(provider.url+"?"+params,{signal:AbortSignal.timeout(14000)});
+              if(!response.ok)throw Error(provider.name+" HTTP "+response.status);
+              const body=await response.json();
+              if(!Array.isArray(body.features))throw Error(provider.name+" malformed JSON");
+              rows.push(...body.features);
+              console.log(provider.name+" page "+offset+": "+body.features.length+
+                " in "+(Date.now()-started)+"ms");
+            }
+            const mapped=new Map(),duplicates=[];
+            for(const f of rows){
+              const raw=String(f.properties?.[provider.id]??"").trim();
+              if(!/^\d{1,6}$/.test(raw))continue;
+              const key="bom:"+raw.padStart(6,"0");
+              if(mapped.has(key))duplicates.push(key);
+              else mapped.set(key,f);
+            }
+            all[provider.name]=mapped;
+            const matches=[...mapped.keys()].filter(x=>original.has(x));
+            const present=rows.filter(f=>String(f.properties?.State??"").toUpperCase()==="QLD").length;
+            console.log(JSON.stringify({
+              provider:provider.name,rawRows:rows.length,uniqueIds:mapped.size,duplicates:duplicates.length,
+              matchingBoMAudit:matches.length,auditCount:original.size,
+              qldRows:present,examples:rows.slice(0,3).map(f=>f.properties),
+              auditMissing:[...original].filter(x=>!mapped.has(x)).slice(0,12)
+            }));
+          }));
+          const union=new Set([...all.QRA_SLS.keys(),...all.QLD_FloodCheck.keys()]);
+          console.log(JSON.stringify({
+            unionMatchingAudit:[...original].filter(x=>union.has(x)).length,
+            overlap:[...all.QRA_SLS.keys()].filter(x=>all.QLD_FloodCheck.has(x)).length,
+            twoSources:[...all.QRA_SLS.keys()].filter(x=>
+              original.has(x)&&all.QLD_FloodCheck.has(x)).length
           }));
           NODE
