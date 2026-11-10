@@ -92,6 +92,59 @@ export function chooseQscopeRadarEventDock({
       (sum,v)=>sum+intersects(best,v.rect),0)
   };
 }
+
+/* An opened evidence window is NOT the compact pending-event dock.
+   Allocate its own geometry without covering either the BoM palette or
+   the independent geodesic map scale. Prefer keeping the queue visible;
+   on a genuinely narrow canvas, temporarily step it aside until Close.
+   The event ledger and all pending alerts remain intact. */
+export function chooseQscopeRadarEvidenceWindow({
+  width,height,legend=null,scale=null,nav=null,truth=null,inbox=null,
+  obstacles=[]
+}={}) {
+  if(!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0)
+    return {left:8,top:64,width:320,maxHeight:180,hideInbox:false};
+  const margin=width<=700?8:MARGIN;
+  const panelWidth=Math.min(500,Math.max(0,width-2*margin));
+  const top=clamp(Math.max(60,nav?nav.y+nav.height+GAP:60),margin,
+    Math.max(margin,height-margin));
+  const availableHeight=Math.max(0,Math.min(520,height-top-margin));
+  const blockers=[legend,scale,nav,truth,
+    ...obstacles.filter(x=>x&&x.rect).map(x=>x.rect)].filter(Boolean);
+  const xs=[width-margin-panelWidth,margin,(width-panelWidth)/2];
+  function find(includeInbox) {
+    let best=null;
+    for(let i=0;i<xs.length;i++){
+      const x=clamp(xs[i],margin,Math.max(margin,width-margin-panelWidth));
+      let h=availableHeight;
+      const visible=includeInbox&&inbox?[...blockers,inbox]:blockers;
+      for(const rect of visible){
+        if(rect.width<=0||rect.height<=0||
+          Math.min(x+panelWidth,rect.x+rect.width)<=Math.max(x,rect.x))
+          continue;
+        if(rect.y+rect.height<=top)continue;
+        if(rect.y<=top){h=0;break;}
+        h=Math.min(h,rect.y-GAP-top);
+      }
+      h=Math.max(0,h);
+      const proposed={left:Math.round(x),top:Math.round(top),
+        width:Math.round(panelWidth),maxHeight:Math.floor(h),
+        name:["upper-right","upper-left","upper-centre"][i]};
+      if(!best || proposed.maxHeight>best.maxHeight ||
+        (proposed.maxHeight===best.maxHeight && i<best.priority))
+        best={...proposed,priority:i};
+    }
+    return best;
+  }
+  // Do not sacrifice the ability to read and close a review window merely
+  // to keep a second queue on-screen. It is restored as soon as review closes.
+  const minimum=Math.min(160,availableHeight);
+  const withQueue=find(true);
+  const hideInbox=Boolean(inbox&&(!withQueue||withQueue.maxHeight<minimum));
+  const chosen=hideInbox?find(false):withQueue;
+  return {...chosen,hideInbox};
+}
+
 export function attachQscopeResearchEventDock({
   map,inbox,details,documentRef=globalThis.document,win=globalThis.window
 }={}){
@@ -99,7 +152,8 @@ export function attachQscopeResearchEventDock({
     throw new TypeError("Q-SCOPE research layout requires map and event controls.");
   const named=[
     ["#legendDock",true],["#nav",true],
-    ["#mapTruthLabel",false],["#mapTools",true],
+    ["#mapTruthLabel",false],["#mapScaleBar",true],
+    ["#mapTools",true],
     ["#multiRadarPanel",true],["#mapMeasurePanel",true],
     ["#cycloneForecastQaPanel",true],
     ["#supplementalHoldNote",false],
@@ -116,15 +170,17 @@ export function attachQscopeResearchEventDock({
     const r=map.getBoundingClientRect();
     const get=selector=>rectInMap(
       targets.find(v=>v.selector===selector)?.element,map,win);
-    const legend=get("#legendDock"),nav=get("#nav"),truth=get("#mapTruthLabel");
+    const legend=get("#legendDock"),nav=get("#nav"),truth=get("#mapTruthLabel"),
+      scale=get("#mapScaleBar");
     const obstacles=targets.filter(v=>
-      !["#legendDock","#nav","#mapTruthLabel"].includes(v.selector))
+      !["#legendDock","#nav","#mapTruthLabel","#mapScaleBar"].includes(v.selector))
       .map(v=>({rect:rectInMap(v.element,map,win),critical:v.critical}))
       .filter(v=>v.rect);
     const desired=Math.max(MIN_DOCK_HEIGHT,inbox.scrollHeight+2);
     const position=chooseQscopeRadarEventDock({
       width:r.width,height:r.height,contentHeight:desired,
-      legend,nav,truth,obstacles,narrow:r.width<=700
+      legend,nav,truth,obstacles:[...obstacles,...(scale?[{rect:scale,critical:true}]:[])],
+      narrow:r.width<=700
     });
     // No absolute bottom/right anchoring: it caused the BoM legend to sit
     // directly across the event's open/clear actions in the V10.6 photo.
@@ -134,6 +190,29 @@ export function attachQscopeResearchEventDock({
     inbox.style.width=position.width+"px";
     inbox.style.maxHeight=position.maxHeight+"px";
     inbox.dataset.placement=position.name;
+    if(details.hidden){
+      inbox.style.visibility="";
+      return;
+    }
+    // Opening the evidence panel must not simply cover map controls;
+    // place it independently and constrain its scroll height.
+    const inboxRect=rectInMap(inbox,map,win);
+    const review=chooseQscopeRadarEvidenceWindow({
+      width:r.width,height:r.height,legend,scale,nav,truth,
+      inbox:inboxRect,obstacles
+    });
+    details.style.bottom="auto";details.style.right="auto";
+    details.style.transform="none";
+    details.style.left=review.left+"px";
+    details.style.top=review.top+"px";
+    details.style.width=review.width+"px";
+    details.style.maxHeight=review.maxHeight+"px";
+    details.dataset.placement=review.name;
+    inbox.style.visibility=review.hideInbox?"hidden":"";
+    if(review.hideInbox&&inbox.contains(documentRef.activeElement)){
+      details.querySelector(".qscope-wind-event-detail-title button")
+        ?.focus({preventScroll:true});
+    }
   }
   function schedule(){
     if(dead||scheduled)return;
@@ -147,9 +226,13 @@ export function attachQscopeResearchEventDock({
     ?new win.ResizeObserver(schedule):null;
   watcher?.observe(map);
   watcher?.observe(inbox);
+  watcher?.observe(details);
   for(const item of targets)if(item.element)watcher?.observe(item.element);
   const mutation=typeof win.MutationObserver==="function"
     ?new win.MutationObserver(schedule):null;
+  mutation?.observe(details,{
+    attributes:true,attributeFilter:["hidden","class"]
+  });
   for(const item of targets)if(item.element)
     mutation?.observe(item.element,{
       attributes:true,attributeFilter:["hidden","open","class","data-mode"]
