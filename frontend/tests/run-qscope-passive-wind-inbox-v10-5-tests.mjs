@@ -28,6 +28,13 @@ function alert(category,utc,latitude=-27.45,longitude=153.1,extras={}){
 const t1="2026-11-10T03:00:00Z",t2="2026-11-10T03:05:00Z",
   t3="2026-11-10T03:10:00Z";
 const ctx=(utc,mode="rain",radarId="66")=>({mode,frameUtc:utc,radarId});
+// A shape-only hook contains no velocity radar ID. Accept its source truth
+// as reflectivity instead of dropping the user's orange alert.
+const reflectivityOnly=createResearchRadarEventLedger();
+const noWindId=alert("hook_shape_only",t1);
+delete noWindId.radar_id;
+assert.equal(reflectivityOnly.ingest([noWindId],ctx(t1)),1);
+assert.equal(reflectivityOnly.list()[0].evidence[0].radarId,"reflectivity");
 const storage=fakeStorage();
 const ledger=createResearchRadarEventLedger({storage});
 assert.equal(ledger.pendingCount,0);
