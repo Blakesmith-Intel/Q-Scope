@@ -301,7 +301,8 @@ export function createPassiveWindEventInbox({
     if(destroyed)return;
     const pending=ledger.list();
     const listed=ledger.list({includeAcknowledged:showHistory});
-    root.hidden=pending.length===0 && !showHistory && !openEventId;
+    root.hidden=pending.length===0 && ledger.archivedCount===0 &&
+      !showHistory && !openEventId;
     count.textContent=String(pending.length)+" awaiting review";
     historyButton.textContent=showHistory?"Hide history":
       "History ("+ledger.archivedCount+")";
