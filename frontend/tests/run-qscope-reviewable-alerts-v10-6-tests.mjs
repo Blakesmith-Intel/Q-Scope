@@ -39,7 +39,7 @@ function mockDocument() {
   const nodes=[];
   const node=(name)=>({
     name,children:[],textContent:"",className:"",hidden:false,
-    listeners:{},attributes:{},style:{},
+    listeners:{},attributes:{},style:{},dataset:{},
     setAttribute(k,v){this.attributes[k]=v;},
     addEventListener(k,cb){this.listeners[k]=cb;},
     append(...v){this.children.push(...v);},
