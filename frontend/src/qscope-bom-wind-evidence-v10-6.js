@@ -11,18 +11,6 @@ export const BOM_RESEARCH_WIND_RULES=Object.freeze({
   maxStationsPerEvent:2
 });
 const finite=v=>typeof v==="number"&&Number.isFinite(v);
-function dateFromBoM(value){
-  if(typeof value!=="string"||!/^[0-9]{14}$/.test(value))return null;
-  const year=Number(value.slice(0,4)),month=Number(value.slice(4,6)),
-    day=Number(value.slice(6,8)),hour=Number(value.slice(8,10)),
-    minute=Number(value.slice(10,12)),second=Number(value.slice(12,14));
-  const epoch=Date.UTC(year,month-1,day,hour,minute,second);
-  const d=new Date(epoch);
-  if(d.getUTCFullYear()!==year||d.getUTCMonth()!==month-1||
-     d.getUTCDate()!==day||d.getUTCHours()!==hour||
-     d.getUTCMinutes()!==minute||d.getUTCSeconds()!==second)return null;
-  return d.toISOString();
-}
 export function kilometresApart(a,b){
   const r=Math.PI/180,lat1=a.latitude*r,lat2=b.latitude*r,
     dlat=lat2-lat1,dlon=(b.longitude-a.longitude)*r;
@@ -51,8 +39,9 @@ export function readBoMStationGusts(source,{expectedStationId=null}={}){
   const ident=source?.stn?.identity,loc=source?.stn?.location,
     obs=source?.obs,wind=obs?.wind;
   const rawId=ident?.bom_stn_num;
-  if(!Number.isInteger(rawId)||rawId<0||rawId>999999||
-     !/^\\d{6}$/.test(String(expectedStationId??"").padStart(6,"0")))
+  if(!Number.isInteger(rawId)||rawId<1||rawId>999999||
+     (expectedStationId!==null &&
+      !/^\\d{6}$/.test(String(expectedStationId))))
     return null;
   const stationId=String(rawId).padStart(6,"0");
   if(expectedStationId!==null&&stationId!==String(expectedStationId).padStart(6,"0"))
