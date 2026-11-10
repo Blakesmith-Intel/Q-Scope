@@ -21,12 +21,33 @@ function distanceKm(a, b) {
     EARTH_KM_PER_DEGREE * Math.cos(latitudeMean*Math.PI/180),
     (a.latitude-b.latitude)*EARTH_KM_PER_DEGREE);
 }
+// A single georeferenced source pixel cannot simultaneously have conflicting
+// inbound and outbound velocity. Fail the whole observation closed instead
+// of ignoring the contradictory colour and manufacturing a one-way cluster.
+function hasConflictingPixelEvidence(record){
+  const byCoordinate=new Map(),byIndex=new Map();
+  for(const p of record.samples??[]){
+    if(!finite(p.velocity_kmh)||!finite(p.longitude)||!finite(p.latitude))
+      continue;
+    const coord=p.longitude.toFixed(6)+":"+p.latitude.toFixed(6);
+    if(byCoordinate.has(coord)&&byCoordinate.get(coord)!==p.velocity_kmh)
+      return true;
+    byCoordinate.set(coord,p.velocity_kmh);
+    if(Number.isInteger(p.pixel_index)&&p.pixel_index>=0){
+      if(byIndex.has(p.pixel_index)&&byIndex.get(p.pixel_index)!==p.velocity_kmh)
+        return true;
+      byIndex.set(p.pixel_index,p.velocity_kmh);
+    }
+  }
+  return false;
+}
 function isTrusted(record) {
   return Boolean(record && DOPPLER_QA_APPROVED_RADARS.includes(String(record.radarId)) &&
     record.geometryVerified === true && trustedTimes.has(record.timeBasis) &&
     !record.temporalInference && !record.velocityInterpolated &&
     Array.isArray(record.samples) && record.samples.length <= MAX_SAMPLES &&
-    record.samples.length > 0 && finite(Date.parse(record.observedUtc)));
+    record.samples.length > 0 && finite(Date.parse(record.observedUtc)) &&
+    !hasConflictingPixelEvidence(record));
 }
 // Source pixels must form a connected spatial cluster, not merely appear
 // anywhere within the same 5-km bin. Local grid lookup keeps assessment
