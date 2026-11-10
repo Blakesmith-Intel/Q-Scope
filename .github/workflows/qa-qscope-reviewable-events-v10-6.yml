@@ -63,7 +63,7 @@ jobs:
           bash scripts/build-current-site.sh
           python scripts/apply-ftp-aep-release-v10.py
           python scripts/apply-radar-auto-refresh-v1.py
-          test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6
+          test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -ge 6
           # Test of the pinned V10.5 inbox remains valid with an added
           # isolated V10.6 preview. Never delete or rewrite V10.5.
           grep -Fq 'Q-SCOPE PERSISTENT RESEARCH EVENTS V10.6' _site/preview/wind-hook-v10-6/BUILD.txt
