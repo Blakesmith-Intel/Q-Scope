@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {createRiverGaugeLayer} from "../src/context-layers/river-gauge-layer-v1.js";
 import {buildNotableFloodGaugeReport} from "../src/context-layers/river-gauge-notable-report-v1.js";
-const now=Date.UTC(2026,9,24,11,30);
+let now=Date.UTC(2026,9,24,11,30);
 const ids=Array.from({length:130},(_,i)=>String(535100+i));
 const features=ids.map((number,i)=>({
  id:"bom:"+number,type:"Feature",
@@ -58,14 +58,26 @@ await layer.refresh();
 const before=layer.crossingCoverage;
 assert(before.pending>0,"Cold browser must have pending crossing sources");
 await layer.checkCrossingReferences();
+assert.equal(calls.recent.size,4,
+ "A report must not bypass the 4-request Worker budget on cold start");
+assert.equal(layer.crossingCoverage.pending,126,
+ "The report must show 126 unverified stations, never imply the audit is complete");
+assert(calls.maximum<=4,"No more than four simultaneous station source requests");
+assert(calls.maximum>=2,"Preserve bounded parallelism, not serial reads");
+// Advance the simulated active-browser clock through paced one-minute pulses.
+// Completeness is eventual and visibly provisional, NOT an immediate 130
+// source-request burst that overuses Cloudflare.
+for(let pulse=0;pulse<80&&layer.crossingCoverage.pending;pulse++){
+  now+=60000;
+  await layer.checkCrossingReferences();
+}
 assert.equal(layer.crossingCoverage.pending,0,
- "A requested full report check must finish ALL 130 source records, not just 16");
+ "Paced and budgeted checks must EVENTUALLY cover all eligible stations");
 assert.equal(layer.crossingCoverage.sourceMissing,0);
 assert.equal(calls.recent.size,130);
-assert(calls.maximum<=4,"No more than four simultaneous station source requests");
+assert(calls.maximum<=4);
 assert.equal(new Set(calls.recent.keys()).size,130,
- "The 64-station limit is a batch size, NEVER a global cap");
-assert(calls.maximum>=2,"Avoid expensive fully serial station retrieval");
+ "No global 64-station ceiling or permanently forgotten entries");
 const report=buildNotableFloodGaugeReport(layer.sourceFeatures,null,now);
 const station=report.groups[2].rows.find(x=>x.id==="bom:535162");
 assert(station,"535162 must be in report after the complete source pass");
@@ -73,4 +85,4 @@ assert.equal(station.crossing.levelMetres,1.71);
 assert.equal(station.crossing.amountAboveMetres,1.06);
 assert.equal(layer.features.some(f=>f.id==="bom:535162"),true,
  "Map also shows the real crossing after source verification");
-console.log("PASS 130-station complete crossing scan via original BoM relay, 535162 included in map/report, bounded concurrency and no silent remaining eligible gauges");
+console.log("PASS provisional 130-station audit: 4 initial requests, 1-minute paced eventual completion, exact source IDs, 535162 and no silent missing gauges");
