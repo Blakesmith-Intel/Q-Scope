@@ -18,7 +18,7 @@ assert(html.slice(headingStart,headingEnd).includes('Live weather map'),
 const tagStart=html.lastIndexOf('<a ',linkIndex);
 const tagEnd=html.indexOf('</a>',linkIndex);
 const anchor=html.slice(tagStart,tagEnd+4);
-assert.match(anchor,/href="https:\/\/github\.com\/Blakesmith-Intel\/StormTracker\/blob\/main\/docs\/OPERATOR_GUIDE_CURRENT\.md"/);
+assert.match(anchor,/href="https:\/\/github\.com\/Blakesmith-Intel\/Q-Scope\/blob\/main\/docs\/OPERATOR_GUIDE_CURRENT\.md"/);
 assert.match(anchor,/target="_blank"/);
 assert.match(anchor,/rel="noopener noreferrer"/);
 assert.match(anchor,/Operator guide/);
