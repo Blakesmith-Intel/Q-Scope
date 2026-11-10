@@ -41,12 +41,22 @@ function sourceCrop(source,coords,doc){
     const sx=x0+x,sy=y0+y;
     if(sx<0||sy<0||sx>=source.width||sy>=source.height)continue;
     const idx=(sy*source.width+sx)*4,outidx=(y*SIDE+x)*4;
-    const alpha=source.data[idx+3];
-    if(!alpha)continue;
-    out.data[outidx]=source.data[idx];
-    out.data[outidx+1]=source.data[idx+1];
-    out.data[outidx+2]=source.data[idx+2];
-    out.data[outidx+3]=alpha;
+    if(source.categories) {
+      const category=source.categories[sy*source.width+sx];
+      if(category<=0||category>=16)continue;
+      const rgb=category*3;
+      out.data[outidx]=COLOR_TABLE[rgb];
+      out.data[outidx+1]=COLOR_TABLE[rgb+1];
+      out.data[outidx+2]=COLOR_TABLE[rgb+2];
+      out.data[outidx+3]=255;
+    } else {
+      const alpha=source.data?.[idx+3];
+      if(!alpha)continue;
+      out.data[outidx]=source.data[idx];
+      out.data[outidx+1]=source.data[idx+1];
+      out.data[outidx+2]=source.data[idx+2];
+      out.data[outidx+3]=alpha;
+    }
     visible++;
   }
   if(!visible)return null;
@@ -67,16 +77,12 @@ export function captureResearchSourceThumbnail({
         frame.observedUtc!==alert.observed_utc ||
         !Number.isInteger(frame.width)||!Number.isInteger(frame.height) ||
         frame.categories?.length!==frame.width*frame.height)return null;
-      const source=new Uint8ClampedArray(frame.width*frame.height*4);
-      for(let i=0;i<frame.categories.length;i++){
-        const category=frame.categories[i];
-        if(category<=0||category>=16)continue;
-        const rgb=category*3,off=i*4;
-        source[off]=COLOR_TABLE[rgb];source[off+1]=COLOR_TABLE[rgb+1];
-        source[off+2]=COLOR_TABLE[rgb+2];source[off+3]=255;
-      }
+      // Only process the 160px evidence window, not the entire statewide
+      // source mosaic. Reduces decoding work and large allocations.
       const coords=mercatorPixel(frame,alert.longitude,alert.latitude);
-      const dataUrl=sourceCrop({width:frame.width,height:frame.height,data:source},coords,documentRef);
+      const dataUrl=sourceCrop({
+        width:frame.width,height:frame.height,categories:frame.categories
+      },coords,documentRef);
       return dataUrl?{
         dataUrl,
         label:"Retained crop reconstructed from the genuine BoM reflectivity category grid (not original map artwork).",
