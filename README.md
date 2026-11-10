@@ -1,3 +1,17 @@
+# Q-SCOPE — Queensland Situational Awareness
+
+**Formerly StormTracker.** A browser-based Queensland weather, hazard and emergency situational-awareness platform covering native BoM radar/Doppler, flood gauges, severe-weather warnings, cyclone outlooks, rainfall, road closures, power outages and community incidents. **Independent viewer only**, not an official government warning or dispatch authority.
+
+**Production website:** https://blakesmith-intel.github.io/StormTracker/ — the existing path is retained for links, caches, and relay compatibility, although the visible site name is Q-SCOPE.
+
+**Operator-accepted technical restore point:** [V10.2.53](https://github.com/Blakesmith-Intel/StormTracker/releases/tag/v10.2.53), annotated tag `v10.2.53` and branch `restore/v10.2.53` at `1466851327584b62e06172b3aa2c279afd27870e`. Never modify or repoint an existing restore reference. Q-SCOPE's initial branding change is a separate presentation-only enhancement on top of that source.
+
+**Branding rules and future name migration:** [Q-SCOPE identity and legacy compatibility](docs/Q_SCOPE_BRAND_IDENTITY.md). The V10.3 hook-echo and straight-line-wind alert science remains a separately pinned, **experimental** QA preview; this name change does not promote those alerts.
+
+---
+
+## Historical StormTracker releases and technical record
+
 # StormTracker — V10.2.42 immutable operator-accepted production baseline
 
 **Current accepted release (1 November 2026): V10.2.42.** The operator confirmed the working V10.2.41 application on a physical iPhone after source-verified V10.2.40 radar recovery and the V10.2.41 Longreach camera-retention correction. V10.2.42 is a **documentation, verified rollback and release-workflow freeze only**; it does not change the accepted live weather application, features or timing.
