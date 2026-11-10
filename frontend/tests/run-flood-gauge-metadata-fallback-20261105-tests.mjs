@@ -19,7 +19,7 @@ const now=Date.UTC(2026,10,5,0,0);
 let metadataRequests=0,heightRequests=0,recordedTimeouts=[];
 const nativeSetTimeout=globalThis.setTimeout;
 globalThis.setTimeout=(cb,ms,...args)=>{
-  if(ms===60000||ms===15000)recordedTimeouts.push(ms);
+  if(ms===10000||ms===15000)recordedTimeouts.push(ms);
   return nativeSetTimeout(cb,ms,...args);
 };
 const fetchImpl=async (url,{signal}={})=>{
@@ -28,8 +28,8 @@ const fetchImpl=async (url,{signal}={})=>{
    metadataRequests++;
    // The source isn't absent: it just isn't ready immediately while the
    // radar-heavy browser is also fetching genuine imagery.
-   await new Promise(resolve=>nativeSetTimeout(resolve,16100));
-   assert.equal(signal?.aborted,false,"Never abort a valid slow metadata read after 15s");
+   await new Promise(resolve=>nativeSetTimeout(resolve,1100));
+   assert.equal(signal?.aborted,false,"Never abort a valid slow metadata read while the local versioned reference loads");
    return {ok:true,json:async()=>source};
  }
  if(target.includes("/river-height-bulletins")){
@@ -48,7 +48,7 @@ try{
  const second=await loadRiverGaugeOperationalSnapshot({fetchImpl,force:true});
  assert.equal(metadataRequests,1,"BoM reference metadata loads once, not every ten-minute height update");
  assert.equal(heightRequests,2,"Every refresh retrieves live river-height bulletins");
- assert.ok(recordedTimeouts.includes(60000),"Verified metadata is allowed a bounded 60-second retrieval window");
+ assert.ok(recordedTimeouts.includes(10000),"Static relay metadata has a bounded 10-second delivery window");
  assert.ok(recordedTimeouts.includes(15000),"BoM height refresh timeout is unchanged");
  assert.equal(first.matchedCount,1);
  assert.equal(second.matchedCount,1);
@@ -70,5 +70,5 @@ try{
      return {ok:true,json:async()=>({products:[]})};
    }
  }),/BoM metadata relay unavailable/);
- console.log("PASS original source-only BoM metadata request, 60s self-abort correction, one station fetch/session, live 10m height update, exact flood-stage classification");
+ console.log("PASS original source-only BoM metadata request, 10s bounded local reference, one station fetch/session, live 10m height update, exact flood-stage classification");
 }finally{globalThis.setTimeout=nativeSetTimeout;}
