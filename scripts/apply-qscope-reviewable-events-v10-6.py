@@ -31,7 +31,7 @@ def main(site):
     # The inner script URL is independently cached by the browser. Bump it
     # alongside the outer iframe so the restored compass is truly loaded.
     b=one(b,'src="./src/live3d-operational-v9.js?v=',
-      'src="./src/live3d-operational-v9.js?v=v10-6-7-modern-bom-kmhr-',
+      'src="./src/live3d-operational-v9.js?v=v10-6-8-artifact-screen-',
       "preview operator-runtime cache revision")
     if s.count("/preview/wind-hook-v10-5/")!=2:
         raise ValueError("V10.5 source route was changed: cannot safely rebrand.")
@@ -58,11 +58,12 @@ mountNorthCompass({
       '''import { createPassiveWindEventInbox } from "./qscope-reviewable-event-inbox-v10-6.js?v=source-retention";
 import { captureResearchSourceThumbnail } from "./qscope-source-evidence-thumbnail-v10-6.js?v=observed-only";
 import { shouldPauseForNewResearchEvent } from "./qscope-intelligent-pause-v10-6.js";
-import { attachQscopeResearchEventDock } from "./qscope-research-event-dock-layout-v10-6-1.js?v=compass-safe-severity-v4";''',
+import { attachQscopeResearchEventDock } from "./qscope-research-event-dock-layout-v10-6-1.js?v=compass-safe-severity-v4";
+import { screenResearchWindArtefacts } from "./qscope-wind-artefact-guard-v10-6.js?v=v10-6-8-native-quality";''',
       "new inbox and original-source thumbnail modules")
     s=one(s,
       'inboxStyle.href="./src/qscope-passive-wind-inbox-v10-5.css?v=v10-5";',
-      'inboxStyle.href="./src/qscope-reviewable-event-inbox-v10-6.css?v=v10-6-7-modern-bom-kmhr";',
+      'inboxStyle.href="./src/qscope-reviewable-event-inbox-v10-6.css?v=v10-6-8-artifact-screen";',
       "preview-only CSS")
     s=one(s,
       '      onNavigate:navigateToPassiveResearchEvidence',
@@ -95,7 +96,12 @@ function pauseForGenuineNewResearchEvent(event,context) {
           alert,mode:"rain",frame:current,documentRef:document
         })
       }));
-      passiveRadarInbox?.observe(observed,
+      // Only new-source, multi-pixel coherent radial patches become WIND
+      // notifications. Hook echoes and coupled candidates are unaffected.
+      const screened=screenResearchWindArtefacts({
+        alerts:observed,currentRecords,previousRecords:priorRecords
+      });
+      passiveRadarInbox?.observe(screened.alerts,
         {mode:"rain",frameUtc:current.observedUtc});''',
       "genuine measured reflectivity snapshot")
     s=one(s,
@@ -107,7 +113,11 @@ function pauseForGenuineNewResearchEvent(event,context) {
           alert,mode:"doppler",record:latest,documentRef:document
         })
       }));
-      passiveRadarInbox?.observe(observed,
+      const screened=screenResearchWindArtefacts({
+        alerts:observed,currentRecords:[{...latest,geometryVerified:true}],
+        previousRecords:[{...prior,geometryVerified:true}]
+      });
+      passiveRadarInbox?.observe(screened.alerts,
         {mode:"doppler",frameUtc:latest.observedUtc,radarId});''',
       "genuine native Doppler RGB screenshot")
     s=one(s,
@@ -156,7 +166,7 @@ if (passiveRadarInbox) {
 // Prevent an older asynchronous radar-image load''',
       "research dock placement after inbox exists")
     a=one(a,"qscope-v10-6-persistent-evidence",
-      "qscope-v10-6-7-modern-bom-kmhr","browser iframe cache refresh")
+      "qscope-v10-6-8-artifact-screen","browser iframe cache refresh")
     for forbidden in ["enableWindHookResearch", "windHookResearchQaControl",
                       "syncSevereStormAlerts(", "syncIndependentDopplerResearch("]:
         if forbidden in s:raise ValueError(f"Unwanted legacy research UI source: {forbidden}")
@@ -170,6 +180,7 @@ if (passiveRadarInbox) {
         handle.write("\nQ-SCOPE V10.6.5 RESTORED ORIGINAL TRUE-NORTH COMPASS — V10.6 PREVIEW ONLY, INDEPENDENT OF RADAR EVENTS\n")
         handle.write("Q-SCOPE V10.6.6 COLOUR-CODED SOURCE-FAITHFUL WIND HOOK COUPLET EVENT VISUALS — OBSERVED GUSTS REQUIRE VERIFIED RETRIEVAL\n")
         handle.write("Q-SCOPE V10.6.7 SELECTED NEW BOM QUEENSLAND OBSERVATIONS PAGE — KM/HR, STRICT MODERN STATION IDs, NO FABRICATED GUSTS\n")
+        handle.write("Q-SCOPE V10.6.8 REJECT FRAGMENTED DOPPLER ARTEFACTS — NATIVE COHERENCE AND VELOCITY-GRADIENT TESTS; WIND EVENTS ONLY\n")
 
 if __name__=="__main__":
     args=ArgumentParser()
