@@ -358,3 +358,16 @@
     width:34px;height:34px;font-size:27px;
   }
 }
+
+/* Keep source evidence visible but never push the operator's event action
+   underneath a clipped scrollbar, legend, or compass in a short map panel. */
+#mapPanel .qscope-wind-event-open[data-has-snapshot="true"] .qscope-wind-signature-identity,
+#mapPanel .qscope-wind-event-open[data-has-snapshot="true"] .qscope-wind-card-meta {
+  padding-right:62px;
+}
+#mapPanel .qscope-wind-card-source {
+  position:absolute;right:7px;bottom:7px;
+  width:54px;height:46px;
+  object-fit:cover;
+  pointer-events:none;
+}
