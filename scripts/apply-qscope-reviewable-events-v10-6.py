@@ -34,7 +34,8 @@ def main(site):
     s=one(s,
       'import { createPassiveWindEventInbox } from "./qscope-passive-wind-inbox-v10-5.js";',
       '''import { createPassiveWindEventInbox } from "./qscope-reviewable-event-inbox-v10-6.js?v=source-retention";
-import { captureResearchSourceThumbnail } from "./qscope-source-evidence-thumbnail-v10-6.js?v=observed-only";''',
+import { captureResearchSourceThumbnail } from "./qscope-source-evidence-thumbnail-v10-6.js?v=observed-only";
+import { shouldPauseForNewResearchEvent } from "./qscope-intelligent-pause-v10-6.js";''',
       "new inbox and original-source thumbnail modules")
     s=one(s,
       'inboxStyle.href="./src/qscope-passive-wind-inbox-v10-5.css?v=v10-5";',
@@ -49,13 +50,13 @@ import { captureResearchSourceThumbnail } from "./qscope-source-evidence-thumbna
       '''let researchOperatorNavigationInProgress=false;
 const passiveResearchSeen=new Set();
 function pauseForGenuineNewResearchEvent(event,context) {
-  const age=Date.now()-Date.parse(event.latestUtc);
-  // Historical replay and archived scans must not interrupt an operator.
-  // Existing events can never trigger this callback again.
-  if(!isWindHookQaPreview || !windHookResearchEnabled ||
-     !Number.isFinite(age) || age<0 || age>12*60000 ||
-     !playback.isPlaying() || document.hidden ||
-     researchOperatorNavigationInProgress)return;
+  // Historical replay and archived scans must not interrupt the operator.
+  // The inbox triggers this only for a genuinely NEW pending event.
+  if(!shouldPauseForNewResearchEvent({
+    event,isResearch:isWindHookQaPreview && windHookResearchEnabled,
+    isPlaying:playback.isPlaying(),isHidden:document.hidden,
+    isNavigating:researchOperatorNavigationInProgress
+  }))return;
   void playback.pause();
   setStatus("Experimental Q-SCOPE radar event awaiting review · playback paused by preference.","warning");
 }
