@@ -31,6 +31,23 @@ def main(site):
     if s.count("/preview/wind-hook-v10-5/")!=2:
         raise ValueError("V10.5 source route was changed: cannot safely rebrand.")
     s=s.replace("/preview/wind-hook-v10-5/","/preview/wind-hook-v10-6/")
+    # The preview originates from pinned V10.3 before true-north compass
+    # existed. Fix the BUILD, not the event panel CSS. Mount the exact
+    # operational compass on the original map-camera controller here.
+    if "mountNorthCompass" in s or "north-compass-v1.js" in s:
+        raise ValueError("Pinned V10.3 compass absence contract changed; inspect source")
+    s=one(s,
+      "// The verified browser-source QA viewer must never call Cesium.camera.flyTo;",
+      '''// The original operator compass must be present in V10.6 even with
+// NO radar alerts. It is a camera controller tool, independent of the inbox.
+mountNorthCompass({
+  cameraController:mapCamera,
+  mapPanel:document.getElementById("mapPanel")
+});
+
+// The verified browser-source QA viewer must never call Cesium.camera.flyTo;''',
+      "restore working north compass immediately after camera creation")
+    s='import {mountNorthCompass} from "./north-compass-v1.js?v=v10-6-5-operational-compass";\\n'.replace('\\n', '\n')+s
     s=one(s,
       'import { createPassiveWindEventInbox } from "./qscope-passive-wind-inbox-v10-5.js";',
       '''import { createPassiveWindEventInbox } from "./qscope-reviewable-event-inbox-v10-6.js?v=source-retention";
