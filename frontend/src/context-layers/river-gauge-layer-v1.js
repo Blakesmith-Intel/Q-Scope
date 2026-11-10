@@ -899,8 +899,13 @@ export function createRiverGaugeLayer({
         diagnostics.historySourceMissing=screening.missingSource;
 
         const staleText=staleOfficial ? ` · ${staleOfficial} last-confirmed flood stage(s), observations stale` : "";
+        const coverage=result.metadataCoverage;
+        const referenceCoverage=coverage&&coverage.total>coverage.matched
+          ?` (${coverage.matched} of ${coverage.total} audited stations; ${coverage.total-coverage.matched} locations not verified in this reference)`:"";
         const metadataText=result.metadataFallback
-          ?String(result.metadataSource??"").startsWith("cached-")
+          ?result.metadataSource==="qld-government-bom-sls-reference"
+            ?` · station locations from versioned Queensland Government BoM network${referenceCoverage} as at ${new Date(result.metadataCheckedAt).toLocaleString("en-AU",{timeZone:"Australia/Brisbane"})}; river heights checked LIVE`
+          :String(result.metadataSource??"").startsWith("cached-")
             ?` · station locations from verified BoM browser records as at ${new Date(result.metadataCheckedAt).toLocaleString("en-AU",{timeZone:"Australia/Brisbane"})}; river heights checked LIVE`
             :result.metadataSource==="qld-government-bom-flood-network"
               ?" · station locations from Queensland Government BoM flood network; live BoM readings"
@@ -949,6 +954,7 @@ export function createRiverGaugeLayer({
           metadataSource:result.metadataSource,
           metadataFallback:result.metadataFallback,
           metadataCheckedAt:result.metadataCheckedAt,
+          metadataCoverage:result.metadataCoverage??null,
 
           loadedAt:
             lastLoadedAt
