@@ -41,7 +41,7 @@ export function readBoMStationGusts(source,{expectedStationId=null}={}){
   const rawId=ident?.bom_stn_num;
   if(!Number.isInteger(rawId)||rawId<1||rawId>999999||
      (expectedStationId!==null &&
-      !/^\\d{6}$/.test(String(expectedStationId))))
+      !/^\d{6}$/.test(String(expectedStationId))))
     return null;
   const stationId=String(rawId).padStart(6,"0");
   if(expectedStationId!==null&&stationId!==String(expectedStationId).padStart(6,"0"))
@@ -49,7 +49,7 @@ export function readBoMStationGusts(source,{expectedStationId=null}={}){
   const point={latitude:loc?.lat_dec_deg,longitude:loc?.long_dec_deg};
   const time=obs?.datetime_utc;
   if(!validPosition(point)||typeof time!=="string"||
-     !/^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d+)?Z$/.test(time)||
+     !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(time)||
      !Number.isFinite(Date.parse(time))||
      !finite(wind?.gust_speed_10m_max_mps)||
      wind.gust_speed_10m_max_mps<0||
@@ -142,7 +142,7 @@ export function createBoMWindGustResearchLookup({
     // on operator review; never a user-supplied URL and no statewide polling.
     // The site's latest feed cannot time-correlate expired historical events.
     const near=stations.filter(s=>validPosition(s)&&
-      /^\\d{6}$/.test(String(s.stationId))&&
+      /^\d{6}$/.test(String(s.stationId))&&
       kilometresApart(event,s)<=rules.maxStationKm)
       .sort((a,b)=>kilometresApart(event,a)-kilometresApart(event,b))
       .slice(0,rules.maxStationsPerEvent);
