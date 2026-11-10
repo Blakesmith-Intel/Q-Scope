@@ -66,6 +66,7 @@ function queuePassiveResearchPair(mode,index){
         // Reflectivity-only hook shapes remain legitimate research, but
         // no yellow/red radar-velocity evidence can be invented.
         console.warn("Q-SCOPE source Doppler could not be verified:",error);
+        passiveResearchSeen.delete(unique); // Retry only on a later normal source refresh.
       }
       if(sourceSites!==selectedSourceRadars().join(",")+":"+selectedRadarRegion())return;
       const assessment=assessV10RadarFrame({
@@ -73,6 +74,9 @@ function queuePassiveResearchPair(mode,index){
         dopplerState:{records:currentRecords},
         previousDopplerState:{records:priorRecords}
       });
+      if((!currentRecords.length||!priorRecords.length) &&
+         Date.now()-Date.parse(current.observedUtc) < 20*60000)
+        passiveResearchSeen.delete(unique); // Source may publish shortly after rain.
       passiveRadarInbox?.observe(assessment.alerts,
         {mode:"rain",frameUtc:current.observedUtc});
     } else {
@@ -226,6 +230,18 @@ def transform(site: Path):
     s=replace_once(s,"let windHookResearchEnabled = false;",
         "let windHookResearchEnabled = isWindHookQaPreview;",
         "automatic analysis opt-in removal")
+    s=replace_once(s,"let windHookResearchSources = null;",
+        "let windHookResearchSources = null;\\nlet windHookResearchCacheAt = 0;",
+        "bounded live-source refresh timestamp")
+    s=replace_once(s,
+        "  if (windHookResearchSources)return windHookResearchSources;",
+        "  if (windHookResearchSources && Date.now()-windHookResearchCacheAt < 4*60000)\\n    return windHookResearchSources;",
+        "finite original Doppler history cache lifetime")
+    s=replace_once(s,
+        "if(windHookResearchSiteKey===siteKey)windHookResearchSources=sources;",
+        "if(windHookResearchSiteKey===siteKey){windHookResearchSources=sources;windHookResearchCacheAt=Date.now();}",
+        "record original Doppler history cache refresh")
+
     s=replace_range(s,
         "if (isWindHookQaPreview) {\n  const qaStyle = document.createElement",
         "// Prevent an older asynchronous radar-image load",
