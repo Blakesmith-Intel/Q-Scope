@@ -264,6 +264,24 @@ function eventHeading(e) {
   const presentation=radarEventPresentation(e);
   return presentation.summary+" · "+presentation.priority;
 }
+const RADAR_SIGNATURE_GLYPHS=Object.freeze({
+  wind:"≋",hook:"↶",couplet:"⟳"
+});
+function signatureIdentity(doc,presentation,kind) {
+  const bar=createNode(doc,"div","qscope-wind-signature-identity");
+  bar.dataset.severity=presentation.severity;
+  const emblem=createNode(doc,"span","qscope-wind-signature-emblem",
+    RADAR_SIGNATURE_GLYPHS[presentation.severity]);
+  emblem.setAttribute("aria-hidden","true");
+  const summary=createNode(doc,"div","qscope-wind-signature-summary");
+  summary.append(
+    createNode(doc,"strong","",presentation.summary),
+    createNode(doc,"span","qscope-wind-signature-priority",
+      presentation.priority+" · EXPERIMENTAL")
+  );
+  bar.append(emblem,summary);
+  return bar;
+}
 export function createPassiveWindEventInbox({
   container, documentRef=globalThis.document,
   storage=globalThis.localStorage, onNewEvent=()=>{}, onNavigate=async()=>({ok:false,
@@ -351,6 +369,7 @@ export function createPassiveWindEventInbox({
       openEventId="";renderDetails();render();
     });
     headingLine.append(label,dismiss);
+    const identity=signatureIdentity(documentRef,presentation,"detail");
     const meta=createNode(documentRef,"p","",
       "Recorded "+timeAest(record.firstUtc)+"–"+timeAest(record.latestUtc)+
       " · "+record.latitude.toFixed(3)+"°, "+record.longitude.toFixed(3)+"°");
@@ -396,7 +415,7 @@ export function createPassiveWindEventInbox({
     clear.addEventListener("click",()=>{
       ledger.clear(record.id);openEventId="";render();
     });
-    details.append(headingLine,meta,sourceNote,evidenceList,
+    details.append(headingLine,identity,meta,sourceNote,evidenceList,
       locationStatus,clear);
   }
   function render(){
@@ -418,10 +437,23 @@ export function createPassiveWindEventInbox({
       const presentation=radarEventPresentation(record);
       const item=createNode(documentRef,"article","qscope-wind-event-card");
       item.dataset.severity=presentation.severity;
-      const open=createNode(documentRef,"button","qscope-wind-event-open",
-        eventHeading(record)+" · "+record.evidence.length+
-        (record.evidence.length===1?" observation":" observations")+
+      const open=createNode(documentRef,"button","qscope-wind-event-open");
+      const identity=signatureIdentity(documentRef,presentation,"compact");
+      const eventMeta=createNode(documentRef,"span","qscope-wind-card-meta",
+        record.evidence.length+
+        (record.evidence.length===1?" radar observation":" radar observations")+
         " · "+timeAest(record.latestUtc));
+      open.append(identity,eventMeta);
+      // Use the ACTUAL retained scan crop, never illustrative radar pixels,
+      // fake arrows or AI imagery masquerading as an observed signature.
+      const original=bestEvidence(record)?.snapshot;
+      if(original){
+        const sourceThumb=createNode(documentRef,"img","qscope-wind-card-source");
+        sourceThumb.src=original.dataUrl;
+        sourceThumb.alt="Retained source radar image at the detected time";
+        sourceThumb.loading="lazy";
+        open.appendChild(sourceThumb);
+      }
       open.type="button";
       open.addEventListener("click",()=>openRecord(record.id));
       const clear=createNode(documentRef,"button","qscope-wind-event-dismiss",
