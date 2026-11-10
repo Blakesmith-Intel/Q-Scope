@@ -121,6 +121,24 @@ try {
   assert(g[".qscope-wind-event-inbox"].x+
     g[".qscope-wind-event-inbox"].width<=g["#nav"].x+g["#nav"].width+2,
     "Compact event dock must align with radar toolbar");
+  if(!g.clickable){
+    const details=await page.evaluate(()=>{
+      const button=document.querySelector(".qscope-wind-event-open");
+      const dock=document.querySelector(".qscope-wind-event-inbox");
+      const r=button.getBoundingClientRect();
+      const target=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+      const dockRect=dock.getBoundingClientRect();
+      const nav=document.querySelector("#nav").getBoundingClientRect();
+      return {button:[r.x,r.y,r.width,r.height],
+        target:target?.outerHTML?.slice(0,260)??null,
+        eventVisibility:getComputedStyle(dock).visibility,
+        eventDisplay:getComputedStyle(dock).display,
+        dock:[dockRect.x,dockRect.y,dockRect.width,dockRect.height],
+        nav:[nav.x,nav.y,nav.width,nav.height],
+        placement:dock.dataset.placement,hidden:dock.hidden};
+    });
+    console.error("Q-SCOPE EVENT HIT TARGET",JSON.stringify(details));
+  }
   assert(g.clickable,"Operator MUST be able to actually click the event button");
   assert(g.zIndex>3000,"Event dock must have map-control stacking priority");
 
