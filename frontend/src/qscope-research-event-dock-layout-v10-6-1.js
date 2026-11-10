@@ -3,7 +3,8 @@
 // BoM reflectivity/Doppler legend or another visible operator control.
 // Sizing/placement is local DOM work; no radar, Worker or science changes.
 const MARGIN=10, GAP=10;
-const MIN_DOCK_HEIGHT=104;
+// Keep at least one actionable alert card legible below header and controls.
+const MIN_DOCK_HEIGHT=164;
 function clamp(value,min,max){return Math.min(max,Math.max(min,value));}
 function intersects(a,b){
   if(!a||!b)return 0;
