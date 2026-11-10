@@ -1,7 +1,7 @@
 // Offline/browser-only persistence of source-CONFIRMED flood-class stations.
 // Never match by site name. Any newer BoM below-minor observation clears its
 // own exact station ID. A stale missing observation is NOT proof of recovery.
-import {parseQueenslandObservationTime,FLOOD_STAGE_MAX_AGE_MS} from "./river-flood-signals-v1.js?v=20261018-inland-rise";
+import {parseQueenslandObservationTime,floodStageEvidenceMaxAge} from "./river-flood-signals-v1.js?v=20261018-inland-rise";
 import {stationFloodLevels,observedFloodClass}
   from "./river-flood-thresholds-v1.js?v=20261020-new-beith-ahd-v2";
 
@@ -9,7 +9,7 @@ export const OFFICIAL_FLOOD_STORAGE_KEY="stormtracker.qld-confirmed-flood-statio
 // The absence of new telemetry must NOT preserve a flood classification
 // indefinitely. After 24 h without a source-observed flood level, retire
 // the map record without asserting that the crossing is safe.
-export const FLOOD_CONFIRMATION_MAX_AGE_MS=FLOOD_STAGE_MAX_AGE_MS;
+export const FLOOD_CONFIRMATION_MAX_AGE_MS=24*60*60*1000; // default automatic/stale expiry
 const officialLevels=new Set(["minor","moderate","major"]);
 const normalised=value=>String(value??"").trim().toLowerCase();
 const stationId=id=>/^(bom|awrc):[a-z0-9_-]+$/i.test(String(id??""));
@@ -33,7 +33,7 @@ function safeRecord(id,record,now){
       !officialLevels.has(normalised(f?.properties?.STORMTRACKER_FLOOD_CLASS))||
       !Number.isFinite(observedAt)||observedAt<=0||
       observedAt>now+5*60000||
-      now-observedAt>FLOOD_CONFIRMATION_MAX_AGE_MS||
+      now-observedAt>floodStageEvidenceMaxAge(f)||
       f.properties?.STORMTRACKER_IDENTITY_WARNING||
       f.properties?.STORMTRACKER_STATION_TABLE_CONFLICT)return null;
   const latest=record?.latestFeature;
@@ -88,7 +88,7 @@ export function retainConfirmedFloodStations(features,previous={},now=Date.now()
     const latestAt=prior?.latestObservedAt??priorAt;
     const latest=prior?.latestFeature??prior?.feature;
     const validAt=Number.isFinite(at)&&at>0&&at<=now+5*60000 &&
-      now-at<=FLOOD_CONFIRMATION_MAX_AGE_MS;
+      now-at<=floodStageEvidenceMaxAge(incoming);
     const isEarlier=validAt&&at<latestAt;
     const observation=isEarlier && latest ? latest:incoming;
     const observationAt=isEarlier?latestAt:at;
