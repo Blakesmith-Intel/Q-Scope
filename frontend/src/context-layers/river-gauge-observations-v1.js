@@ -211,6 +211,11 @@ function featureWithObservation(
         ?? {}
       ),
 
+      // Directly from BoM's station-type column. Never infer 'manual'
+      // from station names, source gaps, or similar nearby gauges.
+      ...(observation.reportingMode==="manual"
+        ?{STORMTRACKER_REPORTING_MODE:"manual"}:{}),
+
       STORMTRACKER_HEIGHT_METRES:
         observation.heightMetres,
 
