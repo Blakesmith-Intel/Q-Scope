@@ -92,7 +92,13 @@ jobs:
           grep -Fq 'v9.20.1-secondary-3d-fix' _site/live3d-operational-v9.html
           test -f _site/preview/incremental-3d/BUILD.txt
           grep -Fq 'EXPERIMENTAL incremental 3-D QA' _site/preview/incremental-3d/BUILD.txt
-          test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 5
+          test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6
+          # Only the sixth opt-in science-preview may contain the V10.6 UI.
+          test -s _site/preview/wind-hook-v10-6/BUILD.txt
+          grep -Fq 'Q-SCOPE PERSISTENT RESEARCH EVENTS V10.6' _site/preview/wind-hook-v10-6/BUILD.txt
+          grep -Fq 'captureResearchSourceThumbnail' _site/preview/wind-hook-v10-6/src/live3d-operational-v9.js
+          grep -Fq 'Q-SCOPE PASSIVE WIND/HOOK RESEARCH V10.5' _site/preview/wind-hook-v10-5/BUILD.txt
+          ! grep -Fq 'qscope-reviewable-event-inbox-v10-6' _site/src/live3d-operational-v9.js
           # Q-SCOPE passive alerts are a separate fifth experimental preview,
           # never a newly activated operational or BoM-authoritative layer.
           test -s _site/preview/wind-hook-v10-5/BUILD.txt
