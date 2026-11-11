@@ -12,14 +12,16 @@ const asTime=v=>v&&Number.isFinite(Date.parse(v))?
 const severityRank=s=>windDisplay[s]?.priority??0;
 function markerSvg(record){
  const band=windDisplay[windStationSeverity(record)]??windDisplay.below;
- const sinceMidnight=windStationBasis(record)==="today-since-midnight";
- const val=sinceMidnight?record.todayMaximumGustKmh:record.gustKmh??record.sustainedKmh;
+ const basis=windStationBasis(record);
+ const sinceMidnight=basis==="today-since-midnight";
+ const mean=basis==="verified-10-minute-mean";
+ const val=sinceMidnight?record.todayMaximumGustKmh:mean?record.sustainedKmh:record.gustKmh??record.sustainedKmh;
  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="100" height="44" viewBox="0 0 100 44">'+
   '<rect x="2" y="3" width="96" height="37" rx="11" fill="#102430" stroke="'+band.colour+'" stroke-width="3"/>'+
   '<path d="M12 17h21q8 0 5-7-2-5-8-2 M12 23h29q12 0 7 9-4 7-11 1 M12 29h16" fill="none" stroke="'+band.colour+'" stroke-width="2.5" stroke-linecap="round"/>'+
   '<text x="72" y="24" font-size="18" font-weight="700" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif">'+
   Math.round(val??0)+'</text>'+
-  '<text x="71" y="35" font-size="9" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif">'+(sinceMidnight?"TODAY":"km/hr")+'</text></svg>';
+  '<text x="71" y="35" font-size="9" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif">'+(sinceMidnight?"TODAY":mean?"10m mean":"km/hr")+'</text></svg>';
  return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
 }
 function labelRow(holder,label,value){
@@ -90,7 +92,8 @@ export function initialiseOperationalBomWindObservations({
   labelRow(infoRows,"Mean wind speed",gustKmh(record.sustainedKmh));
   labelRow(infoRows,"Averaging period",record.windAveragingMinutes===10?"Verified 10 minutes":"Not verified by source");
   labelRow(infoRows,"Measured wind severity",windDisplay[windStationSeverity(record)].label+
-   (windStationBasis(record)==="today-since-midnight"?" · from today\'s peak, not latest gust":""));
+   (windStationBasis(record)==="today-since-midnight"?" · from today\'s peak, not latest gust":
+    windStationBasis(record)==="verified-10-minute-mean"?" · verified 10-minute mean":""));
   labelRow(infoRows,"Highest gust today (since midnight)",gustKmh(record.todayMaximumGustKmh));
   const hist=history.get(record.wmo);
   labelRow(infoRows,"Highest available gust in rolling 24 hours",
@@ -166,8 +169,10 @@ export function initialiseOperationalBomWindObservations({
     top.className="rainfall-report-entry";
     const name=document.createElement("strong"),value=document.createElement("span");
     name.textContent=station.name;
-    value.className="rainfall-report-mm";value.textContent=gustKmh(windStationBasis(station)==="today-since-midnight"?station.todayMaximumGustKmh:station.gustKmh)+
-     (windStationBasis(station)==="today-since-midnight"?" · today":"");
+    value.className="rainfall-report-mm";const basis=windStationBasis(station);
+    value.textContent=gustKmh(basis==="today-since-midnight"?station.todayMaximumGustKmh:
+     basis==="verified-10-minute-mean"?station.sustainedKmh:station.gustKmh)+
+     (basis==="today-since-midnight"?" · today":basis==="verified-10-minute-mean"?" · 10m mean":"");
     top.append(name,value);
     const meta=document.createElement("div");meta.className="rainfall-report-meta";
     const h=history.get(station.wmo);
