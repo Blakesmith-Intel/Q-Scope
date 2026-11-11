@@ -89,6 +89,26 @@ for old,new in (
     app_source,number=re.subn(pattern,new+"?v=20261112-seven-genuine-unique-v1",
                                app_source,count=1)
     assert number==1,"Missing exactly one runtime seven-scan import: "+old
+# One read-only acceptance trace: compare genuine requested UTCs with accepted
+# actual pixels and committed playback. No extra Worker requests or timers.
+request_needle='  const requestedInferred = requestedPlan.filter(entry => entry.kind === "inferred").length;'
+assert app_source.count(request_needle)==1
+app_source=app_source.replace(request_needle,request_needle+'''
+  console.log("QSCOPE_RADAR_DOM "+JSON.stringify({
+    stage:"source-to-request",selection:loopSelection,
+    advertised:availableRadarHistoryTimes.length,requested:times.length,
+    requestedUtc:times,partial:rainHistoryIncomplete
+  }));''',1)
+loaded_needle='  if (!displayFrames.length) {'
+assert app_source.count(loaded_needle)==1
+app_source=app_source.replace(loaded_needle,'''
+  console.log("QSCOPE_RADAR_DOM "+JSON.stringify({
+    stage:"verified-to-display",selection:loopSelection,
+    accepted:frames.length,displayFrames:displayFrames.length,
+    acceptedUtc:frames.map(f=>f.observedUtc),
+    failures:failureDiagnostics
+  }));
+'''+loaded_needle,1)
 app.write_text(app_source,encoding="utf-8")
 assert unique_model in app_source and unique_rain in app_source
 assert "const targetSpanMinutes = minutes;" in (root/unique_model).read_text()
