@@ -33,19 +33,15 @@ assert(content.observations.length>=50,"Statewide BoM observations missing");
 assert(content.observations.every(s=> /^\d{5}$/.test(s.wmo) &&
   Number.isFinite(s.latitude)&&Number.isFinite(s.longitude)&&
   Number.isFinite(Date.parse(s.observedUtc))),"Station metadata invalid");
-const valid=content.observations.find(s=>s.gustKmh!==null&&s.current);
-assert(valid,"No live current gust station verified");
-const history=await request("/qld-wind-observations?wmo="+valid.wmo);
-assert.equal(history.response.status,200,"Station 24h relay must succeed: "+history.body.slice(0,180));
-const h=JSON.parse(history.body);
-assert.equal(h.format,"QScopeBoMWindStation24hV1");
-assert.equal(h.wmo,valid.wmo);
-assert(Number.isFinite(h.peak.peakGustKmh)&&h.peak.sampleCount>=1);
-assert(Number.isFinite(Date.parse(h.peak.peakUtc)));
+const valid=content.observations.find(s=>s.todayMaximumGustKmh!==null&&s.current);
+assert(valid,"No current highest-gust-today value in official BoM state product");
+assert(Number.isFinite(valid.todayMaximumGustKmh));
+assert.equal(content.highestGustPeriod,"since-midnight-aest");
+assert(!("rolling24hCoverage" in content),"Never advertise a rolling 24-hour maximum");
 const invalid=await request("/qld-wind-observations?wmo=99999");
-assert([404,503].includes(invalid.response.status));
+assert.equal(invalid.response.status,400,"Per-station history requests disabled; only BoM statewide source");
 console.log("Q-SCOPE local Cloudflare Worker → official BoM end-to-end PASS",
  JSON.stringify({stations:content.observations.length,sampleStation:valid.wmo,
-  available24hSamples:h.peak.sampleCount,
+  highestGustTodayKmh:valid.todayMaximumGustKmh,
   cors:state.response.headers.get("access-control-allow-origin"),
   invalidStation:invalid.response.status}));
