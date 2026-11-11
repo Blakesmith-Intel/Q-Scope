@@ -52,7 +52,7 @@ export function parseUtc(stamp){
    stamp.slice(8,10)+":"+stamp.slice(10,12)+":"+stamp.slice(12,14)+"Z";
   return Number.isFinite(Date.parse(iso))?new Date(iso).toISOString():null;
  }
- return /Z$/.test(stamp)&&Number.isFinite(Date.parse(stamp))?
+ return /^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d+)?(?:Z|[+-]\\d\\d:\\d\\d)$/.test(stamp)&&Number.isFinite(Date.parse(stamp))?
   new Date(stamp).toISOString():null;
 }
 function attrs(tag){
@@ -95,7 +95,7 @@ export function parseQueenslandWindXml(xml,{now=Date.now()}={}){
   if(gust===null&&sustainedKmh===null&&today===null)continue;
   seen.add(wmo);
   records.push({
-   stationId:/^\d{6}$/.test(bom)?bom:null,wmo,name:(a.name??"BoM station").slice(0,110),
+   stationId:/^\d{6}$/.test(bom)?bom:null,wmo,name:(a["stn-name"]??a.name??"BoM station").slice(0,110),
    latitude,longitude,observedUtc,
    gustKmh:gust,sustainedKmh,windDirection:valueOf(p[2],"wind_dir"),
    // BoM OMD one-minute and METAR ten-minute mean wind are not equivalent.
