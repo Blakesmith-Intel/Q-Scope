@@ -65,18 +65,18 @@ jobs:
           node --check scripts/qscope-wind-qa-worker-v1.js
           node --check _wind_preview_assets/src/live3d-operational-v9.js
           node --check _wind_preview_assets/src/context-layers/qscope-bom-wind-observations-operational-v1.js
-      - name: Publish exclusively the separate qscope-wind-pr328 Worker with static site
+      - name: Publish branch preview under existing Worker WITHOUT production deployment
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy --config wrangler.qscope-wind-qa-preview.jsonc
+          command: preview --config wrangler.qscope-wind-qa-preview.jsonc --name qscope-wind-pr328
       - name: Prove public preview URL and official observations are accessible
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          const base='https://qscope-wind-pr328.stormtracker-bom-relay.workers.dev';
+          const base='https://qscope-wind-pr328-stormtracker-bom-relay.stormtracker-bom-relay.workers.dev';
           let health=null;
           let failure='';
           for(let i=0;i<9;i++){
