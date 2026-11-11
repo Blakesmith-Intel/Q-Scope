@@ -193,6 +193,8 @@ import {
 } from "./context-layers/qfd-technical-rescues-operational-v1.js?v=9.15.0-icons-onload";
 import {initialiseOperationalSignificantRainfall} from
   "./context-layers/significant-rainfall-operational-v1.js?v=20261018-rain-v1";
+import {initialiseOperationalBomWindObservations} from
+  "./context-layers/qscope-bom-wind-observations-operational-v1.js?v=20261111-wind-obs-v1";
 
 import {
   addVolumeDisplayPoint,
@@ -813,6 +815,10 @@ initialiseOperationalQfdTechnicalRescues({
   viewer
 });
 initialiseOperationalSignificantRainfall({viewer});
+// Independent BoM station observation layer; all accepted sources untouched.
+try{initialiseOperationalBomWindObservations({viewer});}
+catch(error){console.warn("Q-SCOPE BoM wind observation layer unavailable",error);}
+
 
 let hybridFrames = [];
 let hybridResults = [];
