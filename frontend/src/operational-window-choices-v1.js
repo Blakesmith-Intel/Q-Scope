@@ -1,7 +1,7 @@
 import { DOPPLER_AVAILABLE_LOOP_VALUE } from "./doppler-available-window-v1.js";
 
 // Operator-approved native BoM rain playback: display the current published
-// 30-minute / up-to-seven-source-scan window only. Do not advertise browser archives.
+// 30-minute / up-to-seven-source-scan window only. No extended history choices.
 // The independent Doppler all-available option remains untouched.
 export const RAIN_ONLY_LOOP_MINUTES = Object.freeze([30]);
 
