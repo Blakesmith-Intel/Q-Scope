@@ -52,7 +52,7 @@ export function parseUtc(stamp){
    stamp.slice(8,10)+":"+stamp.slice(10,12)+":"+stamp.slice(12,14)+"Z";
   return Number.isFinite(Date.parse(iso))?new Date(iso).toISOString():null;
  }
- return /^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d+)?(?:Z|[+-]\\d\\d:\\d\\d)$/.test(stamp)&&Number.isFinite(Date.parse(stamp))?
+ return /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/.test(stamp)&&Number.isFinite(Date.parse(stamp))?
   new Date(stamp).toISOString():null;
 }
 function attrs(tag){
