@@ -73,11 +73,19 @@ export function reconcileLatestBoMWarnings(messages,{complete=true,nowMs=Date.no
       products[code]=stateRow(officialActive?.has(code)?"listed-active":"no-active",notice);
       continue;
     }
-    const latestWarnings=options.filter(x=>x.issued===latest.issued)
+    // CAP sent time and the source GIS2Web original issue time may differ
+    // by seconds. Merge ONLY same-issue candidates (within the existing
+    // 120-second BoM WFS match tolerance), never superseded storm outlines.
+    const latestWarnings=options.filter(x=>latest.issued-x.issued<=120000)
       .flatMap(x=>x.warnings)
       .filter(w=>w.productCode===code && validMs(w.expiresUtc)>nowMs &&
         validMs(w.issuedUtc)<=nowMs && w.official===true);
-    const unique=[...new Map(latestWarnings.map(w=>[w.id,w])).values()];
+    // The original published GIS2Web geometry wins over a duplicate CAP
+    // representation. One source feature == one counted polygon, regardless
+    // of multi-ring/multipolygon topology or how many councils it intersects.
+    const gisWarnings=latestWarnings.filter(w=>w.sourceProduct!=null);
+    const authoritative=gisWarnings.length?gisWarnings:latestWarnings;
+    const unique=[...new Map(authoritative.map(w=>[w.id,w])).values()];
     if(!unique.length){
       // An explicit live warning without valid geometry is NOT a no-warning
       // response, even when the enclosing RSS request succeeded.
