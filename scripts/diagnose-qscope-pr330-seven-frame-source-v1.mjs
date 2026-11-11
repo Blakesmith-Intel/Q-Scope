@@ -6,6 +6,8 @@ import {resolveRainHistoryWindow} from
  "../frontend/src/rain-history-recovery-v1.js";
 import {normaliseRadarHistoryTimes,radarHistorySpanMinutes} from
  "../frontend/src/radar-history-window-v1.js";
+import {buildBomReflectivityTileUrl,reflectivityWindowForRegion} from
+ "../frontend/src/bom-wmts-loop-v2.js";
 const url="https://qscope-ui-seven-pr330-stormtracker-bom-relay.stormtracker-bom-relay.workers.dev/wmts-native-capabilities";
 const begin=Date.now();
 const res=await fetch(url,{signal:AbortSignal.timeout(20000),headers:{Accept:"application/xml"}});
@@ -28,3 +30,35 @@ console.log("QSCOPE_BOM_SEVENTH_FRAME_SOURCE",JSON.stringify({
  modelSelectedCount:selected.plan.length,modelPartial:selected.partial,
  codeNotes:"One official Capabilities GET, no tile probes, no Worker metadata fanout"
 }));
+
+const previewOrigin=new URL(url).origin;
+const window=reflectivityWindowForRegion("66");
+const centerCol=Math.floor((window.colStart+window.colEnd)/2);
+const centerRow=Math.floor((window.rowStart+window.rowEnd)/2);
+async function inspectTile(col,row,time){
+ const officialUrl=new URL(buildBomReflectivityTileUrl(col,row,time));
+ const resultUrl=previewOrigin+officialUrl.pathname+officialUrl.search;
+ try{
+  const r=await fetch(resultUrl,{signal:AbortSignal.timeout(12000)});
+  const arr=new Uint8Array(await r.arrayBuffer());
+  const validPng=arr.length>=8 && [137,80,78,71,13,10,26,10]
+    .every((x,i)=>x===arr[i]);
+  return {time,col,row,http:r.status,bytes:arr.length,
+    png:validPng,contentType:r.headers.get("content-type")};
+ }catch(e){return {time,col,row,error:String(e).slice(0,180)}}
+}
+// Only 7 center-tile checks and the oldest frame's actual Stapylton window;
+// never scan all nine sources or all radar sites. One-time QA, no new poller.
+const center=[];
+for(const time of span30)
+ center.push(await inspectTile(centerCol,centerRow,time));
+const oldest=span30[0],footprint=[];
+for(let row=window.rowStart;row<=window.rowEnd;row++)
+ for(let col=window.colStart;col<=window.colEnd;col++){
+  if(row===centerRow&&col===centerCol)continue;
+  footprint.push(await inspectTile(col,row,oldest));
+ }
+console.log("QSCOPE_BOM_SEVENTH_FRAME_TILES",JSON.stringify({
+ region:"66",window,checkedUtc:new Date().toISOString(),oldest,
+ sampledSeven: center,oldestGenuineFullFootprint:footprint,
+ note:"QA only, source-published timestamps; no guessed scans or background checks"}));
