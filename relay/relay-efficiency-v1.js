@@ -10,6 +10,7 @@ export const SAFE_TEXT_PRODUCT_ROUTES = Object.freeze(new Set([
   "/essential-energy-outages",
   "/qld-ifd-point",
   "/qld-significant-rainfall",
+  "/qld-wind-observations",
   "/river-crossing-heights",
   "/river-gauge-metadata",
   "/river-flood-thresholds",
