@@ -19,7 +19,7 @@ function markerSvg(record){
   '<path d="M12 17h21q8 0 5-7-2-5-8-2 M12 23h29q12 0 7 9-4 7-11 1 M12 29h16" fill="none" stroke="'+band.colour+'" stroke-width="2.5" stroke-linecap="round"/>'+
   '<text x="72" y="24" font-size="18" font-weight="700" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif">'+
   Math.round(val??0)+'</text>'+
-  '<text x="71" y="35" font-size="9" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif">km/hr</text></svg>';
+  '<text x="71" y="35" font-size="9" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif">'+(sinceMidnight?"TODAY":"km/hr")+'</text></svg>';
  return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
 }
 function labelRow(holder,label,value){
