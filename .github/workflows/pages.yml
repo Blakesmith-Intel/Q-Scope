@@ -195,6 +195,10 @@ jobs:
           mkdir -p checked/radar-refresh-review/_site
           rsync -a --exclude='/preview/' _site/ checked/radar-refresh-review/_site/
           python scripts/apply-radar-auto-refresh-v1.py
+          # Preserve the pre-radar QA source above. Apply only the operator-
+          # approved read-only clocks/brand and 7-real-scan selection to the
+          # FINAL root, after the immutable radar release is installed.
+          bash scripts/apply-qscope-quiet-seven-finalize-v1.sh
           # V10.2.45 is the operator-approved QA-tested engine, promoted to
           # the public ROOT. Changes below are cache-identity/manifest only,
           # not radar measurements, science, or UI controls.

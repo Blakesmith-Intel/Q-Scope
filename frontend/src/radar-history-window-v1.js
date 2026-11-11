@@ -172,10 +172,7 @@ export function availableRadarLoopMinutes(times) {
   return SUPPORTED_LOOP_MINUTES.filter(
     minutes =>
       spanMinutes
-      >= Math.max(
-        0,
-        minutes - RADAR_PLAYBACK_CADENCE_MINUTES
-      )
+      >= minutes
   );
 }
 
@@ -202,11 +199,8 @@ export function selectRadarHistoryPlan(
   const latestEpoch =
     Date.parse(plan.at(-1).observedUtc);
 
-  const targetSpanMinutes =
-    Math.max(
-      0,
-      minutes - RADAR_PLAYBACK_CADENCE_MINUTES
-    );
+  // Inclusive scan endpoints: 00:50 through 01:20 is 7 real scans, 30 min.
+  const targetSpanMinutes = minutes;
 
   const cutoff =
     latestEpoch - targetSpanMinutes * 60000;

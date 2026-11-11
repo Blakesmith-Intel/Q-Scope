@@ -40,4 +40,4 @@ assert.match(runtime,/independentDopplerRefresh = createLiveLoopRefresh\(/);
 assert.match(runtime,/hybridCombinedSchedule = isCombined \? combinedSchedule : \[\]/);
 assert.doesNotMatch(markup,/id="showDopplerOverlay"|id="dopplerPlayButton"/);
 assert.match(markup,/id="radarOpacity"|id="dopplerOpacity"|id="volumeOpacity"/);
-console.log("PASS BoM-only six-scan rain mode, no archive UI, and unmodified independent Doppler loop.");
+console.log("PASS BoM-only seven-scan rain mode, no archive UI, and unmodified independent Doppler loop.");

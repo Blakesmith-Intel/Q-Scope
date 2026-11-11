@@ -24,8 +24,8 @@ const fiveMinuteHistory =
 assert.equal(radarHistorySpanMinutes(fiveMinuteHistory), 40);
 assert.equal(radarHistoryCadenceMinutes(fiveMinuteHistory), 5);
 assert.deepEqual(availableRadarLoopMinutes(fiveMinuteHistory), [30]);
-assert.equal(selectRadarHistoryTimes(fiveMinuteHistory, 30).length, 6);
-assert.equal(selectRadarHistoryPlan(fiveMinuteHistory, 30).length, 6);
+assert.equal(selectRadarHistoryTimes(fiveMinuteHistory, 30).length, 7);
+assert.equal(selectRadarHistoryPlan(fiveMinuteHistory, 30).length, 7);
 
 const tenMinuteCadence =
   Array.from({ length: 10 }, (_, index) => stamp(index * 10));
@@ -49,7 +49,7 @@ assert.equal(threeHourPlan.at(-1).observedUtc, stamp(180));
 assert.ok(availableRadarLoopMinutes(threeHourSparse).includes(180));
 assert.equal(
   selectRadarHistoryPlan(threeHourSparse, 180).length,
-  36
+  37
 );
 
 const oneMissingScan = [
@@ -80,7 +80,7 @@ assert.deepEqual(
   continuousRadarHistoryTimes(gappy),
   [stamp(55), stamp(60), stamp(65), stamp(70), stamp(75), stamp(80)]
 );
-assert.deepEqual(availableRadarLoopMinutes(gappy), [30]);
+assert.deepEqual(availableRadarLoopMinutes(gappy), []);
 
 const maximumBridge = [
   stamp(0), stamp(MAX_TEMPORAL_INTERPOLATION_GAP_MINUTES),

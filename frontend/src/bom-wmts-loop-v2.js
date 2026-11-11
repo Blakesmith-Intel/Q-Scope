@@ -293,10 +293,19 @@ export async function loadVerifiedNationalMosaicAtTime(observedUtc, region = 'SE
   let tiles;
   try{
     tiles=await loadCompleteRadarTiles(tasks,
+      // A failed preflight tile participates in the SAME targeted recovery
+      // as other source PNGs. Never permanently throw the original 403:
+      // the retry must reach the original, authentic BoM tile URL again.
       url=>url===first.url
-        ? (firstRefusal?Promise.reject(firstRefusal):Promise.resolve(firstImage))
+        ? (firstRefusal
+            ? (firstRefusal=null,Promise.reject(
+                Object.assign(Error("Image request failed: HTTP 403"),{status:403})))
+            : firstImage
+              ? Promise.resolve(firstImage)
+              : fetchReadableImage(url))
         : fetchReadableImage(url),{
-      retries:1,stopOnPermanent:true
+      retries:1,stopOnPermanent:true,
+      retryVerified403:true,retry403DelayMs:5500
     });
   }catch(error){
     if(/HTTP\s+400\b/.test(String(error?.message??error)))
@@ -450,18 +459,18 @@ export async function discoverBomReflectivityHistory(
 }
 
 export async function findRecentBomReflectivityTimes(
- now=Date.now(),count=6,region='SEQ',
+ now=Date.now(),count=7,region='SEQ',
  {publishedTimes=publishedReflectivityTimes,
   verifyNationalTile=probeTimestamp}={}
 ){
  return (await discoverBoundedBomReflectivityHistory(now,180,region,{
   publishedTimes,maximumPublishedFrames:count,verifyNationalTile
- })).slice(-Math.max(1,Math.min(9,Math.trunc(Number(count)||6))));
+ })).slice(-Math.max(1,Math.min(9,Math.trunc(Number(count)||7))));
 }
 
 export async function loadRecentBomReflectivityMosaics(
   now = Date.now(),
-  count = 6,
+  count = 7,
   onProgress = null,
   region = 'SEQ'
 ) {

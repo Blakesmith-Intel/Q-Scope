@@ -4,6 +4,10 @@
 export async function loadCompleteRadarTiles(tasks, fetchTile, {
   retries = 1,
   stopOnPermanent = false,
+  // One delayed retry of ONLY refused genuine PNGs. Disabled unless the
+  // publication time has already been independently verified by BoM.
+  retryVerified403 = false,
+  retry403DelayMs = 5500,
   wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 } = {}) {
   if (!Array.isArray(tasks) || !tasks.length || typeof fetchTile !== "function") {
@@ -50,7 +54,7 @@ export async function loadCompleteRadarTiles(tasks, fetchTile, {
     if (!failures.length) return results;
     const refusedTile=stopOnPermanent && failures.some(({error}) =>
       /(?:HTTP\s+403\b|source refusal cooldown)/i.test(error));
-    if (attempt === retries || permanent || refusedTile) {
+    if (attempt === retries || permanent || (refusedTile && !retryVerified403)) {
       const details = failures.slice(0, 6).map(({ task, error }) =>
         "tile " + task.col + "/" + task.row + ": " + error
       ).join("; ");
@@ -60,7 +64,7 @@ export async function loadCompleteRadarTiles(tasks, fetchTile, {
         (permanent ? "; remaining tiles not requested after source refusal" : ""));
     }
     pending = failures.map(({ task, i }) => ({ task, i }));
-    await wait(250);
+    await wait(refusedTile ? retry403DelayMs : 250);
   }
   throw new Error("Radar tile loading unexpectedly exhausted.");
 }

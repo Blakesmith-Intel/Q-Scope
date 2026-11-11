@@ -1,0 +1,36 @@
+name: PR330 real Cloudflare mobile and desktop startup diagnostic
+on:
+  push:
+    branches:
+      - feature/qscope-quiet-refresh-and-premium-brand-20261112
+    paths:
+      - "scripts/diagnose-qscope-pr330-live-startup-v1.mjs"
+      - ".github/workflows/qa-qscope-pr330-live-startup-v1.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  live-preview-startup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    container: mcr.microsoft.com/playwright:v1.58.2-noble
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Diagnose real preview in Chromium and mobile WebKit
+        run: |
+          set -euxo pipefail
+          npm install --no-save --ignore-scripts playwright@1.58.2
+          QSCOPE_RADAR_DIAG=1 node scripts/diagnose-qscope-pr330-live-startup-v1.mjs
+      - name: Keep screenshots and failed-network evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qscope-pr330-real-browser-startup
+          path: /tmp/qscope-pr330-*.png
+          if-no-files-found: ignore

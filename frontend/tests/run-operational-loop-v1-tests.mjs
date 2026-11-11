@@ -14,8 +14,8 @@ assert.deepEqual(
 
 assert.equal(normaliseLoopMinutes(30), 30);
 assert.equal(normaliseLoopMinutes("180"), 180);
-assert.equal(frameCountForLoopMinutes(30), 6);
-assert.equal(frameCountForLoopMinutes(180), 36);
+assert.equal(frameCountForLoopMinutes(30), 7);
+assert.equal(frameCountForLoopMinutes(180), 37);
 assert.equal(playbackDelayForSpeed(1), 450);
 assert.equal(playbackDelayForSpeed(2), 225);
 assert.equal(playbackDelayForSpeed(3), 150);

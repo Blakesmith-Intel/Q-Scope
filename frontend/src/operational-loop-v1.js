@@ -38,6 +38,7 @@ export function frameCountForLoopMinutes(
       value
     )
     / 5
+    + 1 // Inclusive endpoints: 30 minutes means seven genuine 5-minute scans.
   );
 }
 
