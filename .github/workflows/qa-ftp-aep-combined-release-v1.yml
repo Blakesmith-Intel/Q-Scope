@@ -93,7 +93,14 @@ jobs:
           grep -Fq '__STORMTRACKER_NATIONAL_MOSAIC_PRIMARY=true' _site/live3d-operational-v9.html
           # The current operational Pages build is V10.2.50 plus the approved
           # native six-scan source-only overlay, NOT the October archive UI.
-          grep -Fq 'operational-window-choices-v1.js?v=20261103-six-published-scans-only-v1' _site/src/live3d-operational-v9.js
+          # Current operator release explicitly requires a seven-genuine-scan
+          # inclusive 30-minute loop, not the retired 6-scan import identity.
+          grep -Fq 'radar-history-window-seven-genuine-v1.js?v=20261112-seven-genuine-unique-v1' _site/src/live3d-operational-v9.js
+          grep -Fq 'rain-history-recovery-seven-genuine-v1.js?v=20261112-seven-genuine-unique-v1' _site/src/live3d-operational-v9.js
+          grep -Fq 'const targetSpanMinutes = minutes;' _site/src/radar-history-window-seven-genuine-v1.js
+          grep -Fq 'retryVerified403:true' _site/src/bom-wmts-loop-v2.js
+          node frontend/tests/run-qscope-seven-genuine-frames-v1-tests.mjs
+          node frontend/tests/run-radar-tile-retry-v1-tests.mjs
           grep -Fq 'Object.freeze([30])' _site/src/operational-window-choices-v1.js
           ! grep -Fq 'browser archive' _site/src/operational-window-choices-v1.js
           grep -Fq 'No off-window historical downloads' _site/src/live3d-operational-v9.js
