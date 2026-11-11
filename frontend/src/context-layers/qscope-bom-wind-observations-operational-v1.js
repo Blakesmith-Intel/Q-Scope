@@ -72,7 +72,7 @@ export function initialiseOperationalBomWindObservations({
   const damaging=qualifying.filter(x=>windStationSeverity(x)==="damaging").length;
   const gale=qualifying.filter(x=>windStationSeverity(x)==="gale").length;
   say((checkedAt?"BoM observed winds · ":"No verified observations · ")+
-   qualifying.length+" qualifying stations"+
+   qualifying.length+" qualifying observed winds / daily peaks"+
    (destructive?" · "+destructive+" destructive":"")+
    (damaging?" · "+damaging+" damaging":"")+
    (gale?" · "+gale+" sustained gale":"")+
@@ -157,7 +157,7 @@ export function initialiseOperationalBomWindObservations({
    section.append(h);
    if(!entries.length){
     const p=document.createElement("p");p.className="rainfall-report-empty";
-    p.textContent="No currently qualifying verified measurements.";section.append(p);
+    p.textContent="No qualifying verified latest wind or current-day gust peaks.";section.append(p);
    }
    const ul=document.createElement("ul");
    for(const station of entries){
@@ -165,7 +165,8 @@ export function initialiseOperationalBomWindObservations({
     top.className="rainfall-report-entry";
     const name=document.createElement("strong"),value=document.createElement("span");
     name.textContent=station.name;
-    value.className="rainfall-report-mm";value.textContent=gustKmh(windStationBasis(station)==="today-since-midnight"?station.todayMaximumGustKmh:station.gustKmh);
+    value.className="rainfall-report-mm";value.textContent=gustKmh(windStationBasis(station)==="today-since-midnight"?station.todayMaximumGustKmh:station.gustKmh)+
+     (windStationBasis(station)==="today-since-midnight"?" · today":"");
     top.append(name,value);
     const meta=document.createElement("div");meta.className="rainfall-report-meta";
     const h=history.get(station.wmo);
