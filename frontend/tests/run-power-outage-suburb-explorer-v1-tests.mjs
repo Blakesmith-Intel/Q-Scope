@@ -52,7 +52,7 @@ for(const id of ["openPowerOutageExplorer","powerOutageExplorer","outageSuburbSe
   "outageSuburbResults","outageSuburbSummary","outageSuburbFeedStatus",
   "powerOutageExplorerCountdown","outageByProviderReport","outageSuburbMore","closePowerOutageExplorer"])
   assert.ok(html.includes('id="'+id+'"'),id+" missing");
-assert.match(html,/power-outage-suburb-explorer-v1\\.css/);
+assert.match(html,/power-outage-suburb-explorer-v1\.css/);
 assert.doesNotMatch(html,/id="refreshPowerOutageExplorer"/,"Report no longer contains manual refresh button");
 assert.match(html,/role="timer"/,"Report uses a passive timer");
 assert.equal(formatPowerOutageRefreshCountdown(0,1000),"Automatic refresh not scheduled");
@@ -62,10 +62,10 @@ assert.equal(formatPowerOutageRefreshCountdown(901000,1000),"Next refresh in 15:
 assert.equal(formatPowerOutageRefreshCountdown(611000,1000),"Next refresh in 10:10");
 assert.equal(formatPowerOutageRefreshCountdown(61001,1000),"Next refresh in 01:01");
 assert.equal(formatPowerOutageRefreshCountdown(11001,1000),"Next refresh in 00:11");
-assert.match(view,/getNextRefreshAt\\(\\)/,"Countdown reads actual existing source polling schedule");
-assert.match(runtime,/getNextRefreshAt:\\(\\)=>layer\\?\\.nextScheduledRefreshAt/);
+assert.match(view,/getNextRefreshAt\(\)/,"Countdown reads actual existing source polling schedule");
+assert.match(runtime,/getNextRefreshAt:\(\)=>layer\?\.nextScheduledRefreshAt/);
 assert.match(css,/power-outage-refresh-countdown/);
-assert.doesNotMatch(view,/reload\\.addEventListener/,"No report manual refresh handler");
+assert.doesNotMatch(view,/reload\.addEventListener/,"No report manual refresh handler");
 assert.match(view,/groupOutagesBySuburb\(features\)/);
 assert.match(view,/document\.createElement/);
 assert.ok(view.includes("renderProviderReport()"));
