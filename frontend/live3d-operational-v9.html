@@ -102,7 +102,7 @@
         <div class="qscope-bom-wind-key"><span class="wind-key-destructive">≋</span> 125+ km/hr · Destructive gust</div>
         <div class="qscope-bom-wind-key"><span class="wind-key-gale">≋</span> 63–88 km/hr · Verified 10-minute sustained gale</div>
         <div class="qscope-bom-wind-key"><span class="wind-key-destructive">≋</span> 89+ km/hr · Verified 10-minute destructive mean wind</div>
-        <p>Official BoM station readings, not Doppler estimates or issued warnings. Gusts and mean wind are different measures. Highest gust today is since midnight; rolling 24-hour sample peaks are identified separately.</p>
+        <p>Official BoM station readings, not Doppler estimates or issued warnings. Highest gust today is the source-published maximum since midnight AEST. Current gust and mean wind are separate measurements.</p>
       </details>
       <div id="bomWindObservationsStatus" class="note" role="status">Off by default · official BoM surface wind</div>
       <div class="layer-row basemap-row"><label for="basemapSelect">Basemap</label><select id="basemapSelect" aria-label="Map basemap"><option value="street">Street</option><option value="qld-imagery">Satellite · DEA Regional + Local Detail</option></select></div>
@@ -254,7 +254,7 @@
       <header class="rainfall-report-header"><div>
         <span class="map-info-kicker">OFFICIAL BoM SURFACE WIND OBSERVATIONS</span>
         <strong id="bomWindGustReportTitle">Wind gust observations — Queensland</strong>
-        <p>Damaging or destructive measured gusts · verified gale conditions</p>
+        <p>All BoM Queensland stations · highest gust today since midnight AEST</p>
       </div><button id="closeBomWindGustReport" type="button">Close</button></header>
       <div class="rainfall-report-toolbar">
         <span id="bomWindGustReportStatus" role="status" aria-live="polite">Checking BoM measurements…</span>
@@ -262,7 +262,7 @@
       </div>
       <div id="bomWindGustReportSummary" class="rainfall-report-summary"></div>
       <div id="bomWindGustReportRows" class="rainfall-report-groups"></div>
-      <p class="rainfall-report-footnote">Actual BoM surface station readings, not a severe-weather warning. Gust severity uses 90 / 125 km/hr thresholds. Verified 10-minute mean wind at 63+ km/hr meets the damaging gale criterion and 89+ km/hr meets the destructive wind criterion. Mean wind averaging periods are not assumed. Today's maximum is measured since midnight; the rolling 24-hour value is the highest available sample in the station history, where verified. Coverage gaps and unverified readings are not zero or an all-clear.</p>
+      <p class="rainfall-report-footnote">BoM's published highest wind gust is measured since midnight AEST, not over the preceding 24 hours. This report reproduces available values for every station in the official Queensland observations product. Latest gust and mean wind are shown separately. Unavailable values are not estimated or treated as zero. Map marker colours are Q-Scope severity indications, not official BoM warnings.</p>
     </dialog>
     <!-- SIG_RAIN_CARD_START -->
     <section id="significantRainfallInfo" class="map-info-card significant-rainfall-info" aria-live="polite" hidden>
