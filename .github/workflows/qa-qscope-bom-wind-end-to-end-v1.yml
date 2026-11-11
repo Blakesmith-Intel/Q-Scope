@@ -88,7 +88,9 @@ jobs:
       - name: Install tested browser
         run: |
           npm install --no-save --ignore-scripts playwright@1.58.2
-          npx playwright install --with-deps ${{ matrix.platform == 'mobile' && 'webkit' || 'chromium' }}
+          # GitHub-hosted runner already has browser libraries. Avoid apt mirror
+          # DNS failures: fetch only the exact pinned Playwright browser build.
+          npx playwright install ${{ matrix.platform == 'mobile' && 'webkit' || 'chromium' }}
       - name: Exercise report and map controls in actual browser
         env:
           STORMTRACKER_BROWSER: ${{ matrix.platform }}
