@@ -34,7 +34,12 @@ jobs:
           const source='https://www.bom.gov.au/fwo/IDQ60920.xml';
           const response=await fetch(source,{signal:AbortSignal.timeout(25000)});
           if(!response.ok)throw Error('BoM state XML not available to CI: '+response.status);
-          const stations=parseQueenslandWindXml(await response.text());
+          const raw=await response.text();
+          console.log('Official BoM XML schema sample:',raw.slice(0,500));
+          console.log('First station tags:',[...raw.matchAll(/<station\\b[^>]*>/gi)].slice(0,2).map(m=>m[0]));
+          console.log('First periods:',[...raw.matchAll(/<period\\b[^>]*>/gi)].slice(0,2).map(m=>m[0]));
+          console.log('First elements:',[...raw.matchAll(/<element\\b[^>]*>/gi)].slice(0,3).map(m=>m[0]));
+          const stations=parseQueenslandWindXml(raw);
           console.log('Verified station count: '+stations.length);
           const station=stations.find(s=>s.gustKmh!==null&&s.current);
           if(!station)throw Error('No verified current gust station from BoM');
