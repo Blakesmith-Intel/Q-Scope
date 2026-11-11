@@ -194,7 +194,7 @@ export function initialiseOperationalBomWindObservations({
   }));
  }
  function openReport(){
-  if(!dialog)return;dialog.showModal?.();renderReport();
+  if(!dialog)return;if(!dialog.open)dialog.showModal?.();renderReport();
   if(!checkedAt||now()-checkedAt>refreshMs)
    void refresh().then(()=>loadReportPeaks()).catch(()=>{});
   else void loadReportPeaks();
