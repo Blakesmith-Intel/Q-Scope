@@ -61,9 +61,10 @@ jobs:
           set -euo pipefail
           node frontend/tests/run-bom-warning-crisp-golden-palette-v1-tests.mjs
           node --check frontend/src/context-layers/bom-warning-terrain-imagery-v1.js
+          # The final builder already performs every immutable approved overlay.
+          # Replaying older radar/AEP patches after 7-frame URL sealing breaks
+          # exact-import checks and was never necessary for this QA.
           bash scripts/build-current-site.sh
-          python scripts/apply-ftp-aep-release-v10.py
-          python scripts/apply-radar-auto-refresh-v1.py
           node --check _site/src/context-layers/bom-warning-terrain-imagery-v1.js
           grep -Fq '20261102-unified-terrain-warning-polygon-v1' _site/src/context-layers/bom-warning-operational-v1.js
       - name: Install Chromium or WebKit
