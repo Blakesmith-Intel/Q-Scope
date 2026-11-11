@@ -271,9 +271,13 @@ for relative,needles in chains.items():
     file=SITE/relative
     data=file.read_text(encoding="utf-8")
     for needle in needles:
-        if data.count(needle)!=1:
+        # The accepted QLDTraffic module contains two separately versioned
+        # imports of its original source. Preserve BOTH, no module redesign.
+        expected=2 if (relative=="src/context-layers/flood-road-closures-operational-v1.js"
+          and needle=="flood-road-closures-v1.js?v=") else 1
+        if data.count(needle)!=expected:
             raise AssertionError(f"Cache identity ambiguity {relative}: {needle} x{data.count(needle)}")
-        data=data.replace(needle,needle+cache_suffix,1)
+        data=data.replace(needle,needle+cache_suffix,expected)
     file.write_text(data,encoding="utf-8")
 
 with (SITE/"BUILD.txt").open("a",encoding="utf-8") as log:
