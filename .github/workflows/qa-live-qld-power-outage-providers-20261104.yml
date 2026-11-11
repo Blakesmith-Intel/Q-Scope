@@ -6,6 +6,7 @@ on:
       - frontend/src/context-layers/power-outages-operational-v1.js
       - frontend/src/context-layers/power-outage-suburb-explorer-v1.js
       - scripts/audit-live-qld-power-outage-providers-20261104.mjs
+      - scripts/probe-power-provider-extracted-vs-feed-clock-v1.mjs
       - .github/workflows/qa-live-qld-power-outage-providers-20261104.yml
   workflow_dispatch:
 permissions:
@@ -22,3 +23,7 @@ jobs:
         run: |
           node --check scripts/audit-live-qld-power-outage-providers-20261104.mjs
           node scripts/audit-live-qld-power-outage-providers-20261104.mjs
+      - name: Compare live Energex/Ergon record clocks to official ProcessAudit
+        run: |
+          node --check scripts/probe-power-provider-extracted-vs-feed-clock-v1.mjs
+          node scripts/probe-power-provider-extracted-vs-feed-clock-v1.mjs
