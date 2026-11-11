@@ -70,6 +70,9 @@ jobs:
           path: checked/wind-hook-v10.3-qa
       - name: Build exact operational Pages and apply pinned release changes
         run: |
+          # Show the exact legacy invariant that rejects the new seven-frame
+          # candidate; only diagnostic shell trace, no source mutation.
+          set -euxo pipefail
           # The full production-equivalent builder applies all previously
           # approved post-seal radar/AEP overlays, followed by the guarded
           # Q-SCOPE 7-source-scan source-window correction. Do not replay old
