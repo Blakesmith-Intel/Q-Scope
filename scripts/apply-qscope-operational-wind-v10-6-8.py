@@ -191,8 +191,10 @@ def main(site=Path("_site")):
     landing=index.read_text(encoding="utf-8")
     if "qscopeOperationalWindEvents" in runtime:
         raise ValueError("Wind addon already mounted: never install twice")
-    if "isWindHookQaPreview" in runtime or "syncSevereStormAlerts(" in runtime:
+    if "isWindHookQaPreview" in runtime:
         raise ValueError("Research-preview runtime cannot replace operational")
+    # The pinned root retains a permanently disabled legacy analysis method.
+    # Never remove, activate, or rewrite it as part of this additive rollout.
     if "PUBLISHED_PRODUCTION_RUNTIME" not in runtime:
         raise ValueError("Unexpected root: pinned operational invariant absent")
     runtime=IMPORT+runtime
