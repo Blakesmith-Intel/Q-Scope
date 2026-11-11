@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import {
- windSeverity,windStationSeverity,windDisplay,gustKmh,parseUtc,
+ windSeverity,windStationSeverity,windStationBasis,windDisplay,gustKmh,parseUtc,
  parseQueenslandWindXml,sampledWindPeak24h
 } from "../src/context-layers/qscope-bom-wind-observation-model-v1.js";
 const NOW=Date.parse("2026-11-11T12:30:00Z");
@@ -11,6 +11,10 @@ assert.equal(windSeverity(90,null),"damaging");
 assert.equal(windSeverity(124,null),"damaging");
 assert.equal(windSeverity(125,null),"destructive");
 assert.equal(windSeverity(null,63),"gale");
+assert.equal(windSeverity(65,88),"gale");
+assert.equal(windSeverity(65,89),"destructive");
+assert.equal(windStationBasis({gustKmh:60,sustainedKmh:90,windAveragingMinutes:10}),"verified-10-minute-mean");
+assert.equal(windStationBasis({gustKmh:20,todayMaximumGustKmh:135,sustainedKmh:25,windAveragingMinutes:10}),"today-since-midnight");
 assert.equal(windStationSeverity({gustKmh:0,sustainedKmh:68,windAveragingMinutes:1}),"below");
 assert.equal(windStationSeverity({gustKmh:0,sustainedKmh:68,windAveragingMinutes:10}),"gale");
 assert.equal(gustKmh(null),"Unavailable");
