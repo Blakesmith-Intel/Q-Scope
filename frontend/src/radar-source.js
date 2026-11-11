@@ -145,8 +145,12 @@ export async function fetchReadableImage(url) {
     // Access-Control-Allow-Origin. Do not repeatedly make doomed browser
     // CORS requests after an isolated relay 403; let the existing exact-tile
     // cooldown/recovery retry the original PNG via the approved relay.
+    // GitHub Pages AND isolated Cloudflare previews have the same browser
+    // CORS limitation against BoM's native endpoint. Those doomed direct
+    // attempts waste time before the authentic relay tile can be recovered.
     const browserNativeCorsBlocked=globalThis.location?.origin===
-      "https://blakesmith-intel.github.io";
+      "https://blakesmith-intel.github.io" ||
+      String(globalThis.location?.hostname??"").endsWith(".workers.dev");
     const nativeUrl=isWmts && response.status===403 && !browserNativeCorsBlocked
       ? officialWmtsFallbackUrl(url):null;
     if(nativeUrl){
