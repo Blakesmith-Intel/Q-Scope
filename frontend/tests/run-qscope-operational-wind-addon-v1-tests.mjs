@@ -57,7 +57,6 @@ for(const str of [
  "qscopeOperationalWindEvents.queueWindow(\"rain\"",
  "qscopeOperationalWindEvents.queueWindow(\"doppler\"",
  "ROOT_ADDITION",
- "screenResearchWindArtefacts",
  "assessOperationalWindPair",
  "qscopeWindNavigateToActualFrame",
  "severeStormAlertOverlay.setEnabled(false);"
