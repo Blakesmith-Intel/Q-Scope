@@ -293,7 +293,7 @@ def main(site=Path("_site")):
     # and ONE independent observer must reconstruct every original operational
     # runtime byte. Radar internals, input controls, frame refresh, warnings,
     # QFD, flood and other source logic are never rewritten.
-    unchanged=runtime.replace(IMPORT,"",1).replace("\\n"+ROOT_ADDITION,"",1)
+    unchanged=runtime.replace(IMPORT,"",1).replace(chr(10)+ROOT_ADDITION,"",1)
     assert unchanged==original_runtime, (
       "Approved operational runtime changed outside isolated wind observer")
     # Commit ONLY once all source anchors and required modules are verified.
