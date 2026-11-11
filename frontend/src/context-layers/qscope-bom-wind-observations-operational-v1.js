@@ -1,6 +1,6 @@
 // Independent operational BoM surface-wind observations for Q-SCOPE.
 // Never alters radar, Doppler, wind detection events or approved warning data.
-import {windStationSeverity,windDisplay,gustKmh,
+import {windStationSeverity,windStationBasis,windDisplay,gustKmh,
  WIND_OBS_REFRESH_MS,WIND_OBS_VALID_AGE_MS,WIND_OBS_SOURCE_URL}
  from "./qscope-bom-wind-observation-model-v1.js";
 export const WIND_OBSERVATION_RELAY=
@@ -12,7 +12,8 @@ const asTime=v=>v&&Number.isFinite(Date.parse(v))?
 const severityRank=s=>windDisplay[s]?.priority??0;
 function markerSvg(record){
  const band=windDisplay[windStationSeverity(record)]??windDisplay.below;
- const val=record.gustKmh??record.sustainedKmh;
+ const sinceMidnight=windStationBasis(record)==="today-since-midnight";
+ const val=sinceMidnight?record.todayMaximumGustKmh:record.gustKmh??record.sustainedKmh;
  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="100" height="44" viewBox="0 0 100 44">'+
   '<rect x="2" y="3" width="96" height="37" rx="11" fill="#102430" stroke="'+band.colour+'" stroke-width="3"/>'+
   '<path d="M12 17h21q8 0 5-7-2-5-8-2 M12 23h29q12 0 7 9-4 7-11 1 M12 29h16" fill="none" stroke="'+band.colour+'" stroke-width="2.5" stroke-linecap="round"/>'+
@@ -87,7 +88,8 @@ export function initialiseOperationalBomWindObservations({
   labelRow(infoRows,"Observed gust",gustKmh(record.gustKmh));
   labelRow(infoRows,"Mean wind speed",gustKmh(record.sustainedKmh));
   labelRow(infoRows,"Averaging period",record.windAveragingMinutes===10?"Verified 10 minutes":"Not verified by source");
-  labelRow(infoRows,"Measured wind severity",windDisplay[windStationSeverity(record)].label);
+  labelRow(infoRows,"Measured wind severity",windDisplay[windStationSeverity(record)].label+
+   (windStationBasis(record)==="today-since-midnight"?" · from today\'s peak, not latest gust":""));
   labelRow(infoRows,"Highest gust today (since midnight)",gustKmh(record.todayMaximumGustKmh));
   const hist=history.get(record.wmo);
   labelRow(infoRows,"Highest available gust in rolling 24 hours",
@@ -163,7 +165,7 @@ export function initialiseOperationalBomWindObservations({
     top.className="rainfall-report-entry";
     const name=document.createElement("strong"),value=document.createElement("span");
     name.textContent=station.name;
-    value.className="rainfall-report-mm";value.textContent=gustKmh(station.gustKmh);
+    value.className="rainfall-report-mm";value.textContent=gustKmh(windStationBasis(station)==="today-since-midnight"?station.todayMaximumGustKmh:station.gustKmh);
     top.append(name,value);
     const meta=document.createElement("div");meta.className="rainfall-report-meta";
     const h=history.get(station.wmo);
