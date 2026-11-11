@@ -38,6 +38,11 @@ jobs:
           # Replaying older radar/AEP patches after 7-frame URL sealing breaks
           # exact-import checks and was never necessary for this QA.
           bash scripts/build-current-site.sh
+          # Reproduce the true production order: sealed builder, accepted
+          # FTP/AEP, restored radar, THEN the isolated operator UI correction.
+          python scripts/apply-ftp-aep-release-v10.py
+          python scripts/apply-radar-auto-refresh-v1.py
+          bash scripts/apply-qscope-quiet-seven-finalize-v1.sh
           ! grep -Fq 'NATIVE_DOPPLER_STRICT_PALETTE_START_ROW' _site/src/native-doppler-image-v1.js
           grep -Fq 'RICHMOND REAL PIXEL PALETTE TOLERANCE ALL ROWS' _site/BUILD.txt
       - name: Install browser
