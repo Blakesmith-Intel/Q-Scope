@@ -103,9 +103,12 @@ export function sourceExactQldBomWfsFeatures(collection,notice,{nowMs=Date.now()
  }
  return warnings;
 }
-export async function fetchQldBomWfsGeometry(notice,{fetchImpl=fetch,nowMs=Date.now()}={}){
- const source=allowed(notice?.productCode);
- if(!source)return [];
+// Fetch the ORIGINAL WFS-derived polygons independently for each QLD warning
+// product. Do not make retrieval depend on being in the first 22 national CAP
+// entries: simultaneous regional and detailed warnings can otherwise disappear.
+async function fetchProductCollection(code,{fetchImpl=fetch}={}){
+ const source=allowed(code);
+ if(!source)return null;
  const url=new URL(QLD_BOM_GIS_WARNING_REPLICA+"/"+source.layer+"/query");
  url.searchParams.set("f","geojson");
  url.searchParams.set("where","product='"+source.axf+"'");
@@ -118,12 +121,65 @@ export async function fetchQldBomWfsGeometry(notice,{fetchImpl=fetch,nowMs=Date.
   signal:AbortSignal.timeout(14500)
  });
  if(!response.ok)throw Error("Queensland BoM WFS derivative HTTP "+response.status);
- const text=await response.text();
- if(text.length>1800000)throw Error("BoM GIS polygon response oversized");
+ const body=await response.text();
+ if(body.length>1800000)throw Error("BoM GIS polygon response oversized");
  let collection;
- try{collection=JSON.parse(text);}catch{throw Error("Invalid government BoM GIS JSON");}
+ try{collection=JSON.parse(body);}catch{throw Error("Invalid government BoM GIS JSON");}
  if(collection?.error)throw Error("Government BoM GIS unavailable: "+String(collection.error.code??"API error"));
+ return collection;
+}
+export async function fetchQldBomWfsGeometry(notice,{fetchImpl=fetch,nowMs=Date.now()}={}){
+ if(!allowed(notice?.productCode))return [];
+ const collection=await fetchProductCollection(notice.productCode,{fetchImpl});
  return sourceExactQldBomWfsFeatures(collection,notice,{nowMs});
+}
+// A verified, fresh BoM Queensland CURRENT-products index plus the original,
+// valid GIS2Web WFS issue is independently sufficient to authenticate a
+// product's genuine polygons. This safely recovers products omitted from the
+// BOUNDED global CAP history, without inventing any forecast-district shape.
+// A missing/stale index, cancelled product, or stale WFS issue NEVER passes.
+export function indexVerifiedQldBomWfsFeatures(collection,code,index,{nowMs=Date.now()}={}){
+ const source=allowed(code);
+ const checked=timeMs(index?.checkedUtc);
+ if(!source||index?.verified!==true||!Array.isArray(index.activeCodes)||
+   !index.activeCodes.includes(code)||!Number.isFinite(checked)||
+   checked>nowMs+5*60000||nowMs-checked>20*60000)return null;
+ if(collection?.type!=="FeatureCollection"||!Array.isArray(collection.features)||
+    collection.error||collection.features.length>500||
+    collection.exceededTransferLimit===true)
+   throw Error("Incomplete official BoM WFS-derived geometry data");
+ const eligible=collection.features.filter(f=>{
+  const p=f?.properties??{};
+  const from=timeMs(p.validfrom_utc),to=timeMs(p.validto_utc);
+  return p.product===source.axf&&Number.isFinite(from)&&Number.isFinite(to)&&
+    from<=nowMs&&to>nowMs;
+ });
+ if(!eligible.length)return null;
+ const latest=Math.max(...eligible.map(f=>timeMs(f.properties.validfrom_utc)));
+ // Preserve the original GIS issue and expiry, not a synthesized time window.
+ const current=eligible.filter(f=>
+   Math.abs(timeMs(f.properties.validfrom_utc)-latest)<=120000);
+ const expiry=Math.max(...current.map(f=>timeMs(f.properties.validto_utc)));
+ const notice={productCode:code,status:"issued",
+  issuedUtc:new Date(latest).toISOString(),expiresUtc:new Date(expiry).toISOString(),
+  headline:"",description:"",instruction:"",areaDescription:"",
+  bulletinUrl:"https://www.bom.gov.au/warning/"+
+   (/^IDQ2103[35]$/.test(code)?"severe-thunderstorm-warning/":"severe-weather-warning/")+code};
+ const warnings=sourceExactQldBomWfsFeatures(collection,notice,{nowMs})
+  .map(w=>({...w,geometryVerification:"BoM current QLD product index + original current GIS2Web issue"}));
+ if(!warnings.length)return null;
+ return {notice,warnings};
+}
+export async function fetchQldBomWfsCurrentIndexGeometry(code,index,{
+ fetchImpl=fetch,nowMs=Date.now()
+}={}){
+ const checked=timeMs(index?.checkedUtc);
+ if(!allowed(code)||index?.verified!==true||
+   !Array.isArray(index.activeCodes)||!index.activeCodes.includes(code)||
+   !Number.isFinite(checked)||checked>nowMs+5*60000||
+   nowMs-checked>20*60000)return null;
+ const collection=await fetchProductCollection(code,{fetchImpl});
+ return indexVerifiedQldBomWfsFeatures(collection,code,index,{nowMs});
 }
 
 // IDQ21035 also has a DISTINCT BoM product for source-issued storm-cell
