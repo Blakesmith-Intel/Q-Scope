@@ -4,7 +4,7 @@
 export const QLD_BOM_WIND_PRODUCT="IDQ60920";
 export const WIND_OBS_SOURCE_URL="https://www.bom.gov.au/location/australia/queensland#observations";
 export const WIND_OBS_REFRESH_MS=10*60*1000;
-export const WIND_OBS_THRESHOLDS=Object.freeze({sustainedGale:63,damaging:90,destructive:125});
+export const WIND_OBS_THRESHOLDS=Object.freeze({sustainedGale:63,sustainedDestructive:89,damaging:90,destructive:125});
 export const WIND_OBS_VALID_AGE_MS=90*60*1000;
 const numeric=value=>{
  if(value===null||value===undefined||String(value).trim()==="")return null;
@@ -12,13 +12,13 @@ const numeric=value=>{
  return Number.isFinite(n)&&n>=0&&n<=350?n:null;
 };
 export const windSeverity=(gust,sustained)=>{
- if(numeric(gust)!==null&&gust>=125)return "destructive";
+ if((numeric(gust)!==null&&gust>=125)||(numeric(sustained)!==null&&sustained>=89))return "destructive";
  if(numeric(gust)!==null&&gust>=90)return "damaging";
  if(numeric(sustained)!==null&&sustained>=63)return "gale";
  return "below";
 };
 export const windDisplay=Object.freeze({
- destructive:{label:"Destructive gust",colour:"#c93b42",priority:4},
+ destructive:{label:"Destructive wind",colour:"#c93b42",priority:4},
  damaging:{label:"Damaging gust",colour:"#e9aa34",priority:3},
  gale:{label:"Sustained gale-force wind",colour:"#367bbb",priority:2},
  below:{label:"Below damaging threshold",colour:"#667d87",priority:1}
@@ -34,11 +34,15 @@ export function windStationSeverity(record){
  return instant;
 }
 export function windStationBasis(record){
- const latest=windSeverity(record?.gustKmh,
-  record?.windAveragingMinutes===10?record.sustainedKmh:null);
+ const mean=record?.windAveragingMinutes===10?record.sustainedKmh:null;
+ const instant=windSeverity(record?.gustKmh,mean);
  const combined=windStationSeverity(record);
- return combined!==latest?"today-since-midnight":
-   combined==="gale"?"verified-10-minute-mean":"latest-observed-gust";
+ if(combined!==instant)return "today-since-midnight";
+ if(mean!==null&&mean>=89&&(record?.gustKmh??0)<125)
+  return "verified-10-minute-mean";
+ if(mean!==null&&mean>=63&&(record?.gustKmh??0)<90)
+  return "verified-10-minute-mean";
+ return "latest-observed-gust";
 }
 export function gustKmh(value){return numeric(value)===null?"Unavailable":Math.round(+value)+" km/hr";}
 export function parseUtc(stamp){
