@@ -4,7 +4,7 @@ import {reconcileLatestBoMWarnings}
  from "./bom-warning-product-reconcile-v1.js";
 import {fetchCurrentQldBoMWarningsIndex}
  from "./bom-warning-qld-current-index-v1.js";
-import {fetchQldBomWfsGeometry,fetchQldBomStormLocations}
+import {fetchQldBomWfsGeometry,fetchQldBomWfsCurrentIndexGeometry,fetchQldBomStormLocations}
  from "./bom-warning-gis2web-replica-v1.js";
 
 export const BOM_CAP_RSS="https://severeweather.wmo.int/v2/cap-alerts/au-bom-en/rss.xml";
@@ -71,6 +71,20 @@ export async function enrichWarningBoundaries(warning){
   geometryIntersectionsMethod:"esriSpatialRelIntersects — no minimum area"
  };
 }
+// Bound concurrent council boundary requests, but NEVER silently truncate
+// the warning features counted for a live warning or LGA/DDMG report.
+async function enrichAllWarningBoundaries(warnings){
+ const results=new Array(warnings.length);
+ let next=0;
+ async function worker(){
+  while(next<warnings.length){
+   const i=next++;
+   results[i]=await enrichWarningBoundaries(warnings[i]);
+  }
+ }
+ await Promise.all(Array.from({length:Math.min(8,warnings.length)},worker));
+ return results;
+}
 export async function relayBomWarningPolygons(request,origin,corsHeaders){
  const head={"Content-Type":"application/json; charset=utf-8","Cache-Control":"public,max-age=90"};
  let payload;
@@ -110,15 +124,38 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
    if(!prev||Date.parse(n.issuedUtc)>Date.parse(prev.issuedUtc))
     latestIssued.set(n.productCode,n);
   }
-  const gisResults=await Promise.allSettled([...latestIssued.values()]
-   .map(notice=>fetchQldBomWfsGeometry(notice,{nowMs:now})));
+  // The verified Queensland CURRENT index is the product discovery authority.
+  // Fetch GIS2Web shapes for EVERY listed active product independently, even
+  // when a regional CAP alert fell outside the bounded 22-message global RSS.
+  // For an issued CAP product missing from the index, retain the existing
+  // source-exact CAP/GIS matching and newer-issue safety behaviour.
+  const indexedCodes=(qldCurrentIndex?.verified===true?
+    qldCurrentIndex.activeCodes:[]).filter(code=>
+      ["IDQ21033","IDQ21035","IDQ21037","IDQ21038"].includes(code));
+  const indexed=new Set(indexedCodes);
+  const capOnly=[...latestIssued.values()].filter(n=>!indexed.has(n.productCode));
+  const requests=[
+   ...indexedCodes.map(code=>({code,run:()=>fetchQldBomWfsCurrentIndexGeometry(
+     code,qldCurrentIndex,{nowMs:now})})),
+   ...capOnly.map(notice=>({code:notice.productCode,
+     run:()=>fetchQldBomWfsGeometry(notice,{nowMs:now})
+       .then(warnings=>({notice,warnings}))}))
+  ];
+  const gisResults=await Promise.allSettled(requests.map(r=>r.run()));
   let gisFailures=0;
-  [...latestIssued.values()].forEach((notice,i)=>{
+  requests.forEach((request,i)=>{
    const result=gisResults[i];
    if(result.status==="rejected"){gisFailures++;return;}
-   const row=messageRecords.find(r=>r?.notice?.productCode===notice.productCode&&
-     r.notice.issuedUtc===notice.issuedUtc);
-   if(row)row.warnings=[...(row.warnings??[]),...result.value];
+   const match=result.value;
+   if(!match?.notice||!Array.isArray(match.warnings)||!match.warnings.length)return;
+   const cap=latestIssued.get(request.code);
+   // Never render an older, superseded WFS footprint against a newer CAP
+   // issuance if its original GIS coordinates have not yet caught up.
+   if(cap&&Date.parse(cap.issuedUtc)-Date.parse(match.notice.issuedUtc)>120000)return;
+   const row=messageRecords.find(r=>r?.notice?.productCode===request.code&&
+     Math.abs(Date.parse(r.notice.issuedUtc)-Date.parse(match.notice.issuedUtc))<=120000);
+   if(row)row.warnings=[...(row.warnings??[]),...match.warnings];
+   else messageRecords.push(match);
   });
   const reconciled=reconcileLatestBoMWarnings(messageRecords,{
     complete:sourceFailures===0&&!indexPossiblyTruncated,nowMs:now,
@@ -127,13 +164,15 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
   // NSW clipping against the TRUE installed radar coverage union is required
   // before independently publishing NSW warnings. Do not approximate it.
   const qld=reconciled.warnings.filter(x=>x.state==="QLD");
-  const enriched=await Promise.all(qld.slice(0,14).map(enrichWarningBoundaries));
+  const enriched=await enrichAllWarningBoundaries(qld);
   const products=reconciled.products;
   // IDQ65652 is the separate detailed storm-LOCATION product. A published
   // IDQ65650 threat-area polygon must never be treated as an individual cell.
   // A source outage or no available cell geometries never implies "no storms".
   let stormCells=[],stormCellSourceStatus="not-active";
-  const detailedNotice=latestIssued.get("IDQ21035");
+  const detailedNotice=latestIssued.get("IDQ21035")??
+    messageRecords.find(r=>r?.notice?.productCode==="IDQ21035"&&
+      r.notice.status==="issued"&&Array.isArray(r.warnings)&&r.warnings.length)?.notice;
   if(detailedNotice&&products.IDQ21035?.status!=="cancelled"&&
     products.IDQ21035?.status!=="no-active"){
    try{
