@@ -76,21 +76,18 @@ try {
    {wmo:"94579",stationId:"040100",name:"Gale Station",latitude:-27.1,longitude:152.7,
     observedUtc:iso,gustKmh:60,todayMaximumGustKmh:60,sustainedKmh:70,windAveragingMinutes:10,current:true},
    {wmo:"94580",stationId:"040101",name:"Below Threshold",latitude:-27.2,longitude:152.8,
-    observedUtc:iso,gustKmh:25,todayMaximumGustKmh:25,sustainedKmh:18,windAveragingMinutes:10,current:true}
+    observedUtc:iso,gustKmh:25,todayMaximumGustKmh:null,sustainedKmh:18,windAveragingMinutes:10,current:true}
   ];
-  const fetchImpl=async url=>({
-   ok:true,status:200,
-   async json(){
-    if(String(url).includes("?wmo=")){
-     const wmo=String(url).split("wmo=")[1];
-     return {format:"QScopeBoMWindStation24hV1",wmo,
-      peak:{peakGustKmh:wmo==="94576"?143:103,
-       peakUtc:iso,sampleCount:48}};
-    }
+  window._windRequests=[];
+  const fetchImpl=async url=>{
+   window._windRequests.push(String(url));
+   if(String(url).includes("?wmo="))throw Error("Unexpected per-station history request");
+   return {ok:true,status:200,async json(){
     return {format:"QScopeBoMWindObservationsV1",
-     observations,checkedAt:new Date().toISOString()};
-   }
-  });
+     highestGustPeriod:"since-midnight-aest",observations,
+     checkedAt:new Date().toISOString()};
+   }};
+  };
   const mod=await import("/src/context-layers/qscope-bom-wind-observations-operational-v1.js");
   window.qscopeWindUI=mod.initialiseOperationalBomWindObservations({
    viewer,CesiumRef,fetchImpl,refreshMs:600000
@@ -105,10 +102,16 @@ try {
  await page.locator("#openBomWindGustReport").click();
  const dialog=page.locator("#bomWindGustReport");
  assert.equal(await dialog.evaluate(el=>el.open),true);
- assert.match(await dialog.innerText(),/Destructive wind/);
- assert.match(await dialog.innerText(),/Damaging gust/);
- assert.match(await dialog.innerText(),/Sustained gale-force wind/);
- assert.match(await dialog.innerText(),/Highest available|Rolling 24h/i);
+ assert.match(await dialog.innerText(),/Highest wind gust today|highest gust today/i);
+ assert.equal(await page.locator("#bomWindGustReportRows li").count(),4,
+  "Report must include ALL original BoM observations, even below map thresholds");
+ assert.match(await dialog.innerText(),/Below Threshold/);
+ assert.match(await dialog.innerText(),/Unavailable/);
+ assert.doesNotMatch(await dialog.innerText(),/rolling 24h|sample peak|samples/i);
+ assert.equal(await page.evaluate(()=>window._windRequests.length),1,
+  "Opening report must not trigger per-station history fetches");
+ const gusts=await page.locator("#bomWindGustReportRows .rainfall-report-mm").allInnerTexts();
+ assert.deepEqual(gusts.slice(0,3),["140 km/hr","100 km/hr","60 km/hr"]);
  const box=await dialog.boundingBox();
  assert(box,"Wind report must render");
  const viewport=page.viewportSize();
@@ -132,7 +135,7 @@ try {
  assert.equal(await page.evaluate(()=>window._windSource.show),false);
  console.log("PASS real "+(mobile?"WebKit iPhone":"Chromium desktop")+
   " assembled severe-weather controls, preserved warning/rain/flood/nav,"+
-  " station map interaction, severity groups, 24h report and viewport");
+  " station map interaction, BoM direct maxima (all stations), no history fanout and viewport");
 }finally{
  await page.evaluate(()=>window.qscopeWindUI?.stop?.()).catch(()=>{});
  await browser.close();
