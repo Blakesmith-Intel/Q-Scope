@@ -130,7 +130,7 @@ patch("src/context-layers/road-ownership-report-v1.js",
 # This does NOT change cancellation, polling, retries, concurrency or timing.
 patch("src/live-loop-refresh-v1.js",
  '  let timer, active = false, pending = null;',
- '  let timer, active = false, pending = null;\\n  let regularDueAt = 0;')
+ '  let timer, active = false, pending = null;\n  let regularDueAt = 0;')
 patch("src/live-loop-refresh-v1.js",
  '    if (active) timer = schedule(() => { timer = null; void check(); }, interval);',
  '    if (active) { regularDueAt=Date.now()+interval; timer = schedule(() => { timer = null; void check(); }, interval); }')
@@ -138,8 +138,8 @@ patch("src/live-loop-refresh-v1.js",
  '    stop() { active = false; if (timer != null) cancel(timer); timer = null; },',
  '    stop() { active = false; if (timer != null) cancel(timer); timer = null; regularDueAt=0; },')
 patch("src/live-loop-refresh-v1.js",
- '    check\\n  };',
- '    check,\\n    get nextPollAt(){return regularDueAt;}\\n  };')
+ '    check\n  };',
+ '    check,\n    get nextPollAt(){return regularDueAt;}\n  };')
 patch("src/live3d-operational-v9.js",
  '// A QA-only hook tests repeated real source checks',
  'globalThis.__qscopePollClock?.observe("radar",()=>autoRefresh.nextPollAt);\n\n'
