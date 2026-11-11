@@ -53,8 +53,9 @@ jobs:
           set -euo pipefail
           npm test
           bash scripts/build-current-site.sh
-          python3 scripts/apply-ftp-aep-release-v10.py
-          python3 scripts/apply-radar-auto-refresh-v1.py
+          # The sealed build already applies every approved source overlay and
+          # the final read-only UI + 7-frame correction. NEVER double-apply
+          # pinned radar/AEP code against the finished module import graph.
           python3 scripts/prepare-qscope-quiet-seven-preview-v1.py
           grep -Fq 'Q-SCOPE PREMIUM UI 12 COUNTDOWNS AND 7 GENUINE RADAR FRAMES PR330 REVIEW ONLY' _wind_preview_assets/BUILD.txt
           grep -Fq 'BO_M WIND OBSERVATION PRODUCT' _wind_preview_assets/BUILD.txt
