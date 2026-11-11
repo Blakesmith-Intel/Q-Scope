@@ -25,7 +25,7 @@ assert.equal(parseUtc("2026-11-11T22:20:00+10:00"),"2026-11-11T12:20:00.000Z");
 const fixture=`<?xml version="1.0" encoding="UTF-8"?>
 <product><identifier>IDQ60920</identifier><observations>
 <station wmo-id="94576" bom-id="040913" name="Brisbane" lat="-27.48" lon="153.04">
-<period time-utc="2026-11-11T12:20:00Z" wind-src="metar_10">
+<period time-utc="2026-11-11T12:20:00Z" wind-src="TMD">
 <level><element type="wind_spd_kmh">68</element><element type="gust_kmh">125</element>
 <element type="maximum_gust_kmh">131</element></level></period></station>
 <station wmo-id="94578" bom-id="040120" name="Other" lat="-27.5" lon="153.1">
