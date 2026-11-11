@@ -3,7 +3,7 @@ import {readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import {
  windSeverity,windStationSeverity,windStationBasis,windDisplay,gustKmh,parseUtc,
- parseQueenslandWindXml,sampledWindPeak24h
+ parseQueenslandWindXml
 } from "../src/context-layers/qscope-bom-wind-observation-model-v1.js";
 const NOW=Date.parse("2026-11-11T12:30:00Z");
 assert.equal(windSeverity(89,0),"below");
@@ -36,23 +36,13 @@ const rows=parseQueenslandWindXml(fixture,{now:NOW});
 assert.equal(rows.length,2);
 assert.equal(rows[0].gustKmh,125);
 assert.equal(rows[0].todayMaximumGustKmh,131);
+assert.equal(rows[1].todayMaximumGustKmh,null,"Missing BoM daily maximum is unavailable, never inferred");
 assert.equal(rows[0].windAveragingMinutes,10);
 assert.equal(windStationSeverity(rows[0]),"destructive");
 assert.equal(rows[1].windAveragingMinutes,1);
 assert.equal(rows[1].gustKmh,null);
 assert.equal(windStationSeverity(rows[1]),"below");
 assert.throws(()=>parseQueenslandWindXml("<random/>",{now:NOW}),/Unverified/);
-const history={observations:{
- header:[{wmo:94576}],
- data:[
- {wmo:94576,aifstime_utc:"20261111120000",gust_kmh:92,wind_spd_kmh:42},
- {wmo:94576,aifstime_utc:"20261110130000",gust_kmh:145,wind_spd_kmh:45},
- {wmo:94576,aifstime_utc:"20261110110000",gust_kmh:188,wind_spd_kmh:44}
- ]}};
-const peak=sampledWindPeak24h(history,{wmo:"94576",now:NOW});
-assert.equal(peak.peakGustKmh,145,"rolling 24h excludes prior-day older than 24h");
-assert.equal(peak.sampleCount,2);
-assert.equal(sampledWindPeak24h(history,{wmo:"94577",now:NOW}),null);
 assert.equal(windDisplay.destructive.priority>windDisplay.damaging.priority,true);
 const html=readFileSync(fileURLToPath(new URL("../live3d-operational-v9.html",import.meta.url)),"utf8");
 for(const id of ["showBomWindObservations","refreshBomWindObservations",
@@ -65,4 +55,13 @@ assert.match(runtime,/initialiseOperationalBomWindObservations\(\{viewer\}\)/);
 const worker=readFileSync(fileURLToPath(new URL("../../relay/worker.js",import.meta.url)),"utf8");
 assert.match(worker,/incoming\.pathname === "\/qld-wind-observations"/);
 assert.match(worker,/relayQldWindObservations/);
-console.log("Official BoM wind threshold, XML/JSON, 24h, UI and isolated relay contracts PASS");
+const relayFile=readFileSync(fileURLToPath(new URL("../../relay/qld-wind-observations-v1.js",import.meta.url)),"utf8");
+const operatorFile=readFileSync(fileURLToPath(new URL("../src/context-layers/qscope-bom-wind-observations-operational-v1.js",import.meta.url)),"utf8");
+assert.match(relayFile,/IDQ60920\.xml/,"One BoM statewide source remains authoritative");
+assert.doesNotMatch(relayFile,/IDQ60801|sampledWindPeak24h|CACHE_HISTORY_SECONDS/,"No station history peak queries");
+assert.doesNotMatch(operatorFile,/fetchHistory|loadReportPeaks|sampleCount|24.hour|\?wmo=/i,"Report never generates 24h peaks");
+assert.match(operatorFile,/BoM highest wind gust today/);
+assert.match(operatorFile,/stations\.slice\(\)/,"Report includes all source-published stations");
+assert.match(html,/highest gust today since midnight AEST/i);
+assert.doesNotMatch(html,/rolling 24.hour sample peaks|highest available sample in the station history/i);
+console.log("PASS official BoM latest gust and highest since-midnight gust, all stations report, no derived 24h or station fanout");
