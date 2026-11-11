@@ -201,14 +201,25 @@ for control,key in controls.items():
     if len(matches)!=1:
         raise AssertionError("Duplicate manual refresh: "+control)
     button=matches[0].group()
-    # Never remove the required DOM node or event listener contract.
-    hidden=button.replace(">",' class="qscope-retired-manual-refresh" hidden tabindex="-1" aria-hidden="true">',1)
+    # Severe-weather warning polygons are safety-critical: keep the existing
+    # explicit operator refresh visible AND retain the scheduled countdown.
+    # The original handler already uses force=true and shared in-flight guard.
+    # Cyclones likewise retain their existing dynamic #internalCycloneRefresh.
+    hidden=(button if control=="refreshOfficialBomWarnings" else
+        button.replace(">",' class="qscope-retired-manual-refresh" hidden tabindex="-1" aria-hidden="true">',1))
     badge=(f'<output id="qscopeClock_{control}" class="qscope-source-clock" '
            f'data-qscope-poll="{key}" role="timer" aria-live="off" '
            f'aria-label="Time to next {key} observation update">'
            'Awaiting schedule</output>')
     html=one(html,button,hidden+badge,control)
     installed.append(control)
+
+assert re.search(r'<button[^>]*id="refreshOfficialBomWarnings"[^>]*>',html)
+assert 'id="internalCycloneRefresh"' not in html  # Cyclone controls are dynamically mounted.
+# The original live cyclone module mounts the existing accessible manual check.
+cyclone=(SITE/"src/internal-cyclone-live-qa-v1.js").read_text(encoding="utf-8")
+assert 'reload.id="internalCycloneRefresh"' in cyclone
+assert 'reload.addEventListener("click"' in cyclone or 'reload.onclick' in cyclone or 'reload.addEventListener(' in cyclone
 
 # The root already has the accepted passive power-outage report countdown.
 assert 'id="powerOutageExplorerCountdown"' in html
