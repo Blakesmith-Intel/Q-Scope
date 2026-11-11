@@ -125,18 +125,21 @@ patch("src/context-layers/road-ownership-report-v1.js",
 
 # Radar and Doppler use their own immutable five-minute scheduler; expose
 # its armed deadline without changing its busy/source retry behaviour.
+# Build-from-sealed V10.2 intentionally carries the original coalescing
+# scheduler. Observe its own arm(), not the newer unpinned review scheduler.
+# This does NOT change cancellation, polling, retries, concurrency or timing.
 patch("src/live-loop-refresh-v1.js",
- '  let missedWhileLoading = false;',
- '  let missedWhileLoading = false;\n  let regularDueAt = 0;')
+ '  let timer, active = false, pending = null;',
+ '  let timer, active = false, pending = null;\\n  let regularDueAt = 0;')
 patch("src/live-loop-refresh-v1.js",
- '    timer = schedule(() => {',
- '    regularDueAt = Date.now()+interval;\n    timer = schedule(() => {')
+ '    if (active) timer = schedule(() => { timer = null; void check(); }, interval);',
+ '    if (active) { regularDueAt=Date.now()+interval; timer = schedule(() => { timer = null; void check(); }, interval); }')
 patch("src/live-loop-refresh-v1.js",
- '      timer = busyTimer = sourceTimer = null;',
- '      timer = busyTimer = sourceTimer = null;\n      regularDueAt=0;')
+ '    stop() { active = false; if (timer != null) cancel(timer); timer = null; },',
+ '    stop() { active = false; if (timer != null) cancel(timer); timer = null; regularDueAt=0; },')
 patch("src/live-loop-refresh-v1.js",
- '    check\n  };',
- '    check,\n    get nextPollAt(){return regularDueAt;}\n  };')
+ '    check\\n  };',
+ '    check,\\n    get nextPollAt(){return regularDueAt;}\\n  };')
 patch("src/live3d-operational-v9.js",
  '// A QA-only hook tests repeated real source checks',
  'globalThis.__qscopePollClock?.observe("radar",()=>autoRefresh.nextPollAt);\n\n'
