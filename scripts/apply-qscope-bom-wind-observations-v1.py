@@ -77,8 +77,23 @@ def main() -> None:
     html = html_path.read_text(encoding="utf-8")
     js = js_path.read_text(encoding="utf-8")
     index = index_path.read_text(encoding="utf-8")
-    if any("showBomWindObservations" in value for value in (html, js, index)):
-        raise ValueError("Wind product already mounted; no duplicate controls")
+    # The accepted production builder already sources the official-warning
+    # menu fragment from frontend. That fragment may include this new WIND row.
+    # Reuse it once: never add a second checkbox or detach it from Severe Weather.
+    has_menu = 'id="showBomWindObservations"' in html
+    if "showBomWindObservations" in js or "showBomWindObservations" in index:
+        raise ValueError("Unexpected pre-existing wind runtime")
+    if 'id="bomWindGustReport"' in html or 'id="bomWindObservationInfo"' in html:
+        raise ValueError("Observation report mounted before isolated release overlay")
+    if has_menu:
+        for control in ("showBomWindObservations", "openBomWindGustReport",
+                        "bomWindObservationsStatus"):
+            if html.count('id="' + control + '"') != 1:
+                raise ValueError("Duplicated source-derived wind menu ID " + control)
+        if not (html.index('id="severeWeatherDetails"') <
+                html.index('id="showBomWindObservations"') <
+                html.index('id="rainfallObservationsDetails"')):
+            raise ValueError("Wind control is not inside the approved Severe Weather menu")
     if not all(item in js for item in (
         "PUBLISHED_PRODUCTION_RUNTIME",
         "initialiseOperationalSignificantRainfall({viewer})",
@@ -93,7 +108,8 @@ def main() -> None:
     status = re.search(r'<div id="officialBomWarningsStatus"[^>]*>[^<]*</div>', html)
     if not status or html.count('id="officialBomWarningsStatus"') != 1:
         raise ValueError("Original BoM warning status anchor missing")
-    html = html[:status.end()] + "\n" + menu.rstrip() + html[status.end():]
+    if not has_menu:
+        html = html[:status.end()] + "\n" + menu.rstrip() + html[status.end():]
     html = once(html, DIALOG_END, dialog + DIALOG_END, "report placement")
     stylesheet = (
         '<link rel="stylesheet" href="./src/qscope-bom-wind-observations-v1.css?v='
