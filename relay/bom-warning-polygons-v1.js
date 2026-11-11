@@ -152,10 +152,27 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
    // Never render an older, superseded WFS footprint against a newer CAP
    // issuance if its original GIS coordinates have not yet caught up.
    if(cap&&Date.parse(cap.issuedUtc)-Date.parse(match.notice.issuedUtc)>120000)return;
+   // CAP's textual bulletin can legitimately precede the latest refreshed
+   // source GIS geometry by >2 minutes (11-13 min observed 11 Nov 2026).
+   // Preserve its verified *product-level* warning wording and high-end
+   // hazard details; NEVER use the CAP time to change GIS source geometry
+   // issue, expiry, coordinates or individual cell classification.
+   const currentCap=cap&&Date.parse(cap.expiresUtc)>now&&cap.status==="issued"?cap:null;
+   const sourceNotice=currentCap&&indexed.has(request.code)?
+     {...match.notice,headline:currentCap.headline,
+      description:currentCap.description,instruction:currentCap.instruction,
+      areaDescription:currentCap.areaDescription,
+      bulletinUrl:currentCap.bulletinUrl}:match.notice;
+   const sourceWarnings=currentCap&&indexed.has(request.code)?
+     match.warnings.map(w=>({...w,headline:currentCap.headline,
+       description:currentCap.description,instruction:currentCap.instruction,
+       areaDescription:currentCap.areaDescription,
+       bulletinIssuedUtc:currentCap.issuedUtc,
+       bulletinExpiresUtc:currentCap.expiresUtc})):match.warnings;
    const row=messageRecords.find(r=>r?.notice?.productCode===request.code&&
-     Math.abs(Date.parse(r.notice.issuedUtc)-Date.parse(match.notice.issuedUtc))<=120000);
-   if(row)row.warnings=[...(row.warnings??[]),...match.warnings];
-   else messageRecords.push(match);
+     Math.abs(Date.parse(r.notice.issuedUtc)-Date.parse(sourceNotice.issuedUtc))<=120000);
+   if(row)row.warnings=[...(row.warnings??[]),...sourceWarnings];
+   else messageRecords.push({notice:sourceNotice,warnings:sourceWarnings});
   });
   const reconciled=reconcileLatestBoMWarnings(messageRecords,{
     complete:sourceFailures===0&&!indexPossiblyTruncated,nowMs:now,
