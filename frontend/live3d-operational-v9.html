@@ -424,7 +424,7 @@
       <input type="search" id="outageSuburbSearch" autocomplete="off" placeholder="Search councils, suburbs, streets..." />
     </label>
     <button id="outageByProviderReport" type="button" aria-pressed="false">Report by provider</button>
-    <button id="refreshPowerOutageExplorer" type="button">Refresh</button>
+    <output id="powerOutageExplorerCountdown" class="power-outage-refresh-countdown" role="timer" aria-label="Time until next automatic power outage check" aria-live="off">Next refresh in --:--</output>
   </div>
   <p class="outage-explorer-feed-status" id="outageSuburbFeedStatus" role="status" aria-live="polite">Checking existing outage feed…</p>
   <p class="outage-explorer-count" id="outageSuburbSummary" aria-live="polite">Waiting for outages…</p>

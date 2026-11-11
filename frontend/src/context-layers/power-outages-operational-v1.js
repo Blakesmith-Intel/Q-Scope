@@ -337,7 +337,8 @@ export function initialiseOperationalPowerOutages({
   const explorer = createPowerOutageSuburbExplorer({
     viewer,CesiumRef,mapCamera,formatTime:formatPowerOutageTime,
     refresh:()=>layer.refresh({force:true}),
-    getLoadedAt:()=>layer?.lastLoadedAt??0
+    getLoadedAt:()=>layer?.lastLoadedAt??0,
+    getNextRefreshAt:()=>layer?.nextScheduledRefreshAt??0
   });
 
   layer =

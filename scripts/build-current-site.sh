@@ -1116,3 +1116,18 @@ grep -Fq 'id="showBomWindObservations"' _site/live3d-operational-v9.html
 grep -Fq 'id="bomWindGustReport"' _site/live3d-operational-v9.html
 grep -Fq 'qscopeOperationalWindEvents.queueWindow(mode,frames.length)' _site/src/live3d-operational-v9.js
 test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6
+
+
+# User-approved narrow power report adjustment: reuse the original 15-minute
+# poll, remove only this report's refresh button. Keep all sealed controls.
+python3 scripts/apply-qscope-power-outage-report-countdown-v1.py
+node --check _site/src/context-layers/power-outage-suburb-explorer-v1.js
+node --check _site/src/context-layers/power-outages-v1.js
+node --check _site/src/context-layers/power-outages-operational-v1.js
+node frontend/tests/run-power-outage-suburb-explorer-v1-tests.mjs
+grep -Fq 'Q-SCOPE POWER REPORT COUNTDOWN 20261112' _site/BUILD.txt
+grep -Fq 'id="powerOutageExplorerCountdown"' _site/live3d-operational-v9.html
+! grep -Fq 'id="refreshPowerOutageExplorer"' _site/live3d-operational-v9.html
+grep -Fq 'id="showBomWindObservations"' _site/live3d-operational-v9.html
+grep -Fq 'qscopeOperationalWindEvents.queueWindow(mode,frames.length)' _site/src/live3d-operational-v9.js
+test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6

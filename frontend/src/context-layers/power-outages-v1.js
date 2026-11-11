@@ -1025,6 +1025,8 @@ export function createPowerOutageLayer({
   let currentFeatures = [];
   let loading = null;
   let timer = null;
+  // Read-only schedule information for the report countdown. No polling change.
+  let nextScheduledRefreshAt = 0;
   let lastLoadedAt = 0;
   let snapshotExpired = false;
   let lastPresentedStatus = null;
@@ -1355,9 +1357,11 @@ export function createPowerOutageLayer({
     }
 
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange',onVisibilityChange);
+    nextScheduledRefreshAt = Date.now() + refreshMs;
     timer =
       setInterval(
         () => {
+          nextScheduledRefreshAt = Date.now() + refreshMs;
           if (
             typeof document
               !== "undefined"
@@ -1385,6 +1389,7 @@ export function createPowerOutageLayer({
 
     timer =
       null;
+    nextScheduledRefreshAt = 0;
   }
 
   function featureById(
@@ -1422,6 +1427,9 @@ export function createPowerOutageLayer({
 
     get lastLoadedAt() {
       return lastLoadedAt;
+    },
+    get nextScheduledRefreshAt() {
+      return nextScheduledRefreshAt;
     }
   };
 }

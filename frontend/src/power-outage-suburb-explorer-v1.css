@@ -317,3 +317,17 @@
 }
 
 #powerOutageExplorer .outage-provider-source-time{display:block;margin-top:3px;color:#abc8d7;font-size:10px;line-height:1.3;font-weight:400;overflow-wrap:normal;}
+
+/* Passive report timer: reflects the existing outage layer's real polling deadline. */
+#powerOutageExplorer .power-outage-refresh-countdown{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-height:42px;min-width:132px;box-sizing:border-box;
+  padding:7px 10px;border:1px solid #46697b;border-radius:8px;
+  color:#d7edf7;background:#14313e;font-size:12px;font-weight:700;
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+@media (max-width:700px){
+  #powerOutageExplorer .power-outage-refresh-countdown{
+    width:100%;min-width:0;font-size:11px;padding:7px 6px;
+  }
+}

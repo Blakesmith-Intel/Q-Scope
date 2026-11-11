@@ -12,8 +12,19 @@ import {groupOutagesBySuburb,filterOutageSuburbGroups,outageLocation}
 
 // View over the EXISTING layer snapshot; no duplicate requests, no map pick,
 // no new Cesium entities, no weather-frame redraws.
+// Countdown observes the EXISTING 15-minute layer timer; no additional fetch.
+export function formatPowerOutageRefreshCountdown(nextAt,nowMs=Date.now(),busy=false){
+  const stamp=Number(nextAt);
+  if(!Number.isFinite(stamp)||stamp<=0)return "Automatic refresh not scheduled";
+  const remaining=Math.ceil((stamp-nowMs)/1000);
+  if(remaining<=0)return busy?"Checking outages…":"Next refresh due";
+  const mins=Math.floor(remaining/60),secs=remaining%60;
+  return "Next refresh in "+String(mins).padStart(2,"0")+":"+
+    String(secs).padStart(2,"0");
+}
 export function createPowerOutageSuburbExplorer({
-  viewer,CesiumRef,mapCamera,refresh=()=>Promise.resolve(),getLoadedAt=()=>0,formatTime=()=>""
+  viewer,CesiumRef,mapCamera,refresh=()=>Promise.resolve(),getLoadedAt=()=>0,
+  getNextRefreshAt=()=>0,formatTime=()=>""
 }={}){
   const byId=id=>document.getElementById(id);
   const dialog=byId("powerOutageExplorer");
@@ -24,11 +35,11 @@ export function createPowerOutageSuburbExplorer({
   const summary=byId("outageSuburbSummary");
   const state=byId("outageSuburbFeedStatus");
   const more=byId("outageSuburbMore");
-  const reload=byId("refreshPowerOutageExplorer");
+  const countdown=byId("powerOutageExplorerCountdown");
   const byProvider=byId("outageByProviderReport");
   const title=byId("powerOutageExplorerTitle");
   const help=byId("powerOutageExplorerHelp");
-  if(!dialog || !opener || !close || !search || !results || !summary || !state || !more || !reload || !byProvider)
+  if(!dialog || !opener || !close || !search || !results || !summary || !state || !more || !countdown || !byProvider)
     throw new Error("Power outage suburb explorer controls missing");
   const create=(tag,className,text)=>{
     const item=document.createElement(tag);
@@ -79,6 +90,19 @@ export function createPowerOutageSuburbExplorer({
   let openKeys=new Set(),visibleLimit=60,hasSnapshot=false;
   let loading=false,disposed=false;
   let providerView=false;
+  let countdownTicker=null;
+  function updateCountdown(){
+    if(disposed||!dialog.open)return;
+    countdown.textContent=formatPowerOutageRefreshCountdown(
+      getNextRefreshAt(),Date.now(),status.kind==="loading");
+  }
+  function startCountdown(){
+    updateCountdown();
+    if(!countdownTicker)countdownTicker=setInterval(updateCountdown,1000);
+  }
+  function stopCountdown(){
+    if(countdownTicker){clearInterval(countdownTicker);countdownTicker=null;}
+  }
   dialog.dataset.reportView="lga";
   // Suburb name is a direct route to its published outage geometry.
   // The disclosure arrow/count remain for expanding the incident table.
@@ -129,7 +153,7 @@ export function createPowerOutageSuburbExplorer({
     if(!hasSnapshot){
       summary.textContent="Waiting for a verified power outage snapshot";
       results.append(create("p","outage-empty",
-        "Power outage feeds have not loaded. Press Refresh to check again."));
+        "Power outage feeds have not loaded. Waiting for the next automatic check."));
       return;
     }
     const report=powerOutageProviderCounts(latestFeatures,{
@@ -167,8 +191,8 @@ export function createPowerOutageSuburbExplorer({
           hour:"2-digit",minute:"2-digit",hourCycle:"h23"
         }).format(date);
         const timestamp=create("small","outage-provider-source-time",
-          "Record "+sourceClock+" AEST");
-        timestamp.title="Latest EXTRACTED timestamp on an active source record, not an independently verified provider feed refresh time";
+          "Latest record "+sourceClock+" AEST");
+        timestamp.title="Newest EXTRACTED value among current unplanned outage records; NOT the time Q-Scope last retrieved or verified the provider feed.";
         sourceState.append(timestamp);
       }
       tr.append(provider,
@@ -184,7 +208,7 @@ export function createPowerOutageSuburbExplorer({
       create("td","",report.partial?"Partial total":"All three feeds"));
     tbody.append(footer);table.append(tbody);results.append(table);
     results.append(create("p","outage-suburb-note",
-      "Counts are unique UNPLANNED incidents per provider. Customers affected is a separate estimate. Record time is the latest source EXTRACTED stamp; checked time is when StormTracker fetched the feed. Neither establishes that provider web totals have refreshed at the same moment. Shared councils are not double-counted."));
+      "Counts are unique unplanned incidents per provider. Latest active outage record is the greatest source EXTRACTED timestamp among qualifying incidents, NOT an independently verified feed update time. Different Energex and Ergon record times do not imply a Q-Scope refresh delay. Checked time is when Q-Scope retrieved provider feeds. Shared councils are not double-counted."));
     if(report.total.withoutGeometry)results.append(create("p","outage-suburb-note",
       number(report.total.withoutGeometry)+" provider outage records have no source-mapped geometry; included in statewide counts but not plotted or assigned to a council."));
     if(report.partial)results.append(create("p","outage-suburb-note",
@@ -203,7 +227,7 @@ export function createPowerOutageSuburbExplorer({
         (unlocated.length?` · ${unlocated.length} awaiting location`:"")
       : "Waiting for outage information";
     if(!hasSnapshot){
-      results.append(create("p","outage-empty","Outage data hasn't loaded. Press Refresh to retry."));
+      results.append(create("p","outage-empty","Outage data has not loaded. Awaiting automatic retry."));
     }else if(!matching.length && !unlocated.length){
       results.append(create("p","outage-empty",search.value
         ? "No matching council areas, suburbs or outage details.":
@@ -442,12 +466,13 @@ export function createPowerOutageSuburbExplorer({
     updateSourceRefreshLabel();
     updateSidebarCounters();
     // Expired snapshots were already cleared by createPowerOutageLayer.onUpdate([]).
-    if(dialog.open)render();
+    if(dialog.open){render();updateCountdown();}
   }
   function open(){
     if(disposed)return;
     if(!dialog.open)dialog.showModal();
     visibleLimit=60;
+    startCountdown();
     render();
     search.focus();
     // Reuse the already running 15-minute polling of the same outage layer.
@@ -455,7 +480,7 @@ export function createPowerOutageSuburbExplorer({
     if(!getLoadedAt() && !loading){
       loading=true;
       Promise.resolve().then(()=>refresh()).catch(()=>{
-        if(!hasSnapshot)state.textContent="Unable to load outages. Try Refresh.";
+        if(!hasSnapshot)state.textContent="Unable to load outages. Waiting for automatic retry.";
       }).finally(()=>{loading=false;});
     }
   }
@@ -485,31 +510,23 @@ export function createPowerOutageSuburbExplorer({
     open();
   };
   const onClose=()=>dialog.close();
+  dialog.addEventListener("close",stopCountdown);
   const onSearch=()=>{visibleLimit=60;render();};
   const onMore=()=>{visibleLimit+=60;render();};
-  const onRefresh=()=>{
-    if(loading)return;
-    attemptedLocalities.clear();
-    eventLgas=new Map([...eventLgas].filter(([,v])=>v?.councils?.length));
-    loading=true;reload.disabled=true;
-    refresh().catch(()=>{
-      if(!hasSnapshot)state.textContent="Unable to load outages. Try Refresh.";
-    }).finally(()=>{loading=false;reload.disabled=false;});
-  };
   opener.addEventListener("click",onOpen);
   byProvider.addEventListener("click",onProviderView);
   close.addEventListener("click",onClose);
   search.addEventListener("input",onSearch);
   more.addEventListener("click",onMore);
-  reload.addEventListener("click",onRefresh);
   const destroy=()=>{
     disposed=true;
+    stopCountdown();
+    dialog.removeEventListener("close",stopCountdown);
     opener.removeEventListener("click",onOpen);
     byProvider.removeEventListener("click",onProviderView);
     close.removeEventListener("click",onClose);
     search.removeEventListener("input",onSearch);
     more.removeEventListener("click",onMore);
-    reload.removeEventListener("click",onRefresh);
     if(dialog.open)dialog.close();
   };
   updateSourceRefreshLabel();
