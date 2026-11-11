@@ -57,9 +57,10 @@ jobs:
         run: |
           set -euo pipefail
           node frontend/tests/run-qscope-passive-wind-inbox-v10-5-tests.mjs
+          # The final builder already performs every immutable approved overlay.
+          # Replaying older radar/AEP patches after 7-frame URL sealing breaks
+          # exact-import checks and was never necessary for this QA.
           bash scripts/build-current-site.sh
-          python scripts/apply-ftp-aep-release-v10.py
-          python scripts/apply-radar-auto-refresh-v1.py
           test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -ge 5
           # Test of the pinned V10.5 inbox remains valid with an added
           # isolated V10.6 preview. Never delete or rewrite V10.5.
