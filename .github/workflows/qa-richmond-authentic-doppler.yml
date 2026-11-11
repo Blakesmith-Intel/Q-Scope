@@ -34,8 +34,10 @@ jobs:
           path: checked/wind-hook-v10.3-qa
       - name: Build the genuine Pages production artefact
         run: |
+          # The final builder already performs every immutable approved overlay.
+          # Replaying older radar/AEP patches after 7-frame URL sealing breaks
+          # exact-import checks and was never necessary for this QA.
           bash scripts/build-current-site.sh
-          python scripts/apply-ftp-aep-release-v10.py
           ! grep -Fq 'NATIVE_DOPPLER_STRICT_PALETTE_START_ROW' _site/src/native-doppler-image-v1.js
           grep -Fq 'RICHMOND REAL PIXEL PALETTE TOLERANCE ALL ROWS' _site/BUILD.txt
       - name: Install browser
