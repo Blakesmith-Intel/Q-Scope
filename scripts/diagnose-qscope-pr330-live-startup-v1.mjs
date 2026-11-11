@@ -13,6 +13,8 @@ for(const [name,engine,viewport] of (process.env.QSCOPE_RADAR_DIAG==='1' ?
  const ctx=await browser.newContext({viewport,ignoreHTTPSErrors:false});
  const top=await ctx.newPage();
  const reports=[];
+ const radarEvents=[];
+ top.on('console',m=>{if(m.text().startsWith('QSCOPE_RADAR_DOM '))radarEvents.push(m.text().slice(17))});
  const record=(type,x)=>{if(reports.length<75)reports.push({type,detail:String(x).slice(0,440)})};
  top.on('pageerror',e=>record('shell-pageerror',e.stack||e));
  top.on('response',res=>{
@@ -73,24 +75,31 @@ for(const [name,engine,viewport] of (process.env.QSCOPE_RADAR_DIAG==='1' ?
   });
  }catch(e){record('iframe-state-failed',e.stack||e)}
  if(process.env.QSCOPE_RADAR_DIAG==='1'){
+   // Observe DOM changes as they happen BEFORE the expensive Cesium loading
+   // phase. Later evaluate() calls can stall during WebGL memory pressure.
    try{
-    // Bounded observation only; no infinite condition wait or extra fetches.
-    await top.waitForTimeout(24000);
-    const radar=await iframe.locator('body').evaluate(()=>{
+    await iframe.locator('body').evaluate(()=>{
       const el=id=>document.getElementById(id);
-      return {checkedAt:new Date().toISOString(),
-       frameLabel:el('hybridFrameLabel')?.textContent,
-       loopWindow:el('operationalLoopWindow')?.textContent,
-       history:el('sharedHistoryNote')?.textContent?.slice(0,1000),
-       sourceFailureDetails:el('sharedHistoryNote')?.title?.slice(0,3000),
-       autoRefresh:el('autoRefreshNote')?.textContent,
-       status:el('hybridStatus')?.textContent||el('status')?.textContent,
-       sliderMax:el('hybridFrameSlider')?.max
-      };
-    });
-    console.log('QSCOPE_LIVE_RADAR_SEVENTH_FRAME_HANDOFF',JSON.stringify(radar));
-   }catch(e){record('radar-diagnostic',e.stack||e)}
-  }
+      const history=el('sharedHistoryNote');
+      if(!history)return;
+      const send=()=>console.log('QSCOPE_RADAR_DOM '+JSON.stringify({
+        utc:new Date().toISOString(),
+        history:history.textContent?.slice(0,1300),
+        title:history.title?.slice(0,2900),
+        label:el('hybridFrameLabel')?.textContent,
+        max:el('hybridFrameSlider')?.max,
+        operationalWindow:el('operationalLoopWindow')?.textContent,
+        status:el('autoRefreshNote')?.textContent
+      }));
+      const observer=new MutationObserver(send);
+      observer.observe(history,{subtree:true,childList:true,characterData:true,
+        attributes:true,attributeFilter:['title']});
+      send();
+    },{timeout:7000});
+   }catch(e){record('radar-observer-setup',e.stack||e)}
+   await top.waitForTimeout(27000);
+   console.log('QSCOPE_RADAR_REAL_DOM_EVENTS',JSON.stringify(radarEvents.slice(-16)));
+ }
  let screen='';
  try{screen='/tmp/qscope-pr330-'+name+'.png';await top.screenshot({path:screen,fullPage:false})}catch{}
  console.log('QSCOPE_REAL_BROWSER_STARTUP',JSON.stringify({name,navigation,state,reports,screenshot:screen}));
