@@ -6,7 +6,7 @@ const short=stamps([0,5,10,15,20,25,30,35]);
 const native=resolveRainHistoryWindow(short,"30");
 assert.equal(native.partial,false);
 assert.equal(native.requestedMinutes,RAIN_STARTUP_MINUTES);
-assert.equal(native.plan.length,6);
+assert.equal(native.plan.length,7);
 assert.equal(native.plan.at(-1).observedUtc,short.at(-1));
 const tiny=resolveRainHistoryWindow(stamps([0,5,10]),"30");
 assert.equal(tiny.partial,true);
