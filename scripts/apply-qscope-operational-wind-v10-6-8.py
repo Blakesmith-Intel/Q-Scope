@@ -165,6 +165,36 @@ const qscopeOperationalWindEvents=createOperationalWindBridge({
   pause:()=>playback.pause(),
   status:message=>setStatus(message,"warning")
 });
+// Listen to already-approved operator timeline rendering, not to source
+// machinery. In particular, the exact existing frame-loading/playback
+// functions retain their original bytes, behaviour, error handling and order.
+let qscopeWindSchedulePending=false;
+function qscopeWindScheduleAnalysis(){
+  if(qscopeWindSchedulePending)return;
+  qscopeWindSchedulePending=true;
+  Promise.resolve().then(()=>{
+    qscopeWindSchedulePending=false;
+    if(sequenceLoading||document.hidden)return;
+    const mode=isNativeDopplerPlayback()?"doppler":"rain";
+    const frames=mode==="doppler"?windPlaybackFrames:hybridFrames;
+    qscopeOperationalWindEvents.queueWindow(mode,frames.length);
+  });
+}
+const qscopeWindTimelineObserver=typeof MutationObserver==="function"
+  ?new MutationObserver(qscopeWindScheduleAnalysis):null;
+for(const id of ["hybridFrameLabel","sharedHistoryNote","autoRefreshNote"]){
+  const el=$(id);
+  if(el)qscopeWindTimelineObserver?.observe(el,{
+    subtree:true,childList:true,characterData:true
+  });
+}
+// Low-pressure fallback for an idle browser whose genuine source window was
+// updated without changing any of those presentation labels.
+window.setInterval(qscopeWindScheduleAnalysis,60*1000);
+document.addEventListener("visibilitychange",()=>{
+  if(!document.hidden)qscopeWindScheduleAnalysis();
+});
+qscopeWindScheduleAnalysis();
 // END Q-SCOPE V10.6.8 ACCEPTED PASSIVE RADAR SIGNATURES
 '''
 
@@ -201,19 +231,8 @@ def main(site=Path("_site")):
     anchor="severeStormAlertOverlay.setEnabled(false);"
     runtime=once(runtime,anchor,anchor+"\n"+ROOT_ADDITION,
       "independent event overlay initialisation")
-    # Only after successful original radar-loop setup; never intercept its
-    # promise, change response, replace cache or mutate a scan.
-    runtime=once(runtime,
-      '  if(resume) playback.play();\n}\n\nasync function loadHybridSequence(',
-      '  qscopeOperationalWindEvents.queueWindow("doppler",windPlaybackFrames.length);\n'+
-      '  if(resume) playback.play();\n}\n\nasync function loadHybridSequence(',
-      "native Doppler successful window")
-    runtime=once(runtime,
-      '  await showHybridFrame(hybridFrameIndex);\n  if (resume) playback.play();',
-      '  await showHybridFrame(hybridFrameIndex);\n'+
-      '  qscopeOperationalWindEvents.queueWindow("rain",hybridFrames.length);\n'+
-      '  if (resume) playback.play();',
-      "genuine rain successful window")
+    # No hooks are inserted inside approved frame loading or playback code.
+    # An isolated observer watches presentation changes instead.
     if "<head>" not in page or "</head>" not in page:
         raise ValueError("Pinned operator document head unavailable")
     page=once(page,"</head>",
