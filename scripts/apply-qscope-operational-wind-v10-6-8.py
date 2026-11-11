@@ -121,38 +121,75 @@ async function qscopeWindEvaluatePair(mode,index){
   return null;
 }
 async function qscopeWindNavigateToActualFrame(_event,evidence){
-  const target=evidence?.frameUtc;
+  const target=evidence?.frameUtc,site=String(evidence?.radarId??"");
   if(!Number.isFinite(Date.parse(target))||
      !Number.isFinite(evidence?.latitude)||
      !Number.isFinite(evidence?.longitude))
     return {ok:false,message:"No valid original radar source or location."};
-  if(sequenceLoading)
-    return {ok:false,message:"Radar window is updating; no frame substituted."};
+  if(sequenceLoading)return {ok:false,
+    message:"Radar window is updating; no different frame was substituted."};
   const wind=evidence.mode==="doppler";
-  const list=wind?windPlaybackFrames:hybridFrames;
-  const idx=list.findIndex(x=>x.observedUtc===target&&
-    (wind||!x.sourceMetadata?.temporalInference));
-  if(idx<0 || wind!==isNativeDopplerPlayback())
-    return {ok:false,message:
-      "Exact original source frame is unavailable in the currently selected loop. "+
-      "Select the corresponding BoM radar playback window; no substitute was shown."};
   qscopeWindNavigating=true;
   try {
     await playback.pause();
-    const shown=wind?await showDopplerOnlyFrame(idx):await showHybridFrame(idx);
-    if(shown!==true)return {ok:false,
-      message:"Original source frame could not be displayed."};
-    mapCamera.setView({
-      longitude:evidence.longitude,latitude:evidence.latitude,
-      targetHeight:0,range:42000,heading:0,pitch:Cesium.Math.toRadians(-52)
-    });
+    if(wind){
+      if(!["08","50","66"].includes(site)||
+         QLD_RADAR_SITES[site]?.analysisGeorefVerified!==true)
+        return {ok:false,message:"Original Doppler site is not verified."};
+      const selector=$("dopplerOverlayRadar");
+      if(![...(selector?.options??[])].some(o=>o.value===site))
+        return {ok:false,message:"Original Doppler site is not selectable."};
+      if(!isNativeDopplerPlayback()||String(selector.value)!==site){
+        selector.value=site;
+        $("loopDurationMinutes").value=DOPPLER_AVAILABLE_LOOP_VALUE;
+        await refreshIndependentDopplerHistory(false);
+        await loadDopplerSequence(false);
+        await playback.pause();
+      }
+      const idx=windPlaybackFrames.findIndex(f=>f.observedUtc===target);
+      if(idx>=0){
+        if(await showDopplerOnlyFrame(idx)!==true)
+          return {ok:false,message:"Genuine Doppler scan could not be displayed."};
+      }else{
+        mapCamera.setView({longitude:evidence.longitude,latitude:evidence.latitude,
+          targetHeight:0,range:42000,heading:0,pitch:Cesium.Math.toRadians(-52)});
+        scene.requestRender();
+        return {ok:false,message:"Event location centred; original BoM Doppler "+
+          target+" has expired from the available source window."};
+      }
+    }else{
+      if(isNativeDopplerPlayback()||!hybridFrames.length){
+        const loop=$("loopDurationMinutes");
+        if(![...(loop?.options??[])].some(o=>o.value==="30"))
+          return {ok:false,message:"Original 30-minute rain loop unavailable."};
+        loop.value="30";
+        await loadHybridSequence(false);
+        await playback.pause();
+      }
+      const idx=hybridFrames.findIndex(f=>
+        f.observedUtc===target&&!f.sourceMetadata?.temporalInference);
+      if(idx>=0){
+        if(await showHybridFrame(idx)!==true)
+          return {ok:false,message:"Genuine reflectivity scan could not be displayed."};
+      }else{
+        mapCamera.setView({longitude:evidence.longitude,latitude:evidence.latitude,
+          targetHeight:0,range:42000,heading:0,pitch:Cesium.Math.toRadians(-52)});
+        scene.requestRender();
+        return {ok:false,message:"Event location centred; original BoM rain scan "+
+          target+" has expired from the available source window."};
+      }
+    }
+    mapCamera.setView({longitude:evidence.longitude,latitude:evidence.latitude,
+      targetHeight:0,range:42000,heading:0,pitch:Cesium.Math.toRadians(-52)});
     scene.requestRender();
     return {ok:true,message:"Original BoM "+(wind?"Doppler":"reflectivity")+
       " scan "+target+" displayed at event location."};
   }catch(error){
-    return {ok:false,message:"Source frame unavailable: "+String(error?.message??error)};
+    return {ok:false,message:"Original scan unavailable: "+
+      String(error?.message??error)+". No substitute timestamp was selected."};
   }finally{
     qscopeWindNavigating=false;
+    await playback.pause();
   }
 }
 const qscopeOperationalWindEvents=createOperationalWindBridge({
