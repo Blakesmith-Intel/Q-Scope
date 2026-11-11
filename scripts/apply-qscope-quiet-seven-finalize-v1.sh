@@ -19,6 +19,11 @@ node --check _site/src/context-layers/qfd-technical-rescues-operational-v1.js
 node --check _site/src/live-loop-refresh-v1.js
 node --check _site/src/live3d-operational-v9.js
 node --check _site/src/radar-history-window-v1.js
+node --check _site/src/radar-history-window-seven-genuine-v1.js
+node --check _site/src/rain-history-recovery-seven-genuine-v1.js
+grep -Fq 'radar-history-window-seven-genuine-v1.js?v=20261112-seven-genuine-unique-v1' _site/src/live3d-operational-v9.js
+grep -Fq 'rain-history-recovery-seven-genuine-v1.js?v=20261112-seven-genuine-unique-v1' _site/src/live3d-operational-v9.js
+grep -Fq 'const targetSpanMinutes = minutes;' _site/src/radar-history-window-seven-genuine-v1.js
 node --check _site/src/operational-loop-v1.js
 node --check _site/src/bom-wmts-loop-v2.js
 test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6
