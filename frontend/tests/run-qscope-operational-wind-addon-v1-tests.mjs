@@ -54,8 +54,8 @@ const bridge=read("../src/qscope-operational-wind-bridge-v1.js");
 const inbox=read("../src/qscope-reviewable-event-inbox-v10-6.js");
 const placement=read("../src/qscope-research-event-dock-layout-v10-6-1.js");
 for(const str of [
- "qscopeOperationalWindEvents.queueWindow(\"rain\"",
- "qscopeOperationalWindEvents.queueWindow(\"doppler\"",
+ "qscopeOperationalWindEvents.queueWindow(mode,frames.length)",
+ "new MutationObserver(qscopeWindScheduleAnalysis)",
  "ROOT_ADDITION",
  "assessOperationalWindPair",
  "qscopeWindNavigateToActualFrame",
