@@ -1,0 +1,103 @@
+/* Q-SCOPE operator identity and passive source clocks. Presentation only.
+   The approved radar, model, warning, incident and navigation geometry stays. */
+body.simple-ui #controlSidebar > .dashboard-heading {
+  min-height:64px;
+  padding:2px 0 7px;
+  border-bottom:1px solid rgba(79,159,195,.27);
+}
+body.simple-ui #controlSidebar .simple-brand.qscope-identity {
+  display:flex!important;
+  flex:1 1 auto;
+  align-items:center;
+  min-width:0;
+  gap:10px;
+}
+.qscope-identity .qscope-seal {
+  display:inline-flex;
+  width:44px;
+  height:44px;
+  min-width:44px;
+  align-items:center;
+  justify-content:center;
+  border-radius:13px;
+  background:linear-gradient(160deg,#173c53,#071a29);
+  border:1px solid rgba(111,221,242,.58);
+  box-shadow:0 0 0 3px rgba(49,164,187,.10),inset 0 0 14px rgba(56,202,223,.16),0 3px 13px #0007;
+}
+.qscope-identity .qscope-seal svg {width:37px;height:37px;display:block;}
+.qscope-identity .qscope-wordmark {display:flex;flex-direction:column;gap:2px;min-width:0;}
+body.simple-ui #controlSidebar .qscope-wordmark strong {
+  display:block;
+  color:#f1fbff;
+  font-size:21px!important;
+  line-height:1.06;
+  letter-spacing:.105em;
+  font-weight:850;
+  text-shadow:0 1px 10px #10a6dc44;
+  white-space:nowrap;
+}
+body.simple-ui #controlSidebar .qscope-wordmark > span {
+  display:block;
+  font-size:9px!important;
+  font-weight:700;
+  line-height:1.2;
+  color:#a6cde0;
+  letter-spacing:.035em;
+  white-space:nowrap;
+}
+body.simple-ui #controlSidebar .qscope-wordmark .qscope-status-dot {
+  display:inline-block;
+  width:5px;height:5px;
+  border-radius:50%;
+  background:#4cdda7;
+  box-shadow:0 0 7px #4cdda788;
+  vertical-align:middle;
+  margin-right:4px;
+}
+.qscope-retired-manual-refresh[hidden],
+.qscope-retired-radar-control[hidden] {display:none!important;}
+body.simple-ui #controlSidebar #radarStormAnalysisDetails .button-grid:has(> .qscope-retired-radar-control) {
+  display:none!important;
+}
+.qscope-source-clock {
+  display:inline-flex;
+  flex:0 1 auto;
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+  min-height:27px;
+  max-width:100%;
+  padding:4px 7px;
+  margin:0;
+  border:1px solid rgba(81,158,186,.38);
+  background:rgba(13,53,75,.56);
+  color:#addbed;
+  border-radius:7px;
+  font-size:10px;
+  font-weight:750;
+  font-variant-numeric:tabular-nums;
+  line-height:1.25;
+  letter-spacing:.008em;
+  white-space:normal;
+}
+.qscope-source-clock[data-qscope-poll="radar"] {
+  color:#b5edf0;
+  border-color:rgba(50,196,209,.45);
+}
+#radarStormAnalysisDetails #qscopeRadarCountdown {
+  margin-left:auto;
+  min-width:111px;
+}
+.rainfall-report-header + .qscope-source-clock,
+.rainfall-report-toolbar .qscope-source-clock {min-height:32px;}
+@media(max-width:700px){
+  body.simple-ui #controlSidebar > .dashboard-heading{min-height:58px;}
+  .qscope-identity .qscope-seal{width:40px;height:40px;min-width:40px;border-radius:12px;}
+  .qscope-identity .qscope-seal svg{width:33px;height:33px;}
+  body.simple-ui #controlSidebar .qscope-wordmark strong{font-size:19px!important;}
+  body.simple-ui #controlSidebar .qscope-wordmark > span{font-size:8px!important;}
+  .qscope-source-clock{font-size:10px;padding:4px 6px;}
+}
+@media(prefers-reduced-motion:reduce){
+ .qscope-identity * {animation:none!important;}
+}
