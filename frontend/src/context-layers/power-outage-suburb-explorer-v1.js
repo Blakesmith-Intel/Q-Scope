@@ -191,7 +191,7 @@ export function createPowerOutageSuburbExplorer({
           hour:"2-digit",minute:"2-digit",hourCycle:"h23"
         }).format(date);
         const timestamp=create("small","outage-provider-source-time",
-          "Latest active outage record "+sourceClock+" AEST");
+          "Latest record "+sourceClock+" AEST");
         timestamp.title="Newest EXTRACTED value among current unplanned outage records; NOT the time Q-Scope last retrieved or verified the provider feed.";
         sourceState.append(timestamp);
       }
