@@ -254,6 +254,7 @@ def main(site=Path("_site")):
       "severe-storm-v10.js","doppler-persistence-v10-3.js",
     )
     runtime=js.read_text(encoding="utf-8")
+    original_runtime=runtime
     page=html.read_text(encoding="utf-8")
     landing=index.read_text(encoding="utf-8")
     if "qscopeOperationalWindEvents" in runtime:
@@ -288,6 +289,13 @@ def main(site=Path("_site")):
     landing=refresh_reference(landing,
       r'(src="\./live3d-operational-v9\.html\?v=[^"]+)',
       "site frame import")
+    # Byte-exact non-regression proof: stripping the ONE additional import
+    # and ONE independent observer must reconstruct every original operational
+    # runtime byte. Radar internals, input controls, frame refresh, warnings,
+    # QFD, flood and other source logic are never rewritten.
+    unchanged=runtime.replace(IMPORT,"",1).replace("\\n"+ROOT_ADDITION,"",1)
+    assert unchanged==original_runtime, (
+      "Approved operational runtime changed outside isolated wind observer")
     # Commit ONLY once all source anchors and required modules are verified.
     for module in modules:
         original=src/module
