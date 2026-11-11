@@ -6,9 +6,9 @@ const errors=[],failedModules=[];
 page.on("pageerror",e=>errors.push(String(e)));
 page.on("response",r=>{if(r.status()>=400&&/\.js(?:\?|$)/.test(r.url()))
  failedModules.push({status:r.status(),url:r.url()})});
-await page.route("https://blakesmith-intel.github.io/StormTracker/**",async route=>{
+await page.route("https://blakesmith-intel.github.io/Q-Scope/**",async route=>{
  const url=new URL(route.request().url());
- const local="http://127.0.0.1:8137"+url.pathname.replace("/StormTracker","")+url.search;
+ const local="http://127.0.0.1:8137"+url.pathname.replace("/Q-Scope","")+url.search;
  try{
   const res=await fetch(local);
   await route.fulfill({status:res.status,body:Buffer.from(await res.arrayBuffer()),
@@ -38,7 +38,7 @@ await page.route("**/qld-significant-rainfall",route=>route.fulfill({status:200,
  contentType:"application/json",headers:{"Access-Control-Allow-Origin":"*"},
  body:JSON.stringify(source)}));
 try{
- await page.goto("https://blakesmith-intel.github.io/StormTracker/live3d-operational-v9.html?qaFtpAep=20261019",
+ await page.goto("https://blakesmith-intel.github.io/Q-Scope/live3d-operational-v9.html?qaFtpAep=20261019",
   {waitUntil:"domcontentloaded",timeout:45000});
  await page.waitForSelector("#cesiumContainer .cesium-widget canvas",{state:"attached",timeout:45000});
  // The approved four-section operator layout starts collapsed. Navigate
