@@ -41,13 +41,7 @@ export function initialiseOperationalBomWindObservations({
  const source=new CesiumRef.CustomDataSource("qscope-bom-ground-wind-v1");
  source.show=false;viewer.dataSources.add(source);
  let stations=[],qualifying=[],checkedAt=0,loading=null,selected=null,timer=null;
- const history=new Map(),inflight=new Map();
- const MAX_STATION_HISTORY=36;
  function say(message){if(status)status.textContent=message;}
- function qualifies(station){
-  return station.current&&now()-Date.parse(station.observedUtc)<=WIND_OBS_VALID_AGE_MS&&
-   severityRank(windStationSeverity(station))>=3;
- }
  // An explicitly verified 10-minute gale is also a qualifying observation.
  function observed(station){
   return station.current&&now()-Date.parse(station.observedUtc)<=WIND_OBS_VALID_AGE_MS&&
@@ -95,51 +89,12 @@ export function initialiseOperationalBomWindObservations({
    (windStationBasis(record)==="today-since-midnight"?" · from today\'s peak, not latest gust":
     windStationBasis(record)==="verified-10-minute-mean"?" · verified 10-minute mean":""));
   labelRow(infoRows,"Highest gust today (since midnight)",gustKmh(record.todayMaximumGustKmh));
-  const hist=history.get(record.wmo);
-  labelRow(infoRows,"Highest available gust in rolling 24 hours",
-   hist?.peak?gustKmh(hist.peak.peakGustKmh)+" at "+asTime(hist.peak.peakUtc):"Checking/Unavailable");
   labelRow(infoRows,"Observation time",asTime(record.observedUtc));
   labelRow(infoRows,"BoM WMO station",record.wmo);
   labelRow(infoRows,"Source status","Automatic BoM observation, limited quality control");
   const a=document.createElement("a");a.href=WIND_OBS_SOURCE_URL;
   a.rel="noopener noreferrer";a.target="_blank";a.textContent="Official BoM observations";
   infoRows.append(a);info.hidden=false;
-  void fetchHistory(record.wmo).then(()=>{if(selected===record.wmo)updateSelectedHistory();});
- }
- function updateSelectedHistory(){
-  const station=qualifying.find(x=>x.wmo===selected);
-  if(!station||!infoRows)return;
-  const hist=history.get(station.wmo);
-  for(const el of infoRows.querySelectorAll("strong")){ // only replace named value
-   const prev=el.previousElementSibling;
-   if(prev?.textContent==="Highest available gust in rolling 24 hours"){
-    el.textContent=hist?.peak?
-     gustKmh(hist.peak.peakGustKmh)+" at "+asTime(hist.peak.peakUtc)+
-     " ("+hist.peak.sampleCount+" samples)": "Unavailable / incomplete 24-hour record";
-   }
-  }
-  if(dialog?.open)renderReport();
- }
- async function fetchHistory(wmo){
-  const cached=history.get(wmo);
-  if(cached&&now()-cached.checkedAt<15*60000)return cached;
-  if(inflight.has(wmo))return inflight.get(wmo);
-  const job=(async()=>{
-   try{
-    const response=await fetchImpl(WIND_OBSERVATION_RELAY+"?wmo="+encodeURIComponent(wmo),
-     {mode:"cors",cache:"no-store",signal:AbortSignal.timeout(22000)});
-    if(!response.ok)throw Error("BoM station history HTTP "+response.status);
-    const data=await response.json();
-    if(data?.format!=="QScopeBoMWindStation24hV1"||data.wmo!==wmo||
-     !Number.isFinite(data.peak?.peakGustKmh))throw Error("Unverified wind history");
-    const out={peak:data.peak,checkedAt:now()};
-    history.set(wmo,out);return out;
-   }catch(error){
-    const out={peak:null,error:String(error?.message??error),checkedAt:now()};
-    history.set(wmo,out);return out;
-   }finally{inflight.delete(wmo);}
-  })();
-  inflight.set(wmo,job);return job;
  }
  function renderReport(){
   if(!dialog?.open||!reportRows)return;
