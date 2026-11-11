@@ -4,10 +4,10 @@ import {chromium,webkit} from 'playwright';
 const base=process.env.QSCOPE_SMOKE_URL||
  'https://qscope-ui-seven-pr330-stormtracker-bom-relay.stormtracker-bom-relay.workers.dev/';
 let bad=0;
-for(const [name,engine,viewport] of [
- ['chromium',chromium,{width:1365,height:920}],
- ['webkit',webkit,{width:390,height:844}]
-]){
+for(const [name,engine,viewport] of (process.env.QSCOPE_RADAR_DIAG==='1' ?
+ [['chromium',chromium,{width:1365,height:920}]]:
+ [['chromium',chromium,{width:1365,height:920}],['webkit',webkit,{width:390,height:844}]])
+){
  const browser=await engine.launch({headless:true,args:name==='chromium'?
   ['--disable-dev-shm-usage','--enable-webgl','--use-gl=angle','--use-angle=swiftshader']:[]});
  const ctx=await browser.newContext({viewport,ignoreHTTPSErrors:false});
@@ -72,6 +72,28 @@ for(const [name,engine,viewport] of [
    };
   });
  }catch(e){record('iframe-state-failed',e.stack||e)}
+ if(process.env.QSCOPE_RADAR_DIAG==='1'){
+   try{
+    await top.waitForFunction(()=>{
+      const doc=document.querySelector('iframe#liveFrame')?.contentDocument;
+      const txt=doc?.getElementById('sharedHistoryNote')?.textContent||'';
+      return /Loaded \d+ observed|skipped|unavailable/i.test(txt);
+    },{timeout:45000}).catch(()=>{});
+    const radar=await iframe.locator('body').evaluate(()=>{
+      const el=id=>document.getElementById(id);
+      return {checkedAt:new Date().toISOString(),
+       frameLabel:el('hybridFrameLabel')?.textContent,
+       loopWindow:el('operationalLoopWindow')?.textContent,
+       history:el('sharedHistoryNote')?.textContent?.slice(0,1000),
+       sourceFailureDetails:el('sharedHistoryNote')?.title?.slice(0,3000),
+       autoRefresh:el('autoRefreshNote')?.textContent,
+       status:el('hybridStatus')?.textContent||el('status')?.textContent,
+       sliderMax:el('hybridFrameSlider')?.max
+      };
+    });
+    console.log('QSCOPE_LIVE_RADAR_SEVENTH_FRAME_HANDOFF',JSON.stringify(radar));
+   }catch(e){record('radar-diagnostic',e.stack||e)}
+  }
  let screen='';
  try{screen='/tmp/qscope-pr330-'+name+'.png';await top.screenshot({path:screen,fullPage:false})}catch{}
  console.log('QSCOPE_REAL_BROWSER_STARTUP',JSON.stringify({name,navigation,state,reports,screenshot:screen}));
