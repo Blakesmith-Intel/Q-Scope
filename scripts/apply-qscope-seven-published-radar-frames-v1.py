@@ -61,6 +61,39 @@ for name,ids in changes.items():
    data=data.replace(needle,needle+suffix,1)
  file.write_text(data,encoding="utf-8")
 
+# The production restore has accumulated historical import query identities.
+# For the inclusive seven-scan selector, use ONE unambiguous new module path,
+# not an old source filename with yet another cache query suffix. This avoids
+# serving the archived six-scan selector to an existing mobile browser.
+# Both the original and new modules contain the SAME verified official data
+# policy; neither changes BoM retrieval, textures, Doppler or playback cadence.
+import re
+model_source=(root/"radar-history-window-v1.js").read_text(encoding="utf-8")
+rain_source=(root/"rain-history-recovery-v1.js").read_text(encoding="utf-8")
+assert model_source.count("const targetSpanMinutes = minutes;")==1
+assert "minutes - RADAR_PLAYBACK_CADENCE_MINUTES" not in model_source
+unique_model="radar-history-window-seven-genuine-v1.js"
+unique_rain="rain-history-recovery-seven-genuine-v1.js"
+(root/unique_model).write_text(model_source,encoding="utf-8")
+old_dep='./radar-history-window-v1.js?v=20261112-seven-scans'
+assert rain_source.count(old_dep)==1
+rain_source=rain_source.replace(old_dep,'./'+unique_model,1)
+(root/unique_rain).write_text(rain_source,encoding="utf-8")
+app=site/"src/live3d-operational-v9.js"
+app_source=app.read_text(encoding="utf-8")
+for old,new in (
+    ("radar-history-window-v1.js",unique_model),
+    ("rain-history-recovery-v1.js",unique_rain)
+):
+    pattern=r'(?<=\./)'+re.escape(old)+r'\?v=[^"]+'
+    app_source,number=re.subn(pattern,new+"?v=20261112-seven-genuine-unique-v1",
+                               app_source,count=1)
+    assert number==1,"Missing exactly one runtime seven-scan import: "+old
+app.write_text(app_source,encoding="utf-8")
+assert unique_model in app_source and unique_rain in app_source
+assert "const targetSpanMinutes = minutes;" in (root/unique_model).read_text()
+assert "selectRadarHistoryPlan" in (root/unique_rain).read_text()
+
 # The only direct radar record cadence remains source-measured five minutes.
 # We never synthesize a seventh record from a sixth scan.
 print("BO_M_INCLUSIVE_SEVEN_GENUINE_FRAMES_PASS | 30min = 7 × 5min endpoints; "
