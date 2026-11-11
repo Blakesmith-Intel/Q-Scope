@@ -7,7 +7,8 @@ const providerMarkup='<!doctype html><html><head><meta name="viewport" content="
   '<style>'+css+'</style></head><body><dialog id="powerOutageExplorer" open data-report-view="provider">'+
   '<header class="outage-explorer-heading"><strong>Power outages by provider</strong><button>Close</button></header>'+
   '<div class="outage-explorer-toolbar"><label>Find a council<input value=""></label>'+
-  '<button id="outageByProviderReport">Report by LGA</button><button>Refresh</button></div>'+
+  '<button id="outageByProviderReport">Report by LGA</button>'+
+  '<output class="power-outage-refresh-countdown" id="powerOutageExplorerCountdown" role="timer">Next refresh in 14:59</output></div>'+
   '<p class="outage-explorer-feed-status">33 unplanned outages / 1,049 customers</p>'+
   '<p class="outage-explorer-count">33 distinct outages - 1,049 customers</p>'+
   '<div class="outage-explorer-results"><table class="outage-provider-table">'+
@@ -63,6 +64,9 @@ try{
       platform+" "+width+"px: provider report overflow");
     assert.ok(result.toolbarScrollWidth<=result.toolbarWidth+2,
       platform+" "+width+"px: popup toolbar overflow");
+    assert.equal(await page.locator("#powerOutageExplorerCountdown").innerText(),"Next refresh in 14:59");
+    assert.equal(await page.locator(".outage-explorer-toolbar button").count(),1,
+      "Power provider report has no manual Refresh button");
     assert.equal(result.searchDisplay,"none",
       "Provider report must not show irrelevant LGA search");
     assert.ok(result.cells.every(cell=>cell.radius==="0px"&&cell.display==="table-cell"),
