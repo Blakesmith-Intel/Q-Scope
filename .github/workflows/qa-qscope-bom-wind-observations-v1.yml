@@ -26,3 +26,22 @@ jobs:
           node --check relay/qld-wind-observations-v1.js
       - name: Test official thresholds, XML and 24h sample model
         run: node frontend/tests/run-qscope-bom-wind-observations-v1-tests.mjs
+      - name: Check actual public BoM state XML and one station JSON
+        timeout-minutes: 2
+        run: |
+          node --input-type=module <<'NODE'
+          import {parseQueenslandWindXml,sampledWindPeak24h} from './frontend/src/context-layers/qscope-bom-wind-observation-model-v1.js';
+          const source='https://www.bom.gov.au/fwo/IDQ60920.xml';
+          const response=await fetch(source,{signal:AbortSignal.timeout(25000)});
+          if(!response.ok)throw Error('BoM state XML not available to CI: '+response.status);
+          const stations=parseQueenslandWindXml(await response.text());
+          console.log('Verified station count: '+stations.length);
+          const station=stations.find(s=>s.gustKmh!==null&&s.current);
+          if(!station)throw Error('No verified current gust station from BoM');
+          const endpoint='https://www.bom.gov.au/fwo/IDQ60801/IDQ60801.'+station.wmo+'.json';
+          const historyResponse=await fetch(endpoint,{signal:AbortSignal.timeout(25000)});
+          if(!historyResponse.ok)throw Error('BoM station JSON not available to CI: '+historyResponse.status);
+          const peak=sampledWindPeak24h(await historyResponse.json(),{wmo:station.wmo});
+          if(!peak)throw Error('BoM station rolling 24h sample not verified');
+          console.log('Verified one station 24h samples: '+peak.sampleCount);
+          NODE
