@@ -20,6 +20,8 @@ assert.equal(windStationSeverity({gustKmh:0,sustainedKmh:68,windAveragingMinutes
 assert.equal(gustKmh(null),"Unavailable");
 assert.equal(gustKmh(""),"Unavailable");
 assert.equal(parseUtc("20261111122000"),"2026-11-11T12:20:00.000Z");
+assert.equal(parseUtc("2026-11-11T12:20:00+00:00"),"2026-11-11T12:20:00.000Z");
+assert.equal(parseUtc("2026-11-11T22:20:00+10:00"),"2026-11-11T12:20:00.000Z");
 const fixture=`<?xml version="1.0" encoding="UTF-8"?>
 <product><identifier>IDQ60920</identifier><observations>
 <station wmo-id="94576" bom-id="040913" name="Brisbane" lat="-27.48" lon="153.04">
