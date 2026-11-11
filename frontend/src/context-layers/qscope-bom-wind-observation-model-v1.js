@@ -24,7 +24,21 @@ export const windDisplay=Object.freeze({
  below:{label:"Below damaging threshold",colour:"#667d87",priority:1}
 });
 export function windStationSeverity(record){
- return windSeverity(record?.gustKmh,record?.windAveragingMinutes===10?record.sustainedKmh:null);
+ const instant=windSeverity(record?.gustKmh,
+   record?.windAveragingMinutes===10?record.sustainedKmh:null);
+ // BoM's published current-day maximum is a genuine measured gust, but
+ // MUST remain labelled 'since midnight', not as a present-time reading.
+ const today=windSeverity(record?.todayMaximumGustKmh,null);
+ if(today==="destructive"||instant==="destructive")return "destructive";
+ if(today==="damaging"||instant==="damaging")return "damaging";
+ return instant;
+}
+export function windStationBasis(record){
+ const latest=windSeverity(record?.gustKmh,
+  record?.windAveragingMinutes===10?record.sustainedKmh:null);
+ const combined=windStationSeverity(record);
+ return combined!==latest?"today-since-midnight":
+   combined==="gale"?"verified-10-minute-mean":"latest-observed-gust";
 }
 export function gustKmh(value){return numeric(value)===null?"Unavailable":Math.round(+value)+" km/hr";}
 export function parseUtc(stamp){
