@@ -89,6 +89,45 @@ for old,new in (
     app_source,number=re.subn(pattern,new+"?v=20261112-seven-genuine-unique-v1",
                                app_source,count=1)
     assert number==1,"Missing exactly one runtime seven-scan import: "+old
+# Keep the published 30-minute rule at the actual application boundary.
+# The old dynamically assembled player could still issue only six requests,
+# despite a correct seven-scan helper. This narrow guard accepts ONLY exactly
+# seven distinct, consecutive genuine UTCs; it never constructs source images,
+# changes the >30-minute policies or affects Doppler/multi-radar alignment.
+helper='''function qscopeSevenGenuineUtc(times){
+  const ordered=[...new Set((times??[]).filter(t=>Number.isFinite(Date.parse(t))))]
+    .sort((a,b)=>Date.parse(a)-Date.parse(b));
+  const newest=Date.parse(ordered.at(-1)),oldest=newest-30*60000;
+  const window=ordered.filter(t=>Date.parse(t)>=oldest);
+  return window.length===7 && window.every((t,i)=>
+    Date.parse(t)===oldest+i*5*60000) ? window : null;
+}
+'''
+app_source=app_source.replace(
+ 'async function loadHybridSequence(automatic = false) {',
+ helper+'async function loadHybridSequence(automatic = false) {',1)
+original='''  const requestedPlan = isCombined
+    ? [...new Set(combinedRequested.map(entry=>entry.radarObservedUtc))]
+        .map(observedUtc=>({kind:"observed",observedUtc}))
+    : rainWindow.plan;'''
+replacement='''  const requestedPlan = isCombined
+    ? [...new Set(combinedRequested.map(entry=>entry.radarObservedUtc))]
+        .map(observedUtc=>({kind:"observed",observedUtc}))
+    : qscopeSevenGenuineUtc(availableRadarHistoryTimes)
+        ?.map(observedUtc=>({kind:"observed",observedUtc}))
+      ?? rainWindow.plan;'''
+assert app_source.count(original)==1,"Original radar request path changed"
+app_source=app_source.replace(original,replacement,1)
+original_display='''  const displayFrames = [];'''
+assert app_source.count(original_display)==1,"Original source display handoff changed"
+app_source=app_source.replace(original_display,'''  // A fully verified source window must never be cropped to 6 by an
+  // older cached window selector. Preserve the existing partial/recovery path.
+  if(!isCombined && loopSelection==="30"){
+    const seven=qscopeSevenGenuineUtc(frames.map(f=>f.observedUtc));
+    if(seven)displayPlan=seven.map(observedUtc=>({kind:"observed",observedUtc}));
+  }
+'''+original_display,1)
+assert app_source.count("qscopeSevenGenuineUtc")==3
 # One read-only acceptance trace: compare genuine requested UTCs with accepted
 # actual pixels and committed playback. No extra Worker requests or timers.
 request_needle='  const requestedInferred = requestedPlan.filter(entry => entry.kind === "inferred").length;'
