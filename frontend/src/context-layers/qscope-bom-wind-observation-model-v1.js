@@ -24,7 +24,7 @@ export const windDisplay=Object.freeze({
  below:{label:"Below damaging threshold",colour:"#667d87",priority:1}
 });
 export function windStationSeverity(record){
- return windSeverity(record?.gustKmh,record?.sustainedKmh);
+ return windSeverity(record?.gustKmh,record?.windAveragingMinutes===10?record.sustainedKmh:null);
 }
 export function gustKmh(value){return numeric(value)===null?"Unavailable":Math.round(+value)+" km/hr";}
 export function parseUtc(stamp){
