@@ -125,18 +125,19 @@ patch("src/context-layers/road-ownership-report-v1.js",
 
 # Radar and Doppler use their own immutable five-minute scheduler; expose
 # its armed deadline without changing its busy/source retry behaviour.
-# Build-from-sealed V10.2 intentionally carries the original coalescing
-# scheduler. Observe its own arm(), not the newer unpinned review scheduler.
-# This does NOT change cancellation, polling, retries, concurrency or timing.
+# The actual production Pages root has ALREADY applied the approved radar
+# reliability overlay at this point. Observe the precisely armed regular
+# five-minute timer in that EXISTING incremental-refresh scheduler. No changes
+# to polling, retry, coalescing, source requests or playback state.
 patch("src/live-loop-refresh-v1.js",
- '  let timer, active = false, pending = null;',
- '  let timer, active = false, pending = null;\n  let regularDueAt = 0;')
+ '  let missedWhileLoading = false;',
+ '  let missedWhileLoading = false;\n  let regularDueAt = 0;')
 patch("src/live-loop-refresh-v1.js",
- '    if (active) timer = schedule(() => { timer = null; void check(); }, interval);',
- '    if (active) { regularDueAt=Date.now()+interval; timer = schedule(() => { timer = null; void check(); }, interval); }')
+ '    timer = schedule(() => {',
+ '    regularDueAt = Date.now()+interval;\n    timer = schedule(() => {')
 patch("src/live-loop-refresh-v1.js",
- '    stop() { active = false; if (timer != null) cancel(timer); timer = null; },',
- '    stop() { active = false; if (timer != null) cancel(timer); timer = null; regularDueAt=0; },')
+ '      timer = busyTimer = sourceTimer = null;',
+ '      timer = busyTimer = sourceTimer = null;\n      regularDueAt=0;')
 patch("src/live-loop-refresh-v1.js",
  '    check\n  };',
  '    check,\n    get nextPollAt(){return regularDueAt;}\n  };')
