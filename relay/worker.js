@@ -40,6 +40,7 @@ const relayEfficiency=createRelayEfficiency();
 import {relayQldCrossingHeights} from "./river-crossing-heights-v1.js";
 import {relayRoadOwnershipReports} from "./road-ownership-reports-v1.js";
 import {relayBomWarningPolygons} from "./bom-warning-polygons-v1.js";
+import {relayQldWindObservations} from "./qld-wind-observations-v1.js";
 
 const BOM_WMTS =
   "https://api.bom.gov.au/apikey/v1/mapping/timeseries/wmts";
@@ -1689,6 +1690,9 @@ async function dispatchRelayRequest(request,env,ctx){
     }
     if (incoming.pathname === "/qld-significant-rainfall") {
       return relayQldSignificantRainfall(request,origin);
+    }
+    if (incoming.pathname === "/qld-wind-observations") {
+      return relayQldWindObservations(request,incoming,origin,corsHeaders,errorResponse);
     }
     if (incoming.pathname === "/river-crossing-heights") {
       return relayQldCrossingHeights(request,origin,corsHeaders,errorResponse);

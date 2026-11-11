@@ -6,6 +6,7 @@
   <title>StormTracker — V9.18.0 QLD/NSW regional situation viewer</title>
   <link rel="stylesheet" href="https://unpkg.com/cesium@1.145.0/Build/Cesium/Widgets/widgets.css">
   <link rel="stylesheet" href="./src/operational-dashboard-v9-1.css?v=v9-next-full-map-controls-gauge-severity-v4-edge-sidebar-terrainfix-v1">
+  <link rel="stylesheet" href="./src/qscope-bom-wind-observations-v1.css?v=20261111-wind-obs-v1">
   <link rel="stylesheet" href="./src/friendly-ui-v1.css?v=single-interface-20261017-v1">
   <link rel="stylesheet" href="./src/power-outage-suburb-explorer-v1.css?v=council-customers-20261017-v1">
   <link rel="stylesheet" href="./src/lga-sidebar-legend-v1.css?v=single-interface-20261017-v1">
@@ -86,6 +87,24 @@
         <button id="openOfficialBomWarningGroups" type="button" aria-haspopup="dialog" aria-controls="officialBomWarningGroupsReport">LDMG/DDMG report</button>
       </div>
       <div id="officialBomWarningsStatus" class="note official-bom-warnings-status" role="status" aria-live="polite">BoM warning polygons off</div>
+      <!-- Official station-observed wind; separate from passive radar wind alerts. -->
+      <div class="layer-row qscope-bom-wind-row">
+        <label><input id="showBomWindObservations" type="checkbox">
+          <span class="qscope-bom-wind-icon" aria-hidden="true">≋</span> BoM observed wind gusts
+        </label>
+        <button id="refreshBomWindObservations" type="button" aria-label="Refresh BoM wind observations" title="Refresh official ground station observations">↻</button>
+      </div>
+      <div class="significant-rainfall-report-actions qscope-bom-wind-report-actions">
+        <button id="openBomWindGustReport" type="button" aria-haspopup="dialog" aria-controls="bomWindGustReport">Wind gust observations report</button>
+      </div>
+      <details class="qscope-bom-wind-legend"><summary>Wind gust severity · <b>90+</b> damaging · <b>125+</b> destructive</summary>
+        <div class="qscope-bom-wind-key"><span class="wind-key-damaging">≋</span> 90–124 km/hr · Damaging gust</div>
+        <div class="qscope-bom-wind-key"><span class="wind-key-destructive">≋</span> 125+ km/hr · Destructive gust</div>
+        <div class="qscope-bom-wind-key"><span class="wind-key-gale">≋</span> 63–88 km/hr · Verified 10-minute sustained gale</div>
+        <div class="qscope-bom-wind-key"><span class="wind-key-destructive">≋</span> 89+ km/hr · Verified 10-minute destructive mean wind</div>
+        <p>Official BoM station readings, not Doppler estimates or issued warnings. Highest gust today is the source-published maximum since midnight AEST. Current gust and mean wind are separate measurements.</p>
+      </details>
+      <div id="bomWindObservationsStatus" class="note" role="status">Off by default · official BoM surface wind</div>
       <div class="layer-row basemap-row"><label for="basemapSelect">Basemap</label><select id="basemapSelect" aria-label="Map basemap"><option value="street">Street</option><option value="qld-imagery">Satellite · DEA Regional + Local Detail</option></select></div>
       <div class="layer-row flood-road-row"><label><input id="showFloodRoadClosures" type="checkbox"> <img id="floodRoadClosureLegendIcon" class="flood-road-key" alt="" aria-hidden="true"> Unplanned road closures</label></div>
       <div class="layer-row power-outage-row"><label><input id="showPowerOutages" type="checkbox"> <span class="power-outage-key power-outage-key-unplanned" aria-hidden="true"></span> Unplanned power outages</label></div>
@@ -222,6 +241,29 @@
       <div id="qfdTechnicalRescueInfoRows" class="metric"></div>
     </section>
 
+    <!-- OFFICIAL OBSERVED WIND CARD -->
+    <section id="bomWindObservationInfo" class="map-info-card significant-rainfall-info" aria-live="polite" hidden>
+      <header><div><span class="map-info-kicker">BoM OBSERVED GROUND WIND</span>
+        <strong id="bomWindObservationInfoTitle">Wind station</strong></div>
+        <button id="closeBomWindObservationInfo" type="button" aria-label="Close wind details">×</button>
+      </header>
+      <div id="bomWindObservationInfoRows" class="metric"></div>
+    </section>
+    <dialog id="bomWindGustReport" class="significant-rainfall-report qscope-bom-wind-report"
+      aria-labelledby="bomWindGustReportTitle" aria-describedby="bomWindGustReportStatus">
+      <header class="rainfall-report-header"><div>
+        <span class="map-info-kicker">OFFICIAL BoM SURFACE WIND OBSERVATIONS</span>
+        <strong id="bomWindGustReportTitle">Wind gust observations — Queensland</strong>
+        <p>All BoM Queensland stations · highest gust today since midnight AEST</p>
+      </div><button id="closeBomWindGustReport" type="button">Close</button></header>
+      <div class="rainfall-report-toolbar">
+        <span id="bomWindGustReportStatus" role="status" aria-live="polite">Checking BoM measurements…</span>
+        <button id="refreshBomWindGustReport" type="button">↻ Refresh</button>
+      </div>
+      <div id="bomWindGustReportSummary" class="rainfall-report-summary"></div>
+      <div id="bomWindGustReportRows" class="rainfall-report-groups"></div>
+      <p class="rainfall-report-footnote">BoM's published highest wind gust is measured since midnight AEST, not over the preceding 24 hours. This report reproduces available values for every station in the official Queensland observations product. Latest gust and mean wind are shown separately. Unavailable values are not estimated or treated as zero. Map marker colours are Q-Scope severity indications, not official BoM warnings.</p>
+    </dialog>
     <!-- SIG_RAIN_CARD_START -->
     <section id="significantRainfallInfo" class="map-info-card significant-rainfall-info" aria-live="polite" hidden>
       <header><div><span class="map-info-kicker">BoM RAINFALL OBSERVATION</span><strong id="significantRainfallInfoTitle">Rainfall station</strong></div>

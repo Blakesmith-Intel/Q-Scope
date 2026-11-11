@@ -1102,3 +1102,17 @@ grep -Fq 'WMTS_SOURCE_FRESHNESS_MS' _site/src/bom-wmts-loop-v2.js
 grep -Fq 'SECONDARY_WIND_PROVIDER_CACHE_SIZE=8' _site/src/multi-doppler-display-v1.js
 ! grep -Fq 'isWindHookQaPreview' _site/src/live3d-operational-v9.js
 test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6
+
+# Q-SCOPE V10.7 official measured wind observations are mounted ONLY after
+# the operator-accepted passive-event runtime and all six archived previews.
+# No pinned 3D/radar source, old menu handler or existing Worker route changes.
+python3 scripts/apply-qscope-bom-wind-observations-v1.py
+node --check _site/src/context-layers/qscope-bom-wind-observation-model-v1.js
+node --check _site/src/context-layers/qscope-bom-wind-observations-operational-v1.js
+node --check _site/src/live3d-operational-v9.js
+grep -Fq 'BO_M WIND OBSERVATION PRODUCT 20261111-bom-wind-observations-v1' _site/BUILD.txt
+grep -Fq 'initialiseOperationalBomWindObservations({viewer})' _site/src/live3d-operational-v9.js
+grep -Fq 'id="showBomWindObservations"' _site/live3d-operational-v9.html
+grep -Fq 'id="bomWindGustReport"' _site/live3d-operational-v9.html
+grep -Fq 'qscopeOperationalWindEvents.queueWindow(mode,frames.length)' _site/src/live3d-operational-v9.js
+test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6

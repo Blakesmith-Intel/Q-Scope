@@ -1,0 +1,45 @@
+name: Q-Scope BoM wind observation candidate
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'frontend/src/context-layers/qscope-bom-wind-observation-model-v1.js'
+      - 'frontend/src/context-layers/qscope-bom-wind-observations-operational-v1.js'
+      - 'frontend/tests/run-qscope-bom-wind-observations-v1-tests.mjs'
+      - 'relay/qld-wind-observations-v1.js'
+      - '.github/workflows/qa-qscope-bom-wind-observations-v1.yml'
+  workflow_dispatch:
+jobs:
+  wind-observations:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check isolated wind syntax
+        run: |
+          node --check frontend/src/context-layers/qscope-bom-wind-observation-model-v1.js
+          node --check frontend/src/context-layers/qscope-bom-wind-observations-operational-v1.js
+          node --check relay/qld-wind-observations-v1.js
+      - name: Test source-published gusts, BoM since-midnight max and no derived history
+        run: node frontend/tests/run-qscope-bom-wind-observations-v1-tests.mjs
+      - name: Check genuine BoM statewide XML source and published highest gust today
+        timeout-minutes: 2
+        run: |
+          node --input-type=module <<'NODE'
+          import {parseQueenslandWindXml} from './frontend/src/context-layers/qscope-bom-wind-observation-model-v1.js';
+          const source='https://www.bom.gov.au/fwo/IDQ60920.xml';
+          const response=await fetch(source,{signal:AbortSignal.timeout(25000)});
+          if(!response.ok)throw Error('BoM state XML not available to CI: '+response.status);
+          const raw=await response.text();
+          const stations=parseQueenslandWindXml(raw);
+          console.log('Verified station count: '+stations.length);
+          const station=stations.find(s=>s.todayMaximumGustKmh!==null&&s.current);
+          if(!station)throw Error('No verified BoM-published highest gust today');
+          if(!Number.isFinite(station.todayMaximumGustKmh))throw Error('Missing direct BoM maximum');
+          console.log('Source-published highest gust today: '+station.todayMaximumGustKmh+' km/hr at '+station.name);
+          console.log('No per-station history retrieval or synthetic rolling 24-hour peak');
+          NODE

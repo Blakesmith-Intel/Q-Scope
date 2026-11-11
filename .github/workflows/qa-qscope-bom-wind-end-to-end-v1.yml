@@ -1,0 +1,102 @@
+name: Q-SCOPE observed wind end-to-end Worker and real browsers
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/live3d-operational-v9.html"
+      - "frontend/src/context-layers/qscope-bom-wind-observation-model-v1.js"
+      - "frontend/src/context-layers/qscope-bom-wind-observations-operational-v1.js"
+      - "frontend/src/qscope-bom-wind-observations-v1.css"
+      - "relay/worker.js"
+      - "relay/qld-wind-observations-v1.js"
+      - "scripts/build-current-site.sh"
+      - "scripts/apply-qscope-bom-wind-observations-v1.py"
+      - "scripts/probe-qscope-wind-observation-relay-v1.mjs"
+      - "scripts/test-qscope-bom-wind-observation-browser-v1.mjs"
+      - ".github/workflows/qa-qscope-bom-wind-end-to-end-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  worker-transport:
+    name: Cloudflare Worker route, real BoM XML+JSON, CORS
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Check Worker source and observation module
+        run: |
+          node --check relay/worker.js
+          node --check relay/qld-wind-observations-v1.js
+          node frontend/tests/run-qscope-bom-wind-observations-v1-tests.mjs
+      - name: Install isolated local Cloudflare Worker emulator
+        run: npm install --no-save --ignore-scripts wrangler@4.45.0
+      - name: Boot actual routed Worker and check live BoM transport/CORS
+        run: |
+          set -euo pipefail
+          npx wrangler dev --config relay/wrangler.jsonc --local --ip 127.0.0.1 --port 8787 --no-live-reload > /tmp/qscope-wind-worker.log 2>&1 &
+          worker_pid=$!
+          trap 'kill "$worker_pid" 2>/dev/null || true' EXIT
+          if ! node scripts/probe-qscope-wind-observation-relay-v1.mjs; then
+            tail -120 /tmp/qscope-wind-worker.log
+            exit 1
+          fi
+
+  assembled-browser:
+    name: Full assembled Q-SCOPE wind controls (${{ matrix.platform }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [mobile, desktop]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Checkout immutable accepted diagnostics
+        uses: actions/checkout@v4
+        with:
+          ref: acfa0ebd3717a793369e3e887e2d1a54785620b7
+          path: checked/accepted-v9.18
+          persist-credentials: false
+      - name: Checkout immutable accepted foundation
+        uses: actions/checkout@v4
+        with:
+          ref: 047b3bd1c66b0ed5f070d2298202f46d0cd8dae2
+          path: checked/production-v10.2.0
+          persist-credentials: false
+      - name: Checkout immutable research preview for continuity
+        uses: actions/checkout@v4
+        with:
+          ref: f3a07688ca02f5f0234ae6425fc1177722518c53
+          path: checked/wind-hook-v10.3-qa
+          persist-credentials: false
+      - name: Assemble exact production-equivalent root and all six previews
+        run: |
+          set -euo pipefail
+          bash scripts/build-current-site.sh
+          grep -Fq 'BO_M WIND OBSERVATION PRODUCT' _site/BUILD.txt
+          test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6
+      - name: Install tested browser
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.58.2
+          # GitHub-hosted runner already has browser libraries. Avoid apt mirror
+          # DNS failures: fetch only the exact pinned Playwright browser build.
+          npx playwright install ${{ matrix.platform == 'mobile' && 'webkit' || 'chromium' }}
+      - name: Exercise report and map controls in actual browser
+        env:
+          STORMTRACKER_BROWSER: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8137 --bind 127.0.0.1 --directory _site > /tmp/qscope-wind-browser.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          node scripts/test-qscope-bom-wind-observation-browser-v1.mjs
