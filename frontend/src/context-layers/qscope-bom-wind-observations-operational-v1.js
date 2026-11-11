@@ -56,7 +56,8 @@ export function initialiseOperationalBomWindObservations({
    severityRank(windStationSeverity(b))-severityRank(windStationSeverity(a))||
    (b.gustKmh??0)-(a.gustKmh??0));
   source.entities.suspendEvents?.();source.entities.removeAll();
-  for(const station of qualifying){
+  // Add least severe first, so a co-located destructive station is not hidden.
+  for(const station of [...qualifying].reverse()){
    const entity=source.entities.add({
     id:"qscope-bom-wind:"+station.wmo,name:station.name,
     position:CesiumRef.Cartesian3.fromDegrees(station.longitude,station.latitude),
