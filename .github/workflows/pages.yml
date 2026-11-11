@@ -875,6 +875,23 @@ jobs:
             "$base/preview/wind-hook-v10-6/BUILD.txt" \
             | grep -F 'Q-SCOPE V10.6.8 REJECT FRAGMENTED DOPPLER ARTEFACTS' >/dev/null
           echo "PUBLIC Q-SCOPE V10.6.8 TWO-SCAN DOPPLER CLUTTER SUPPRESSION VERIFIED; OPERATIONAL RADAR UNCHANGED"
+          # V10.6.8 was approved for the MAIN operational UI after research
+          # artefact/interaction verification. Check the generated ROOT files,
+          # not merely the experimental /preview route.
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/src/live3d-operational-v9.js" \
+            | grep -F 'qscopeOperationalWindEvents=createOperationalWindBridge' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/src/qscope-operational-wind-bridge-v1.js" \
+            | grep -F 'screenResearchWindArtefacts' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/src/qscope-wind-artefact-guard-v10-6.js" \
+            | grep -F 'minConnectedHigh:12' >/dev/null
+          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
+            "$base/BUILD.txt" \
+            | grep -F 'Q-SCOPE ACCEPTED MAIN WIND EVENTS V10.6.8' >/dev/null
+          echo "PUBLIC Q-SCOPE MAIN WIND EVENTS V10.6.8 DELIVERED; PRE-APPROVED PRODUCT SOURCES UNCHANGED"
+
 
 
 

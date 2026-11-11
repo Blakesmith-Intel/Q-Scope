@@ -1072,3 +1072,33 @@ grep -Fq 'Q-SCOPE PASSIVE WIND/HOOK RESEARCH V10.5' "_site/preview/wind-hook-v10
 grep -Fq '<title>Q-SCOPE | Queensland Situational Awareness</title>' "_site/index.html"
 ! grep -Fq 'enableWindHookResearch' "$review_next/src/live3d-operational-v9.js"
 test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6
+
+# Promoted V10.6.8 operator-approved wind signatures are a LAST, ADDITIVE
+# root overlay. All previously frozen operational/QA checks above complete
+# before this stage. No original BoM radar/Doppler/3D/flood/warning modules,
+# historical previews, or Cloudflare code is replaced.
+python3 scripts/apply-qscope-operational-wind-v10-6-8.py
+node --check _site/src/qscope-operational-wind-bridge-v1.js
+node --check _site/src/qscope-reviewable-event-inbox-v10-6.js
+node --check _site/src/qscope-wind-artefact-guard-v10-6.js
+node --check _site/src/severe-storm-v10.js
+node --check _site/src/doppler-persistence-v10-3.js
+node --check _site/src/live3d-operational-v9.js
+node frontend/tests/run-qscope-wind-artefact-guard-v10-6-tests.mjs
+node frontend/tests/run-qscope-operational-wind-addon-v1-tests.mjs
+grep -Fq 'Q-SCOPE ACCEPTED MAIN WIND EVENTS V10.6.8' _site/BUILD.txt
+grep -Fq 'qscopeOperationalWindEvents.queueWindow(mode,frames.length)' _site/src/live3d-operational-v9.js
+grep -Fq 'new MutationObserver(qscopeWindScheduleAnalysis)' _site/src/live3d-operational-v9.js
+grep -Fq 'window.setInterval(qscopeWindScheduleAnalysis,60*1000)' _site/src/live3d-operational-v9.js
+grep -Fq 'Q-SCOPE V10.6.8 ACCEPTED PASSIVE RADAR SIGNATURES' _site/src/live3d-operational-v9.js
+grep -Fq 'wind-alerts-v10-6-8-main' _site/index.html
+grep -Fq 'wind-alerts-v10-6-8-main' _site/live3d-operational-v9.html
+grep -Fq 'PUBLISHED_PRODUCTION_RUNTIME' _site/src/live3d-operational-v9.js
+grep -Fq 'initialiseOperationalSignificantRainfall({viewer})' _site/src/live3d-operational-v9.js
+grep -Fq 'createOperationalCyclonePanel' _site/src/live3d-operational-v9.js
+grep -Fq 'OFFICIAL_FLOOD_STORAGE_KEY' _site/src/context-layers/river-official-flood-persistence-v1.js
+grep -Fq 'retainConfirmedFloodStations' _site/src/context-layers/river-gauge-layer-v1.js
+grep -Fq 'WMTS_SOURCE_FRESHNESS_MS' _site/src/bom-wmts-loop-v2.js
+grep -Fq 'SECONDARY_WIND_PROVIDER_CACHE_SIZE=8' _site/src/multi-doppler-display-v1.js
+! grep -Fq 'isWindHookQaPreview' _site/src/live3d-operational-v9.js
+test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6
