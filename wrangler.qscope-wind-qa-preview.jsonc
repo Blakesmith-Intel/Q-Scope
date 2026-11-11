@@ -1,8 +1,9 @@
 {
-  "name": "qscope-wind-pr328",
+  "name": "stormtracker-bom-relay",
   "main": "scripts/qscope-wind-qa-worker-v1.js",
   "compatibility_date": "2026-11-10",
   "workers_dev": true,
+  "preview_urls": true,
   "assets": {
     "directory": "./_wind_preview_assets",
     "binding": "ASSETS",
