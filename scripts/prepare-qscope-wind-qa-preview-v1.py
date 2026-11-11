@@ -9,7 +9,7 @@ from pathlib import Path
 import shutil
 
 ORIGINAL = "https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev"
-PREVIEW = "https://qscope-wind-pr328.stormtracker-bom-relay.workers.dev"
+PREVIEW = "https://qscope-wind-pr328-stormtracker-bom-relay.stormtracker-bom-relay.workers.dev"
 SOURCE = Path("_site")
 TARGET = Path("_wind_preview_assets")
 BANNER = '<div id="qscope-wind-preview-notice" role="note" ' \
