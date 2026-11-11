@@ -101,7 +101,7 @@ export function parseQueenslandWindXml(xml,{now=Date.now()}={}){
    // BoM OMD one-minute and METAR ten-minute mean wind are not equivalent.
    // Until the averaging period is verified, a numeric gale threshold is
    // shown as context only, never as a confirmed ten-minute gale.
-   windAveragingMinutes:["metar_10","synop","mdf"].includes(String(pa["wind-src"]??"").toLowerCase())?10:
+   windAveragingMinutes:["metar_10","synop","mdf","tmd"].includes(String(pa["wind-src"]??"").toLowerCase())?10:
      String(pa["wind-src"]??"").toLowerCase()==="omd"?1:null,
    todayMaximumGustKmh:today,
    source:"BoM IDQ60920",provisional:true,
