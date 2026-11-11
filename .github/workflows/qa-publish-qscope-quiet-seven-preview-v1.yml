@@ -114,6 +114,10 @@ jobs:
           assert.match(operatorHtml,/qscopeRadarCountdown/);
           assert.match(operatorHtml,/qscope-seal/);
           assert.match(operatorHtml,/qscopeClock_refreshOfficialBomWarnings/);
+          const severeRefresh=operatorHtml.match(/<button[^>]*id="refreshOfficialBomWarnings"[^>]*>/)?.[0];
+          assert(severeRefresh,'Missing manual severe-warning refresh control');
+          assert.doesNotMatch(severeRefresh,/hidden|aria-hidden|qscope-retired-manual-refresh/,
+            'Manual severe warning refresh must be operator-visible');
           for(const asset of ['/src/context-layers/rainfall-ifd-aep-v1.js',
                               '/src/context-layers/rainfall-catchment-v1.js']){
             const result=await fetch(base+asset,{signal:AbortSignal.timeout(12000)});
@@ -121,9 +125,17 @@ jobs:
             assert.match(result.headers.get('content-type')||'',/javascript/,
               'Required startup JS wrong MIME type: '+asset);
           }
-          const radarFrame=await fetch(base+'/src/radar-history-window-v1.js');
-          assert.equal(radarFrame.status,200);
+          const radarFrame=await fetch(base+'/src/radar-history-window-seven-genuine-v1.js');
+          assert.equal(radarFrame.status,200,'Unique seven-frame model missing');
           assert.match(await radarFrame.text(),/const targetSpanMinutes = minutes/);
+          const recovery=await fetch(base+'/src/rain-history-recovery-seven-genuine-v1.js');
+          assert.equal(recovery.status,200,'Unique seven-frame recovery import missing');
+          assert.match(await recovery.text(),/radar-history-window-seven-genuine-v1/);
+          const app=await fetch(base+'/src/live3d-operational-v9.js');
+          assert.equal(app.status,200);
+          const runtime=await app.text();
+          assert.match(runtime,/rain-history-recovery-seven-genuine-v1\.js\?v=20261112-seven-genuine-unique-v1/);
+          assert.match(runtime,/radar-history-window-seven-genuine-v1\.js\?v=20261112-seven-genuine-unique-v1/);
           const clocks=await fetch(base+'/src/qscope-quiet-refresh-clocks-v1.js');
           assert.equal(clocks.status,200);
           assert.match(await clocks.text(),/__qscopePollClock/);
