@@ -1,6 +1,7 @@
 // Independent official BoM station winds, not Doppler wind estimates or warnings.
-// Queensland IDQ60920: latest state observations (10 min issue), IDQ60801:
-// per-station 72-hour observations. No forecast/radar inference is used.
+// Queensland IDQ60920: BoM-published latest and highest-since-midnight
+// station observations. No 24h recomputation, station-history requests,
+// forecast or radar-derived inference.
 export const QLD_BOM_WIND_PRODUCT="IDQ60920";
 export const WIND_OBS_SOURCE_URL="https://www.bom.gov.au/location/australia/queensland#observations";
 export const WIND_OBS_REFRESH_MS=10*60*1000;
@@ -110,31 +111,4 @@ export function parseQueenslandWindXml(xml,{now=Date.now()}={}){
  }
  if(!records.length)throw Error("BoM IDQ60920 contained no verifiable wind stations");
  return records.sort((a,b)=>a.wmo.localeCompare(b.wmo));
-}
-// BoM IDQ60801 publishes up to 72 hours of station observations. A peak
-// calculated below is the highest AVAILABLE sample in a rolling 24-hour
-// window, not an invented continuous measurement or midnight-day maximum.
-export function sampledWindPeak24h(data,{wmo,now=Date.now()}={}){
- const header=data?.observations?.header??[],rows=data?.observations?.data;
- if(!Array.isArray(rows)||!rows.length||rows.length>1200)return null;
- const first=Array.isArray(header)?header[0]:header;
- const suppliedWmo=String(first?.wmo??rows[0]?.wmo??"");
- if(!/^\d{5}$/.test(suppliedWmo)||String(wmo)!==suppliedWmo)return null;
- const samples=rows.map(row=>{
-  const observedUtc=parseUtc(row?.aifstime_utc??"");
-  const gust=numeric(row?.gust_kmh);
-  return {observedUtc,gustKmh:gust,
-   sustainedKmh:numeric(row?.wind_spd_kmh),
-   windDirection:row?.wind_dir??null};
- }).filter(x=>x.observedUtc&&x.gustKmh!==null&&
-   Date.parse(x.observedUtc)<=now+5*60000&&
-   now-Date.parse(x.observedUtc)<=24*3600000);
- if(!samples.length)return null;
- samples.sort((a,b)=>b.gustKmh-a.gustKmh||
-   b.observedUtc.localeCompare(a.observedUtc));
- const latest=rows.map(x=>parseUtc(x.aifstime_utc??""))
-  .filter(Boolean).sort().at(-1)??null;
- return {peakGustKmh:samples[0].gustKmh,peakUtc:samples[0].observedUtc,
-  sampleCount:samples.length,lastSampleUtc:latest,windowHours:24,
-  method:"highest-available-3-second-gust-sample"};
 }
