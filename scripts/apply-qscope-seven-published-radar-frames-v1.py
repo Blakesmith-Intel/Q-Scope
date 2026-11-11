@@ -94,6 +94,23 @@ assert unique_model in app_source and unique_rain in app_source
 assert "const targetSpanMinutes = minutes;" in (root/unique_model).read_text()
 assert "selectRadarHistoryPlan" in (root/unique_rain).read_text()
 
+# CRITICAL: Q-SCOPE's iframe and ES-module URLs retain long historical cache
+# identities. Rotating only the imported selector path does not invalidate
+# a browser/CDN-cached copy of the PARENT module or page. Guarantee the
+# corrected selector imports are actually executed, not merely uploaded.
+entry_revision="20261112-seven-inclusive-actual-playback-v2-"
+for relative,needle in (
+    ("live3d-operational-v9.html","src/live3d-operational-v9.js?v="),
+    ("index.html","live3d-operational-v9.html?v=")
+):
+    file=site/relative
+    body=file.read_text(encoding="utf-8")
+    assert body.count(needle)==1,"Ambiguous final radar entrypoint: "+relative
+    body=body.replace(needle,needle+entry_revision,1)
+    file.write_text(body,encoding="utf-8")
+assert entry_revision in (site/"index.html").read_text()
+assert entry_revision in (site/"live3d-operational-v9.html").read_text()
+
 # The only direct radar record cadence remains source-measured five minutes.
 # We never synthesize a seventh record from a sixth scan.
 print("BO_M_INCLUSIVE_SEVEN_GENUINE_FRAMES_PASS | 30min = 7 × 5min endpoints; "
