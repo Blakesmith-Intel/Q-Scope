@@ -102,5 +102,43 @@ assert.equal(recovered.length,12,"Only real completed mosaics can display");
 assert.equal(networkReads,13,
   "After retry, only the one missing original tile should require network");
 
+// New source-verified seven-frame path: one delayed missing original
+// succeeds while 11 other real pixels are retained without re-requesting.
+let oneDenied=true,reads=[],waits=[];
+const authentic=await loadCompleteRadarTiles(many,async url=>{
+ reads.push(url);
+ if(url==="tile-7"&&oneDenied){
+  oneDenied=false;
+  const e=new Error("Image request failed: HTTP 403");e.status=403;throw e;
+ }
+ return image;
+},{
+ stopOnPermanent:true,retries:1,retryVerified403:true,retry403DelayMs:5500,
+ wait:async ms=>{waits.push(ms)}
+});
+assert.equal(authentic.length,12);
+assert.deepEqual(waits,[5500],"Respect delayed source cooldown");
+assert.equal(reads.length,13,"Exactly one extra relay call, not 12 new tiles");
+assert.equal(reads.filter(u=>u==="tile-7").length,2);
+assert.equal(reads.filter(u=>u==="tile-8").length,1);
+let stubbornReads=0;
+await assert.rejects(loadCompleteRadarTiles(many,async url=>{
+ stubbornReads++;
+ if(url==="tile-7")throw Object.assign(
+  Error("Image request failed: HTTP 403"),{status:403});
+ return image;
+},{stopOnPermanent:true,retries:1,retryVerified403:true,wait:async()=>{}}),/403/);
+assert.equal(stubbornReads,13,
+ "Persistent source 403 stops after ONE exact missing-tile retry; no loops");
+let rateLimitCalls=0;
+await assert.rejects(loadCompleteRadarTiles(many,async url=>{
+ rateLimitCalls++;
+ if(url==="tile-0")throw Object.assign(
+  Error("Image request failed: HTTP 429"),{status:429});
+ return image;
+},{stopOnPermanent:true,retries:1,retryVerified403:true,wait:async()=>{}}),/429/);
+assert.equal(rateLimitCalls,2,
+ "A source 429 stops immediately; never amplify provider rate limiting");
+
 console.log("PASS isolated 403 caches other genuine tiles and next attempt recovers only refused original");
 console.log("PASS selective WMTS tile retry; existing real tiles retained; no missing-pixel fabrication.");
