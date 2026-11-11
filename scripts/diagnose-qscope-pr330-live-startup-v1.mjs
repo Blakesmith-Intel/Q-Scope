@@ -74,11 +74,8 @@ for(const [name,engine,viewport] of (process.env.QSCOPE_RADAR_DIAG==='1' ?
  }catch(e){record('iframe-state-failed',e.stack||e)}
  if(process.env.QSCOPE_RADAR_DIAG==='1'){
    try{
-    await top.waitForFunction(()=>{
-      const doc=document.querySelector('iframe#liveFrame')?.contentDocument;
-      const txt=doc?.getElementById('sharedHistoryNote')?.textContent||'';
-      return /Loaded \d+ observed|skipped|unavailable/i.test(txt);
-    },{timeout:45000}).catch(()=>{});
+    // Bounded observation only; no infinite condition wait or extra fetches.
+    await top.waitForTimeout(24000);
     const radar=await iframe.locator('body').evaluate(()=>{
       const el=id=>document.getElementById(id);
       return {checkedAt:new Date().toISOString(),
