@@ -141,9 +141,9 @@ patch("src/live-loop-refresh-v1.js",
  '    check\n  };',
  '    check,\n    get nextPollAt(){return regularDueAt;}\n  };')
 patch("src/live3d-operational-v9.js",
- '// A QA-only hook tests repeated real source checks',
+ 'const independentDopplerRefresh = createLiveLoopRefresh({',
  'globalThis.__qscopePollClock?.observe("radar",()=>autoRefresh.nextPollAt);\n\n'
- '// A QA-only hook tests repeated real source checks')
+ 'const independentDopplerRefresh = createLiveLoopRefresh({')
 
 # Remove visual controls without deleting their IDs. Legacy listeners and
 # accepted browser tests can still bind, while operators cannot invoke
