@@ -23,3 +23,7 @@ jobs:
         run: |
           node --check scripts/audit-live-bom-warning-polygon-gap-20261101.mjs
           node scripts/audit-live-bom-warning-polygon-gap-20261101.mjs
+      - name: Check the candidate relay against live, independently counted IDQ21033 and IDQ21035 GIS2Web features and LGA/DDMG intersections
+        run: |
+          node --check scripts/smoke-live-candidate-warning-relay-20261111.mjs
+          node scripts/smoke-live-candidate-warning-relay-20261111.mjs
