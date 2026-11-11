@@ -450,18 +450,18 @@ export async function discoverBomReflectivityHistory(
 }
 
 export async function findRecentBomReflectivityTimes(
- now=Date.now(),count=6,region='SEQ',
+ now=Date.now(),count=7,region='SEQ',
  {publishedTimes=publishedReflectivityTimes,
   verifyNationalTile=probeTimestamp}={}
 ){
  return (await discoverBoundedBomReflectivityHistory(now,180,region,{
   publishedTimes,maximumPublishedFrames:count,verifyNationalTile
- })).slice(-Math.max(1,Math.min(9,Math.trunc(Number(count)||6))));
+ })).slice(-Math.max(1,Math.min(9,Math.trunc(Number(count)||7))));
 }
 
 export async function loadRecentBomReflectivityMosaics(
   now = Date.now(),
-  count = 6,
+  count = 7,
   onProgress = null,
   region = 'SEQ'
 ) {
