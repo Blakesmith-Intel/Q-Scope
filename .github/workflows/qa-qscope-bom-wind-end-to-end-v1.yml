@@ -51,6 +51,9 @@ jobs:
   assembled-browser:
     name: Full assembled Q-SCOPE wind controls (${{ matrix.platform }})
     runs-on: ubuntu-24.04
+    # Official image includes the exact pinned WebKit + Chromium system libs;
+    # GitHub Ubuntu runners intermittently lack GStreamer/GTK4 dependencies.
+    container: mcr.microsoft.com/playwright:v1.58.2-noble
     timeout-minutes: 24
     strategy:
       fail-fast: false
@@ -88,9 +91,8 @@ jobs:
       - name: Install tested browser
         run: |
           npm install --no-save --ignore-scripts playwright@1.58.2
-          # GitHub-hosted runner already has browser libraries. Avoid apt mirror
-          # DNS failures: fetch only the exact pinned Playwright browser build.
-          npx playwright install ${{ matrix.platform == 'mobile' && 'webkit' || 'chromium' }}
+          # Browser executables and all native shared libraries are preinstalled
+          # inside the version-matched Playwright image; no apt or browser fetch.
       - name: Exercise report and map controls in actual browser
         env:
           STORMTRACKER_BROWSER: ${{ matrix.platform }}
