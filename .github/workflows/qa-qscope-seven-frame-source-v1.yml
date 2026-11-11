@@ -1,0 +1,24 @@
+name: Q-SCOPE audit the seventh source-published BoM radar scan
+on:
+  push:
+    branches:
+      - feature/qscope-quiet-refresh-and-premium-brand-20261112
+    paths:
+      - scripts/diagnose-qscope-pr330-seven-frame-source-v1.mjs
+      - .github/workflows/qa-qscope-seven-frame-source-v1.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-provenance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Compare exact BoM last seven 5-minute stamps to Q-SCOPE 30-minute selection
+        run: |
+          node --check scripts/diagnose-qscope-pr330-seven-frame-source-v1.mjs
+          node scripts/diagnose-qscope-pr330-seven-frame-source-v1.mjs
