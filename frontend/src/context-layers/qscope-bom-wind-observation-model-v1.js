@@ -7,6 +7,7 @@ export const WIND_OBS_REFRESH_MS=10*60*1000;
 export const WIND_OBS_THRESHOLDS=Object.freeze({sustainedGale:63,damaging:90,destructive:125});
 export const WIND_OBS_VALID_AGE_MS=90*60*1000;
 const numeric=value=>{
+ if(value===null||value===undefined||String(value).trim()==="")return null;
  const n=typeof value==="number"?value:Number(String(value??"").trim());
  return Number.isFinite(n)&&n>=0&&n<=350?n:null;
 };
@@ -43,7 +44,6 @@ function attrs(tag){
  return out;
 }
 function valueOf(xml,type){
- const escaped=type.replace(/[.*+?^\${}()|[\]\\]/g,"\\$&");
  const re=new RegExp("<element\\b([^>]*)>([^<]*)<\\/element>","gi");
  for(const m of xml.matchAll(re)){
   const a=attrs(m[1]);
@@ -80,6 +80,10 @@ export function parseQueenslandWindXml(xml,{now=Date.now()}={}){
    stationId:/^\d{6}$/.test(bom)?bom:null,wmo,name:(a.name??"BoM station").slice(0,110),
    latitude,longitude,observedUtc,
    gustKmh:gust,sustainedKmh,windDirection:valueOf(p[2],"wind_dir"),
+   // BoM OMD one-minute and METAR ten-minute mean wind are not equivalent.
+   // Until the averaging period is verified, a numeric gale threshold is
+   // shown as context only, never as a confirmed ten-minute gale.
+   windAveragingMinutes:null,
    todayMaximumGustKmh:today,
    source:"BoM IDQ60920",provisional:true,
    current:now-age<=WIND_OBS_VALID_AGE_MS
@@ -98,7 +102,7 @@ export function sampledWindPeak24h(data,{wmo,now=Date.now()}={}){
  const suppliedWmo=String(first?.wmo??rows[0]?.wmo??"");
  if(!/^\d{5}$/.test(suppliedWmo)||String(wmo)!==suppliedWmo)return null;
  const samples=rows.map(row=>{
-  const observedUtc=parseUtc(row?.aifstime_utc??row?.local_date_time_full??"");
+  const observedUtc=parseUtc(row?.aifstime_utc??"");
   const gust=numeric(row?.gust_kmh);
   return {observedUtc,gustKmh:gust,
    sustainedKmh:numeric(row?.wind_spd_kmh),
