@@ -52,10 +52,18 @@ jobs:
         run: |
           set -euo pipefail
           npm test
+          # The sealed site assembler is stage one. Its approved rainfall/AEP
+          # and radar restoration overlays must run BEFORE the new UI overlay.
+          # Otherwise two required native rainfall modules are missing and
+          # the ES module graph fails before Cesium can mount (black map).
           bash scripts/build-current-site.sh
-          # The sealed build already applies every approved source overlay and
-          # the final read-only UI + 7-frame correction. NEVER double-apply
-          # pinned radar/AEP code against the finished module import graph.
+          python3 scripts/apply-ftp-aep-release-v10.py
+          python3 scripts/apply-radar-auto-refresh-v1.py
+          bash scripts/apply-qscope-quiet-seven-finalize-v1.sh
+          test -s _site/src/context-layers/rainfall-ifd-aep-v1.js
+          test -s _site/src/context-layers/rainfall-catchment-v1.js
+          node --check _site/src/context-layers/rainfall-ifd-aep-v1.js
+          node --check _site/src/context-layers/rainfall-catchment-v1.js
           python3 scripts/prepare-qscope-quiet-seven-preview-v1.py
           grep -Fq 'Q-SCOPE PREMIUM UI 12 COUNTDOWNS AND 7 GENUINE RADAR FRAMES PR330 REVIEW ONLY' _wind_preview_assets/BUILD.txt
           grep -Fq 'BO_M WIND OBSERVATION PRODUCT' _wind_preview_assets/BUILD.txt
@@ -106,6 +114,13 @@ jobs:
           assert.match(operatorHtml,/qscopeRadarCountdown/);
           assert.match(operatorHtml,/qscope-seal/);
           assert.match(operatorHtml,/qscopeClock_refreshOfficialBomWarnings/);
+          for(const asset of ['/src/context-layers/rainfall-ifd-aep-v1.js',
+                              '/src/context-layers/rainfall-catchment-v1.js']){
+            const result=await fetch(base+asset,{signal:AbortSignal.timeout(12000)});
+            assert.equal(result.status,200,'Required startup JS missing: '+asset);
+            assert.match(result.headers.get('content-type')||'',/javascript/,
+              'Required startup JS wrong MIME type: '+asset);
+          }
           const radarFrame=await fetch(base+'/src/radar-history-window-v1.js');
           assert.equal(radarFrame.status,200);
           assert.match(await radarFrame.text(),/const targetSpanMinutes = minutes/);
