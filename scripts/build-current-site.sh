@@ -1087,8 +1087,9 @@ node --check _site/src/live3d-operational-v9.js
 node frontend/tests/run-qscope-wind-artefact-guard-v10-6-tests.mjs
 node frontend/tests/run-qscope-operational-wind-addon-v1-tests.mjs
 grep -Fq 'Q-SCOPE ACCEPTED MAIN WIND EVENTS V10.6.8' _site/BUILD.txt
-grep -Fq 'qscopeOperationalWindEvents.queueWindow("rain"' _site/src/live3d-operational-v9.js
-grep -Fq 'qscopeOperationalWindEvents.queueWindow("doppler"' _site/src/live3d-operational-v9.js
+grep -Fq 'qscopeOperationalWindEvents.queueWindow(mode,frames.length)' _site/src/live3d-operational-v9.js
+grep -Fq 'new MutationObserver(qscopeWindScheduleAnalysis)' _site/src/live3d-operational-v9.js
+grep -Fq 'window.setInterval(qscopeWindScheduleAnalysis,60*1000)' _site/src/live3d-operational-v9.js
 grep -Fq 'Q-SCOPE V10.6.8 ACCEPTED PASSIVE RADAR SIGNATURES' _site/src/live3d-operational-v9.js
 grep -Fq 'wind-alerts-v10-6-8-main' _site/index.html
 grep -Fq 'wind-alerts-v10-6-8-main' _site/live3d-operational-v9.html
