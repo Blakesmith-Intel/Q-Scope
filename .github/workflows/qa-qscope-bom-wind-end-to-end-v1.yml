@@ -55,6 +55,9 @@ jobs:
     # GitHub Ubuntu runners intermittently lack GStreamer/GTK4 dependencies.
     container: mcr.microsoft.com/playwright:v1.58.2-noble
     timeout-minutes: 24
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
