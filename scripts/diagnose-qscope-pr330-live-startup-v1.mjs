@@ -15,6 +15,16 @@ for(const [name,engine,viewport] of [
  const reports=[];
  const record=(type,x)=>{if(reports.length<75)reports.push({type,detail:String(x).slice(0,440)})};
  top.on('pageerror',e=>record('shell-pageerror',e.stack||e));
+ top.on('response',res=>{
+   if(res.status()>=400)record('FRAME-http-'+res.status(),
+     res.request().resourceType()+' '+res.url().slice(0,650));
+ });
+ top.on('requestfailed',req=>record('FRAME-failed',
+    req.resourceType()+' '+req.url().slice(0,650)+' '+req.failure()?.errorText));
+ top.on('console',m=>{
+   if(m.type()==='error')record('FRAME-console-error',
+      m.text()+' at '+m.location()?.url+':'+m.location()?.lineNumber);
+ });
  top.on('console',m=>{if(m.type()==='error'||m.type()==='warning')record('shell-'+m.type(),m.text())});
  ctx.on('page',page=>{
    page.on('pageerror',e=>record('iframe-pageerror',e.stack||e));
@@ -35,7 +45,7 @@ for(const [name,engine,viewport] of [
  let navigation='';
  try{const res=await top.goto(base,{waitUntil:'domcontentloaded',timeout:30000});navigation=String(res?.status())}
  catch(e){record('navigation',e.stack||e)}
- await top.waitForTimeout(12500);
+ await top.waitForTimeout(3500);
  const iframe=top.frameLocator('iframe#liveFrame');
  let state={};
  try{
