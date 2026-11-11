@@ -98,70 +98,54 @@ export function initialiseOperationalBomWindObservations({
  }
  function renderReport(){
   if(!dialog?.open||!reportRows)return;
-  const groups=["destructive","damaging","gale"];
-  const unverified=Math.max(0,qualifying.length-MAX_STATION_HISTORY);
+  // Display all station values published in BoM's statewide product, not a
+  // curated subset of severe stations. Do not calculate a rolling peak.
+  const entries=stations.slice().sort((a,b)=>
+   (b.todayMaximumGustKmh??-1)-(a.todayMaximumGustKmh??-1)||
+   a.name.localeCompare(b.name));
   reportRows.replaceChildren();
-  const loaded=qualifying.filter(s=>history.get(s.wmo)?.peak).length;
   reportStatus.textContent=checkedAt?
-   "Official BoM · checked "+asTime(new Date(checkedAt).toISOString())+
-   " · "+loaded+"/"+Math.min(MAX_STATION_HISTORY,qualifying.length)+" available 24h station peaks":
-   "No verified observations loaded";
-  reportSummary.textContent=qualifying.length+" currently qualifying stations"+
-   (unverified?" · "+unverified+" station history peaks not yet checked (request cap)":"");
-  for(const level of groups){
-   const entries=qualifying.filter(s=>windStationSeverity(s)===level);
-   const section=document.createElement("section");section.className="rainfall-report-group";
-   const h=document.createElement("h3");h.textContent=windDisplay[level].label+
-    " · "+entries.length+" station"+(entries.length===1?"":"s");
-   section.append(h);
-   if(!entries.length){
-    const p=document.createElement("p");p.className="rainfall-report-empty";
-    p.textContent="No qualifying verified latest wind or current-day gust peaks.";section.append(p);
-   }
-   const ul=document.createElement("ul");
-   for(const station of entries){
-    const li=document.createElement("li"),top=document.createElement("div");
-    top.className="rainfall-report-entry";
-    const name=document.createElement("strong"),value=document.createElement("span");
-    name.textContent=station.name;
-    value.className="rainfall-report-mm";const basis=windStationBasis(station);
-    value.textContent=gustKmh(basis==="today-since-midnight"?station.todayMaximumGustKmh:
-     basis==="verified-10-minute-mean"?station.sustainedKmh:station.gustKmh)+
-     (basis==="today-since-midnight"?" · today":basis==="verified-10-minute-mean"?" · 10m mean":"");
-    top.append(name,value);
-    const meta=document.createElement("div");meta.className="rainfall-report-meta";
-    const h=history.get(station.wmo);
-    meta.textContent="Mean wind "+gustKmh(station.sustainedKmh)+
-     " (averaging period unverified) · Today's maximum "+gustKmh(station.todayMaximumGustKmh)+
-     " · Rolling 24h observed sample peak: "+(h?.peak?
-      gustKmh(h.peak.peakGustKmh)+" at "+asTime(h.peak.peakUtc)+
-      " ("+h.peak.sampleCount+" samples)":
-      h?"Unavailable":"Not yet checked")+
-     " · Latest "+asTime(station.observedUtc)+" · WMO "+station.wmo;
-    li.append(top,meta);ul.append(li);
-   }
-   section.append(ul);reportRows.append(section);
+   "Official BoM IDQ60920 · checked "+asTime(new Date(checkedAt).toISOString())+
+   " · highest gust today (since midnight AEST)":
+   "No verified BoM observations loaded";
+  reportSummary.textContent=entries.length+" BoM wind stations · "+
+   entries.filter(s=>s.todayMaximumGustKmh!==null).length+
+   " with a published highest gust today · "+qualifying.length+
+   " qualifying map markers";
+  const section=document.createElement("section");
+  section.className="rainfall-report-group";
+  const heading=document.createElement("h3");
+  heading.textContent="BoM highest wind gust today · since midnight AEST";
+  section.append(heading);
+  const list=document.createElement("ul");
+  for(const station of entries){
+   const li=document.createElement("li"),top=document.createElement("div");
+   top.className="rainfall-report-entry";
+   const name=document.createElement("strong"),value=document.createElement("span");
+   name.textContent=station.name;
+   value.className="rainfall-report-mm";
+   value.textContent=gustKmh(station.todayMaximumGustKmh);
+   top.append(name,value);
+   const meta=document.createElement("div");
+   meta.className="rainfall-report-meta";
+   meta.textContent="Latest observed gust "+gustKmh(station.gustKmh)+
+    " · Mean wind speed "+gustKmh(station.sustainedKmh)+
+    (station.windAveragingMinutes===10?" (10-minute average)":
+     " (averaging period unverified)")+
+    " · Observation "+asTime(station.observedUtc)+
+    (station.current?"":" (older observation)")+
+    " · BoM WMO "+station.wmo;
+   li.append(top,meta);list.append(li);
   }
- }
- let batchGeneration=0;
- async function loadReportPeaks(){
-  const generation=++batchGeneration;
-  // Only on operator request, bounded 3 concurrent, first 36 by severity.
-  const list=qualifying.slice(0,MAX_STATION_HISTORY);
-  let cursor=0;
-  await Promise.all(Array.from({length:Math.min(3,list.length)},async()=>{
-   while(cursor<list.length&&generation===batchGeneration&&dialog?.open){
-    const item=list[cursor++];
-    await fetchHistory(item.wmo);
-    if(dialog?.open)renderReport();
-   }
-  }));
+  section.append(list);
+  reportRows.append(section);
  }
  function openReport(){
-  if(!dialog)return;if(!dialog.open)dialog.showModal?.();renderReport();
+  if(!dialog)return;
+  if(!dialog.open)dialog.showModal?.();
+  renderReport();
   if(!checkedAt||now()-checkedAt>refreshMs)
-   void refresh().then(()=>loadReportPeaks()).catch(()=>{});
-  else void loadReportPeaks();
+   void refresh().catch(()=>{});
  }
  async function refresh(force=false){
   if(!source.show&&!dialog?.open&&!force)return stations;
@@ -221,17 +205,16 @@ export function initialiseOperationalBomWindObservations({
  });
  $("refreshBomWindObservations")?.addEventListener("click",()=>refresh(true).catch(()=>{}));
  $("openBomWindGustReport")?.addEventListener("click",openReport);
- $("refreshBomWindGustReport")?.addEventListener("click",()=>refresh(true).then(()=>loadReportPeaks()).catch(()=>{}));
+ $("refreshBomWindGustReport")?.addEventListener("click",()=>refresh(true).catch(()=>{}));
  $("closeBomWindGustReport")?.addEventListener("click",()=>dialog?.close());
  $("closeBomWindObservationInfo")?.addEventListener("click",()=>{if(info)info.hidden=true;selected=null;});
- dialog?.addEventListener("close",()=>{batchGeneration++;});
  window.addEventListener("pointerdown",down,{capture:true,passive:true});
  window.addEventListener("pointerup",up,{capture:true,passive:true});
  window.addEventListener("pointercancel",()=>{touch=null;},{capture:true,passive:true});
  timer=setInterval(()=>{if(!document.hidden&&(source.show||dialog?.open))
   void refresh().catch(()=>{});},refreshMs);
- window.addEventListener("pagehide",()=>{clearInterval(timer);batchGeneration++;},{once:true});
+ window.addEventListener("pagehide",()=>{clearInterval(timer);},{once:true});
  say("Off by default · official BoM station winds");
- return {dataSource:source,refresh,stop(){clearInterval(timer);batchGeneration++;},
+ return {dataSource:source,refresh,stop(){clearInterval(timer);},
   get observations(){return stations.slice();},get qualifying(){return qualifying.slice();}};
 }
