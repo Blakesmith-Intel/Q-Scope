@@ -26,7 +26,7 @@ jobs:
         run: |
           set -euxo pipefail
           npm install --no-save --ignore-scripts playwright@1.58.2
-          node scripts/diagnose-qscope-pr330-live-startup-v1.mjs
+          QSCOPE_RADAR_DIAG=1 node scripts/diagnose-qscope-pr330-live-startup-v1.mjs
       - name: Keep screenshots and failed-network evidence
         if: always()
         uses: actions/upload-artifact@v4
