@@ -341,7 +341,7 @@ jobs:
 
           # The only live rainfall change: immutable, authority-matched station
           # metadata. No new BoM request on any observation refresh.
-          python -m pip install --disable-pip-version-check 'pyshp==2.3.1' 'shapely==2.1.2'
+          python -m pip install --disable-pip-version-check 'pyshp==2.3.1' 'shapely==2.1.2' 'pyproj==3.7.2'
           python scripts/test-bom-rainfall-forecast-districts-v1.py
           python scripts/build-bom-rainfall-forecast-districts-v1.py \
             --stations _site/data/qld-rainfall-basins-v1.json \
@@ -359,10 +359,12 @@ jobs:
           # as a second classification. Static official polygons only at
           # release time; no extra Cloudflare requests during rainfall refresh.
           python scripts/test-qscope-ses-rainfall-regions-v1.py
-          python scripts/build-qscope-ses-rainfall-regions-v1.py \
+          python scripts/test-qscope-ses-nearest-crossborder-v1.py
+          python scripts/build-qscope-ses-nearest-crossborder-v1.py \
             --stations _site/data/qld-rainfall-basins-v1.json \
             --out _site/data/qld-rainfall-ses-regions-v1.json
           python scripts/apply-rainfall-ses-region-report-v1.py
+          python scripts/apply-qscope-ses-nearest-crossborder-v1.py
           node --check _site/src/context-layers/rainfall-ses-region-v1.js
           node --check _site/src/context-layers/significant-rainfall-operational-v1.js
           node --check _site/src/live3d-operational-v9.js
@@ -372,6 +374,24 @@ jobs:
           grep -Fq 'id="significantRainfallSESFilter"' _site/live3d-operational-v9.html
           grep -Fq 'id="significantRainfallDistrictFilter"' _site/live3d-operational-v9.html
           grep -Fq 'Q-SCOPE SEVEN QLD SES ADMINISTRATIVE REGIONS' _site/BUILD.txt
+
+          grep -Fq 'Q-SCOPE SES NEAREST AND NSW CROSS-BORDER' _site/BUILD.txt
+          grep -Fq 'CROSS-BORDER GAUGE (NSW)' _site/src/context-layers/significant-rainfall-operational-v1.js
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path("_site/data/qld-rainfall-ses-regions-v1.json").read_text())
+          assert data["matchedStationCount"]==len(data["stations"])==2086
+          assert data["unmatchedStationCount"]==0
+          assert data["nearestAssignedCount"]>0
+          assert data["crossBorderCount"]>0
+          assert all(g["region"] in data["regions"] for g in data["stations"].values())
+          assert all(g.get("crossBorder") is True
+                     for g in data["stations"].values() if g.get("state")=="NSW")
+          print("SES release coverage",data["matchedStationCount"],
+                "nearest",data["nearestAssignedCount"],
+                "NSW cross-border",data["crossBorderCount"])
+          PY
 
       - name: Package separate browser-accessible radar refresh review
         run: |
