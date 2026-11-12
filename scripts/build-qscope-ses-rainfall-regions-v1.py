@@ -112,13 +112,25 @@ def validated_regions(features):
 def build(station_registry,polygons,source):
     if station_registry.get("schema")!="StormTrackerBoMQldRainfallBasinsV1":
         raise ValueError("Unexpected source station registry")
+    # Prepared topology gives fast, exact point-in-polygon checks even for the
+    # unsimplified official coastline, at release time only.
+    from shapely.geometry import Point, shape
+    from shapely.prepared import prep
+    shapes=[]
+    for name,geometries in polygons.items():
+        for feature in geometries:
+            polygon=shape(feature)
+            if polygon.is_empty:
+                raise ValueError("Empty official SES geometry for "+name)
+            shapes.append((name,prep(polygon),polygon.bounds))
     matches,ambiguous={},[]
     for sid,station in station_registry.get("stations",{}).items():
         lat,lon=station.get("latitude"),station.get("longitude")
-        if not isinstance(lat,(int,float)) or not isinstance(lon,(int,float)):
+        if not isinstance(lat,(float,int)) or not isinstance(lon,(float,int)):
             continue
-        regions=[name for name,geometries in polygons.items()
-                 if any(point_in_geometry(lon,lat,geom) for geom in geometries)]
+        point=Point(lon,lat)
+        regions=list(set(name for name,poly,(xmin,ymin,xmax,ymax) in shapes
+                         if xmin<=lon<=xmax and ymin<=lat<=ymax and poly.intersects(point)))
         if len(regions)>1:
             ambiguous.append(sid)
         elif len(regions)==1:
