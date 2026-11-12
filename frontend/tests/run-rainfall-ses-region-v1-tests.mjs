@@ -66,4 +66,12 @@ assert(crossBorderReport.groups.some(g=>g.title==="South Western Region" &&
  g.rows.some(x=>x.id==="544006")));
 assert(crossBorderReport.groups.some(g=>g.title==="North Coast Region" &&
  g.rows.some(x=>x.id==="544007")));
+assert.equal(sesRegionForStation(nswGauge,registry)?.crossBorder,true);
+registry.stations["017123"]={latitude:-28.0997,longitude:140.1956,
+ region:"South Western Region",assignment:"nearest",state:"SA",
+ crossBorder:true,distanceKm:150};
+const sa=sesRegionForStation(row("017123",-28.0997,140.1956,96,20),registry);
+assert.equal(sa?.state,"SA");
+assert.equal(sa?.crossBorder,true);
+assert.equal(sa?.name,"South Western Region");
 console.log("PASS SES grouping/filtering preserves station totals and AEP calculations");
