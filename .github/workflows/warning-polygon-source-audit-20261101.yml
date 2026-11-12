@@ -8,6 +8,7 @@ on:
       - "relay/bom-warning-polygons-v1.js"
       - "relay/bom-warning-editions-v1.js"
       - "scripts/probe-live-qscope-warning-editions-20261112.mjs"
+      - "scripts/audit-bom-fwo-ftp-product-availability-20261112.py"
       - "relay/bom-warning-product-reconcile-v1.js"
       - "frontend/src/context-layers/bom-warning-cap-source-v1.js"
       - ".github/workflows/warning-polygon-source-audit-20261101.yml"
@@ -33,3 +34,8 @@ jobs:
         run: |
           node --check scripts/probe-live-qscope-warning-editions-20261112.mjs
           node scripts/probe-live-qscope-warning-editions-20261112.mjs
+
+      - name: Audit direct BoM anonymous FTP fwo warning products and cyclone candidates
+        run: |
+          python3 -m py_compile scripts/audit-bom-fwo-ftp-product-availability-20261112.py
+          python3 -u scripts/audit-bom-fwo-ftp-product-availability-20261112.py
