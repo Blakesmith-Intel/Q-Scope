@@ -1,0 +1,65 @@
+name: QA rainfall forecast-district release (official BoM geometry)
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/src/context-layers/rainfall-forecast-district-v1.js'
+      - 'frontend/tests/run-rainfall-forecast-district-v1-tests.mjs'
+      - 'scripts/build-bom-rainfall-forecast-districts-v1.py'
+      - 'scripts/test-bom-rainfall-forecast-districts-v1.py'
+      - 'scripts/apply-rainfall-forecast-district-report-v1.py'
+      - '.github/workflows/pages.yml'
+      - '.github/workflows/qa-rainfall-forecast-district-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-forecast-district-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify official boundaries and exact station mapping
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check pyshp==2.3.1
+          python scripts/test-bom-rainfall-forecast-districts-v1.py
+          node frontend/tests/run-rainfall-forecast-district-v1-tests.mjs
+          python scripts/build-bom-rainfall-basins.py --out /tmp/qscope-basin-registry.json
+          python scripts/build-bom-rainfall-forecast-districts-v1.py \
+            --stations /tmp/qscope-basin-registry.json \
+            --out /tmp/qscope-forecast-districts.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path("/tmp/qscope-forecast-districts.json").read_text())
+          assert data["sourceProduct"]=="IDM00001"
+          assert len(data["districts"])==15
+          assert data["matchedStationCount"]>=350
+          assert all(v["code"].startswith("QLD_PW") for v in data["stations"].values())
+          print("Verified forecast districts",len(data["districts"]),
+                "verified stations",data["matchedStationCount"])
+          PY
+      - name: Validate production-only patch against current rainfall UI
+        run: |
+          set -euo pipefail
+          mkdir -p _site/src/context-layers _site/data
+          cp frontend/src/context-layers/significant-rainfall-operational-v1.js _site/src/context-layers/
+          cp frontend/src/live3d-operational-v9.js _site/src/
+          cp frontend/live3d-operational-v9.html frontend/index.html _site/
+          cp /tmp/qscope-forecast-districts.json _site/data/qld-rainfall-forecast-districts-v1.json
+          echo 'QA package' > _site/BUILD.txt
+          python scripts/apply-rainfall-forecast-district-report-v1.py
+          node --check _site/src/context-layers/rainfall-forecast-district-v1.js
+          node --check _site/src/context-layers/significant-rainfall-operational-v1.js
+          node --check _site/src/live3d-operational-v9.js
+          grep -Fq 'id="significantRainfallDistrictFilter"' _site/live3d-operational-v9.html
+          grep -Fq 'Q-SCOPE BOM IDM00001 FORECAST DISTRICT RAINFALL REPORTS' _site/BUILD.txt
