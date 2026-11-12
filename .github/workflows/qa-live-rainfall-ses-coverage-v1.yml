@@ -40,3 +40,29 @@ jobs:
           assert inventory["liveStationCount"]>=400
           assert inventory["additionalLiveStations"]>=1
           PY
+      - name: Verify all live stations have SES region and Auburn River TM is covered
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'shapely==2.1.2' 'pyproj==3.7.2'
+          python scripts/test-qscope-ses-nearest-crossborder-v1.py
+          python scripts/build-qscope-ses-nearest-crossborder-v1.py \
+            --stations /tmp/qscope-inventory.json \
+            --out /tmp/qscope-ses-all-live.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          inventory=json.loads(Path("/tmp/qscope-inventory.json").read_text())
+          ses=json.loads(Path("/tmp/qscope-ses-all-live.json").read_text())
+          assert ses["matchedStationCount"]==len(inventory["stations"])
+          assert ses["unmatchedStationCount"]==0
+          assert set(ses["stations"])==set(inventory["stations"])
+          auburn=ses["stations"]["042123"]
+          assert auburn["region"] in ses["regions"]
+          assert abs(auburn["latitude"]+25.7448)<0.005
+          assert abs(auburn["longitude"]-150.589)<0.005
+          print("PASS ALL-LIVE SES COVERAGE",
+            "gauges",ses["matchedStationCount"],
+            "newIDs",inventory["additionalLiveStations"],
+            "AUBURN",auburn["region"],
+            "crossBorder",auburn.get("crossBorder",False))
+          PY
