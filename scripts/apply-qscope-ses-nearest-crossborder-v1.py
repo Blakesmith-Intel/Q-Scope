@@ -57,18 +57,18 @@ runtime.write_text(source,encoding="utf-8")
 # classifier when it was updated by the final patch.
 engine_source=engine.read_text(encoding="utf-8")
 engine_source=once(engine_source,'significant-rainfall-operational-v1.js?v=',
-    'significant-rainfall-operational-v1.js?v=20261113-nearest-crossborder-v1-')
+    'significant-rainfall-operational-v1.js?v=20261113-complete-live-inventory-v1-')
 engine.write_text(engine_source,encoding="utf-8")
 source=source.replace('rainfall-ses-region-v1.js?v=',
-    'rainfall-ses-region-v1.js?v=20261113-nearest-crossborder-v1-',1)
+    'rainfall-ses-region-v1.js?v=20261113-complete-live-inventory-v1-',1)
 runtime.write_text(source,encoding="utf-8")
 page=html.read_text(encoding="utf-8")
 page=once(page,'src/live3d-operational-v9.js?v=',
-    'src/live3d-operational-v9.js?v=20261113-nearest-crossborder-v1-')
+    'src/live3d-operational-v9.js?v=20261113-complete-live-inventory-v1-')
 html.write_text(page,encoding="utf-8")
 entry=index.read_text(encoding="utf-8")
 entry=once(entry,'live3d-operational-v9.html?v=',
-    'live3d-operational-v9.html?v=20261113-nearest-crossborder-v1-')
+    'live3d-operational-v9.html?v=20261113-complete-live-inventory-v1-')
 index.write_text(entry,encoding="utf-8")
 with (site/"BUILD.txt").open("a",encoding="utf-8") as output:
     output.write("Q-SCOPE SES NEAREST AND NSW CROSS-BORDER: static verified "
