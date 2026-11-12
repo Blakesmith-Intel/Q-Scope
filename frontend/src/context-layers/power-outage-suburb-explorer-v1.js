@@ -290,6 +290,7 @@ export function createPowerOutageSuburbExplorer({
       const officialCouncil=published?.byLga.get(publishedLgaKey(council.name));
       const officialCustomers=published?officialCouncil?.customers??0:null;
       const officialEvents=published?officialCouncil?.events.size??0:null;
+      const confirmedProviders=published?[...published.verifiedProviders.keys()].join("/"):"";
       const badges=create("span","outage-council-metrics");
       badges.append(
         create("span","outage-suburb-count",
@@ -297,7 +298,7 @@ export function createPowerOutageSuburbExplorer({
         create("span","outage-council-customers",
           officialCustomers===null?
             "Provider LGA customers unavailable":
-            `${number(officialCustomers)} Ergon/Energex customer${officialCustomers===1?"":"s"}`)
+            `${number(officialCustomers)} ${confirmedProviders} customer${officialCustomers===1?"":"s"}`)
       );
       badges.title=published?
         "Official Ergon/Energex council allocations as published via a verified public snapshot. Map locations and event totals can have different retrieval times.":
@@ -312,6 +313,7 @@ export function createPowerOutageSuburbExplorer({
           p.name+" "+formatIncidentRefreshTime(Date.parse(p.sourceUpdatedUtc))).join(" · ");
         parentInner.append(create("p","outage-suburb-note",
           "Provider-published LGA customers (not estimated from outage polygons). "+
+          (totals.crossCouncilEvents?" Multi-council mapped events are attributed using each provider's genuine LGA allocations. ":"")+
           sourceTimes+" · Source: published Ergon/Energex text-view allocations, "+
           "independently verified and mirrored at gowlettluke.github.io/qldpoweroutages. "+
           (published.verifiedProviders.size<2?
