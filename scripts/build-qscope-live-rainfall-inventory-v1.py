@@ -39,8 +39,11 @@ class GaugePage(html.parser.HTMLParser):
         if not match:return
         name,id_,latitude,longitude=match.groups()
         lat,lon=float(latitude),float(longitude)
-        if not (-30.5<=lat<=-9 and 136<=lon<=155):
-            raise ValueError("Invalid BoM gauge coordinates "+str((id_,lat,lon)))
+        # Match the existing Q-Scope live rainfall parser geographic scope.
+        # BoM regional maps include NSW sites further south that the app
+        # intentionally does not display. Those cannot block this catalogue.
+        if not (-29.8<=lat<=-9 and 137<=lon<=154.6):
+            return
         record={"name":name.strip(),"latitude":lat,"longitude":lon}
         previous=self.stations.get(id_)
         if previous and (abs(previous["latitude"]-lat)>0.004 or
