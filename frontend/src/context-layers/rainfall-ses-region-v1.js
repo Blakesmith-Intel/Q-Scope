@@ -32,8 +32,8 @@ export function sesRegionForStation(record,registry,{maxSeparationKm=2}={}){
  const assignment=station.assignment??"within";
  if(!["within","nearest"].includes(assignment))return null;
  if(assignment==="nearest" &&
-    (!["NSW","QLD"].includes(station.state) ||
-     station.crossBorder!==(station.state==="NSW") ||
+    (!["NSW","QLD","SA","NT","WA"].includes(station.state) ||
+     station.crossBorder!==(station.state!=="QLD") ||
      !Number.isFinite(station.distanceKm) || station.distanceKm<0))
   return null;
  if(assignment==="within" && station.crossBorder===true)return null;
