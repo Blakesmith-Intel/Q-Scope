@@ -23,5 +23,8 @@ jobs:
           node-version: '24'
       - name: Assert official LGA customer allocation reconciliation contract
         run: node frontend/tests/run-power-outage-official-lga-allocation-v1-tests.mjs
-      - name: Verify official customer allocation API path
+      # Official domain rejects automated access with 403. Never repeat the
+      # blocked source probes on normal PR updates; manual diagnostics only.
+      - name: Manual public provider API reachability probe
+        if: github.event_name == 'workflow_dispatch'
         run: node scripts/probe-official-ergon-lga-api-20261113.mjs
