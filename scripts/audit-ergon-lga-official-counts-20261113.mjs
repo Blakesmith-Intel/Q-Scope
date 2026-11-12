@@ -33,3 +33,16 @@ for(const [id,v] of [...byOutage].filter(([id,x])=>x.length>1).slice(0,6))
  console.log("ERGON_ARCGIS_DUPLICATE_EVENT",id,JSON.stringify(v).slice(0,1500));
 console.log("ERGON_ARCGIS_UNIQUE",byOutage.size,"duplicate_event_ids",
  [...byOutage].filter(([id,v])=>v.length>1).length);
+
+
+for(const url of [
+ "https://services.arcgis.com/33eHbTVqo7gtiCE8/ArcGIS/rest/services/VwErgonOutages/FeatureServer?f=pjson",
+ "https://services.arcgis.com/33eHbTVqo7gtiCE8/ArcGIS/rest/services/VwErgonOutages/FeatureServer/0?f=pjson",
+ "https://services.arcgis.com/33eHbTVqo7gtiCE8/ArcGIS/rest/services/VwErgonOutages/FeatureServer/1?f=pjson",
+ "https://services.arcgis.com/33eHbTVqo7gtiCE8/ArcGIS/rest/services/VwErgonOutages/FeatureServer/2?f=pjson"
+]){
+ const res=await fetch(url),data=await res.json();
+ console.log("ERGON_SCHEMA",new URL(url).pathname.split("/").slice(-2).join("/"),
+  JSON.stringify({status:res.status,error:data.error,layers:data.layers?.map(x=>({id:x.id,name:x.name})),
+   name:data.name,fields:data.fields?.map(x=>x.name)}).slice(0,3200));
+}
