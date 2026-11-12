@@ -1,0 +1,79 @@
+name: QA Q-Scope SES rainfall region attribution and reporting
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/build-qscope-ses-rainfall-regions-v1.py'
+      - 'scripts/test-qscope-ses-rainfall-regions-v1.py'
+      - 'scripts/apply-rainfall-ses-region-report-v1.py'
+      - 'frontend/src/context-layers/rainfall-ses-region-v1.js'
+      - 'frontend/src/rainfall-ses-region-v1.css'
+      - 'frontend/tests/run-rainfall-ses-region-v1-tests.mjs'
+      - '.github/workflows/pages.yml'
+      - '.github/workflows/qa-rainfall-ses-regions-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install release-only GIS parser
+        run: python -m pip install --disable-pip-version-check 'pyshp==2.3.1' 'shapely==2.1.2'
+      - name: Verify SES source geometry and report model offline
+        run: |
+          set -euo pipefail
+          python scripts/test-qscope-ses-rainfall-regions-v1.py
+          node frontend/tests/run-rainfall-ses-region-v1-tests.mjs
+      - name: Verify official SES region feature layer and BoM station attribution
+        run: |
+          set -euo pipefail
+          python scripts/build-bom-rainfall-basins.py --out /tmp/qscope-basin-registry.json
+          python scripts/build-qscope-ses-rainfall-regions-v1.py \
+            --stations /tmp/qscope-basin-registry.json \
+            --out /tmp/qscope-ses-regions.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path("/tmp/qscope-ses-regions.json").read_text())
+          assert len(data["regions"])==7
+          assert data["matchedStationCount"]>=350
+          assert len({v["region"] for v in data["stations"].values()})==7
+          print("Verified SES regional memberships",data["matchedStationCount"],
+                "unmatched",data["unmatchedStationCount"])
+          PY
+      - name: Verify published-artifact overlay after BoM forecast-district classification
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check pyshp==2.3.1
+          mkdir -p _site/src/context-layers _site/data
+          cp frontend/src/context-layers/significant-rainfall-operational-v1.js _site/src/context-layers/
+          cp frontend/src/live3d-operational-v9.js _site/src/
+          cp frontend/index.html frontend/live3d-operational-v9.html _site/
+          cp /tmp/qscope-basin-registry.json _site/data/qld-rainfall-basins-v1.json
+          python scripts/build-bom-rainfall-forecast-districts-v1.py \
+            --stations _site/data/qld-rainfall-basins-v1.json \
+            --out _site/data/qld-rainfall-forecast-districts-v1.json
+          echo 'Q-Scope isolated packaging test' > _site/BUILD.txt
+          python scripts/apply-rainfall-forecast-district-report-v1.py
+          cp /tmp/qscope-ses-regions.json _site/data/qld-rainfall-ses-regions-v1.json
+          python scripts/apply-rainfall-ses-region-report-v1.py
+          node --check _site/src/context-layers/significant-rainfall-operational-v1.js
+          node --check _site/src/context-layers/rainfall-ses-region-v1.js
+          node --check _site/src/live3d-operational-v9.js
+          grep -Fq 'SES administrative region' _site/src/context-layers/significant-rainfall-operational-v1.js
+          grep -Fq 'BoM forecast district' _site/src/context-layers/significant-rainfall-operational-v1.js
+          grep -Fq 'id="significantRainfallRegionGrouping"' _site/live3d-operational-v9.html
+          grep -Fq 'id="significantRainfallSESFilter"' _site/live3d-operational-v9.html
+          grep -Fq 'id="significantRainfallDistrictFilter"' _site/live3d-operational-v9.html
+          grep -Fq 'Q-SCOPE SEVEN QLD SES ADMINISTRATIVE REGIONS' _site/BUILD.txt
