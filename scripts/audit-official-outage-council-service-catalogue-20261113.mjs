@@ -52,3 +52,34 @@ for(const [provider,base] of accounts){
   }catch(e){console.log("ENERGYQLD_ADDITIONAL_SERVICE_ERROR",provider,service,e.message)}
  }
 }
+
+const alternateSources=[
+ ["Ergon","33eHbTVqo7gtiCE8","VwNSOutagesUDMS",1],
+ ["Ergon","33eHbTVqo7gtiCE8","VwTestNSOutagesUDMS",1],
+ ["Energex","bfVzktoY0OhzQCDj","VwTestSEOutagesUDMS",1]
+];
+for(const [provider,account,service,layer] of alternateSources){
+ try{
+  const root="https://services.arcgis.com/"+account+"/arcgis/rest/services/"+
+   service+"/FeatureServer/"+layer+"/query";
+  const params=new URLSearchParams({where:"1=1",outFields:"EVENT_ID,TYPE,CUSTOMERS_AFFECTED,SUBURBS,EXTRACTED",
+   returnGeometry:"false",f:"json",resultRecordCount:"2000"});
+  const res=await fetch(root+"?"+params,{signal:AbortSignal.timeout(16000)});
+  const data=await res.json();
+  if(data.error)throw Error(JSON.stringify(data.error).slice(0,200));
+  const rows=(data.features??[]).map(f=>f.attributes??{});
+  const events=new Map();
+  for(const row of rows){
+   const id=String(row.EVENT_ID??"");
+   if(!events.has(id))events.set(id,[]);
+   events.get(id).push({customers:row.CUSTOMERS_AFFECTED,suburbs:row.SUBURBS,type:row.TYPE});
+  }
+  console.log("ENERGYQLD_ALTERNATE_OUTAGES",JSON.stringify({
+   provider,service,rows:rows.length,events:events.size,
+   duplicates:[...events].filter(([id,items])=>items.length>1).slice(0,5),
+   knownSplit:events.get("26FN11158")??null,
+   largeEvents:[...events].filter(([id,items])=>items.length===1&&items[0].customers>100).slice(0,4),
+   exceeded:data.exceededTransferLimit??false
+  }).slice(0,4600));
+ }catch(e){console.log("ENERGYQLD_ALTERNATE_OUTAGES_ERROR",provider,service,e.message)}
+}
