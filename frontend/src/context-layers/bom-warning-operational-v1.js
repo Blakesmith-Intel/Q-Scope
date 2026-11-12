@@ -214,6 +214,13 @@ export function hasNewOfficialBoMWarningEdition(signal,products={},warnings=[],c
   if(!active.has(code))continue;
   const remote=signal.products?.[code];
   if(remote?.status!=="verified")continue;
+  // The original BoM bulletin may be reissued before the slower GIS replica
+  // publishes new geometry. Trigger the existing full verification when its
+  // independently authenticated FTP issue advances; do not claim a new shape.
+  const ftpIssue=Date.parse(remote.bulletinIssuedUtc);
+  const localBulletin=Date.parse(products?.[code]?.bulletinIssuedUtc);
+  if(Number.isFinite(ftpIssue)&&
+     (!Number.isFinite(localBulletin)||ftpIssue>localBulletin+1000))return true;
   const localRows=(warnings??[]).filter(w=>w.productCode===code&&w.sourceProduct!=null);
   const localLatest=localRows.length?Math.max(...localRows.map(w=>Date.parse(w.issuedUtc))):0;
   const remoteIssue=Date.parse(remote.issuedUtc);
