@@ -103,6 +103,17 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
   const qldCurrentIndex=indexResult.status==="fulfilled"?indexResult.value:null;
   if(rssResult.status==="rejected"&&!qldCurrentIndex)
    throw new Error("Neither CAP nor current official Queensland warning index verified");
+  // An independently verified Queensland CURRENT warning index is sufficient
+  // to start genuine product-specific WFS retrieval. Do not leave IDQ21035
+  // waiting on up to 22 unrelated national CAP documents before asking GIS2Web.
+  // Promise.allSettled preserves per-product independence and cancellation safety.
+  const indexedCodes=(qldCurrentIndex?.verified===true?
+    qldCurrentIndex.activeCodes:[]).filter(code=>
+      ["IDQ21033","IDQ21035","IDQ21037","IDQ21038"].includes(code));
+  const indexed=new Set(indexedCodes);
+  const indexedRequests=indexedCodes.map(code=>({code,
+    run:()=>fetchQldBomWfsCurrentIndexGeometry(code,qldCurrentIndex,{nowMs:now,force})}));
+  const indexedResultsPending=Promise.allSettled(indexedRequests.map(r=>r.run()));
   const links=rssResult.status==="fulfilled"?
    bomCapRssLinks(rssResult.value,{nowMs:now}):[];
   // RSS scanning is explicitly bounded (22 most recent matching alert links).
@@ -132,19 +143,15 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
   // when a regional CAP alert fell outside the bounded 22-message global RSS.
   // For an issued CAP product missing from the index, retain the existing
   // source-exact CAP/GIS matching and newer-issue safety behaviour.
-  const indexedCodes=(qldCurrentIndex?.verified===true?
-    qldCurrentIndex.activeCodes:[]).filter(code=>
-      ["IDQ21033","IDQ21035","IDQ21037","IDQ21038"].includes(code));
-  const indexed=new Set(indexedCodes);
   const capOnly=[...latestIssued.values()].filter(n=>!indexed.has(n.productCode));
-  const requests=[
-   ...indexedCodes.map(code=>({code,run:()=>fetchQldBomWfsCurrentIndexGeometry(
-     code,qldCurrentIndex,{nowMs:now,force})})),
-   ...capOnly.map(notice=>({code:notice.productCode,
-     run:()=>fetchQldBomWfsGeometry(notice,{nowMs:now,force})
-       .then(warnings=>({notice,warnings}))}))
-  ];
-  const gisResults=await Promise.allSettled(requests.map(r=>r.run()));
+  const capOnlyRequests=capOnly.map(notice=>({code:notice.productCode,
+    run:()=>fetchQldBomWfsGeometry(notice,{nowMs:now,force})
+      .then(warnings=>({notice,warnings}))}));
+  const requests=[...indexedRequests,...capOnlyRequests];
+  const [indexedResults,capOnlyResults]=await Promise.all([
+    indexedResultsPending,Promise.allSettled(capOnlyRequests.map(r=>r.run()))
+  ]);
+  const gisResults=[...indexedResults,...capOnlyResults];
   let gisFailures=0;
   requests.forEach((request,i)=>{
    const result=gisResults[i];
@@ -184,7 +191,11 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
   // NSW clipping against the TRUE installed radar coverage union is required
   // before independently publishing NSW warnings. Do not approximate it.
   const qld=reconciled.warnings.filter(x=>x.state==="QLD");
-  const enriched=await enrichAllWarningBoundaries(qld);
+  // Local government and disaster-district intersections are required for
+  // reports, but are independent of the separate original storm-cell feed.
+  // Start them together so an IDQ21035 refresh does not wait on two unrelated
+  // network stages serially.
+  const enrichedPending=enrichAllWarningBoundaries(qld);
   const products=reconciled.products;
   // IDQ65652 is the separate detailed storm-LOCATION product. A published
   // IDQ65650 threat-area polygon must never be treated as an individual cell.
@@ -202,6 +213,7 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
     stormCellSourceStatus="unavailable";
    }
   }
+  const enriched=await enrichedPending;
   // Never label incomplete CAP source scans as confirmed "no warnings".
   const partial=sourceFailures>0||gisFailures>0||indexPossiblyTruncated||Object.values(products).some(p=>
     p.status==="unavailable"||p.status==="geometry-unavailable");
