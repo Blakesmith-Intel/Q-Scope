@@ -84,7 +84,8 @@ export function selectVisibleOfficialBoMGeometry(warnings,stormCells,selected="a
  // Put regional context behind the detailed footprint. Deduplicate identical
  // source polygons for drawing only: reports still count each real product.
  const areas=[],drawn=new Set();
- for(const item of [...shared,...own]){
+ const detailedShapes=new Set(own.map(w=>JSON.stringify(w.geometry)));
+ for(const item of [...shared.filter(w=>!detailedShapes.has(JSON.stringify(w.geometry))),...own]){
   const key=JSON.stringify(item.geometry);
   if(drawn.has(key))continue;
   drawn.add(key);areas.push(item);
