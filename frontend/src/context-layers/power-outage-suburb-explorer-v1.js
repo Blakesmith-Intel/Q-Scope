@@ -1,7 +1,7 @@
 import {formatIncidentRefreshTime} from "./incident-refreshed-time-v1.js?v=20261017-refresh-v1";
 import {filterLgaGroups,councilOutageCustomerSummary,localityKey,
   resolveQueenslandLocalityLgas}
- from "./incident-lga-model-v1.js?v=council-customers-20261017-v1";
+ from "./incident-lga-model-v1.js?v=verified-lga-customers-20261113-v1";
 import {powerOfficialUrl} from "./official-source-links-v1.js?v=9.13.2";
 import {powerOutageProviderCounts} from "./power-outages-v1.js?v=20261104-qld-provider-count-reconciliation-v1";
 import {groupOutagesByVerifiedGeometry,resolveOutageEventLgas,
@@ -245,13 +245,13 @@ export function createPowerOutageSuburbExplorer({
         create("span","outage-suburb-count",
           `${totals.outages} outage${totals.outages===1?"":"s"}`),
         create("span","outage-council-customers",
-          `${number(totals.customers)} customer${totals.customers===1?"":"s"}`)
+          totals.exactCustomerTotal ? `${number(totals.customers)} customer${totals.customers===1?"":"s"}` : `${number(totals.customers)} confirmed + shared unallocated`)
       );
       if(totals.crossCouncilEvents){
-        badges.append(create("span","outage-council-shared","Shared*"));
-        badges.title="Includes outage-wide customer totals for events listed in more than one council. These are not council-specific customer allocations.";
+        badges.append(create("span","outage-council-shared",`${totals.crossCouncilEvents} shared*`));
+        badges.title="Shared incident customer totals are not allocated to individual councils by this source. Only verified single-council customers are counted.";
       } else {
-        badges.title="Unique outage IDs within this council; customers affected as reported by the electricity providers.";
+        badges.title="Unique outage IDs inside this council; customers affected as reported by the provider.";
       }
       parentTitle.append(create("span","outage-suburb-name",council.name),badges);
       parent.append(parentTitle);
@@ -260,7 +260,7 @@ export function createPowerOutageSuburbExplorer({
       // outage geometry with Queensland Government LGA boundary polygons.
       if(totals.crossCouncilEvents)
         parentInner.append(create("p","outage-suburb-note",
-          "* Shared outages can appear under multiple councils. Customer totals represent entire provider events, not customers allocated to each council."));
+          "* Confirmed exclusive-council customers: "+number(totals.customers)+". "+totals.crossCouncilEvents+" shared outage"+(totals.crossCouncilEvents===1?"":"s")+" cannot be allocated using this source. Whole-event customers across shared incidents: "+number(totals.sharedCustomers)+" (NOT additional council customers). Upper bound if all affected were in this LGA: "+number(totals.customerUpperBound)+". Consult the official provider Outage Finder for its council-specific figure."));
       for(const group of council.suburbs){
       const section=create("details","outage-suburb outage-locality");
       section.open=openKeys.has(group.key);
@@ -345,7 +345,7 @@ export function createPowerOutageSuburbExplorer({
         }
         detail.append(actions);eventCell.append(detail);
         const customers=create("td","outage-customers",number(info.customersAffected));
-        if(item.shared)customers.title="Shared incident: affected customer count is not assigned per suburb";
+        if(item.shared||groups.some(other=>other.key!==council.key&&other.items.some(otherItem=>otherItem.id===item.id)))customers.title="Whole event count, NOT a council/suburb customer allocation";
         const eta=create("td","outage-eta",
           formatTime(info.estimatedFix,info.provider)||"Not supplied");
         row.append(eventCell,customers,eta);
@@ -493,7 +493,7 @@ export function createPowerOutageSuburbExplorer({
     if(title)title.textContent=providerView?"⚡ Power outages by provider":"⚡ Power outages by LGA";
     if(help)help.textContent=providerView?
       "One statewide total · three providers · distinct emergency incidents":
-      "Unplanned outages · expand a council, then a suburb";
+      "Unplanned outages · shared event customers are not double-allocated to councils";
     // The council lookup summary is relevant only when browsing LGAs.
     state.textContent=providerView?(status.message||"Current unplanned outage sources"):
       (status.message||"Current unplanned outage sources")+
