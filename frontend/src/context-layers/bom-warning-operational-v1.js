@@ -391,7 +391,8 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   pending=(async()=>{
    try{
     const retrieve=async()=>{
-     const res=await fetchImpl(SOURCE,{cache:"no-store",signal:AbortSignal.timeout(27000)});
+     const url=force?SOURCE+"?force=1":SOURCE;
+     const res=await fetchImpl(url,{cache:"no-store",signal:AbortSignal.timeout(27000)});
      if(!res.ok)throw Error("Official warning transport HTTP "+res.status);
      return res.json();
     };
