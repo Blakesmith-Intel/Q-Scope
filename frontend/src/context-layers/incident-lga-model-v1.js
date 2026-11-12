@@ -96,29 +96,43 @@ export function filterLgaGroups(groups,query){
  }).filter(Boolean);
 }
 
-// Council summary uses event IDs (never suburb rows) to prevent duplicates.
-// Provider customersAffected describes a whole outage event. When that event
-// appears under more than one council we flag the figure as shared, because
-// it must not be read as an exact number of customers inside either LGA.
+// Distinct-event council reconciliation. ArcGIS CUSTOMER_AFFECTED is the
+// complete incident count, NOT an LGA allocation. For events mapped into more
+// than one council, do not pretend each council owns all those customers.
+// Report single-council customer totals separately and show the upper bound
+// that includes unallocated shared events. Never invent shares by polygon
+// area, centroid, suburb count, or arbitrary division.
 export function councilOutageCustomerSummary(council,allCouncils=[]){
  const unique=new Map();
- for(const item of council?.items||[]){
-   const id=String(item?.id||"");
+ for(const item of council?.items??[]){
+   const id=String(item?.id??"");
    if(id&&!unique.has(id))unique.set(id,item);
  }
- const crossCouncilIds=new Set();
- for(const other of allCouncils){
+ const sharedIds=new Set();
+ for(const other of allCouncils??[]){
    if(other.key===council?.key)continue;
-   for(const item of other.items||[])
-     if(unique.has(String(item?.id||"")))crossCouncilIds.add(String(item.id));
+   for(const item of other.items??[]){
+     const id=String(item?.id??"");
+     if(unique.has(id))sharedIds.add(id);
+   }
  }
- const customers=[...unique.values()].reduce((sum,item)=>{
-   const count=Number(item?.summary?.customersAffected);
-   return sum+(Number.isFinite(count)&&count>0?count:0);
- },0);
+ let customers=0,sharedCustomers=0;
+ for(const [id,item] of unique){
+   const value=Number(item?.summary?.customersAffected);
+   // Missing/malformed counts must not be treated as authoritative zero.
+   const valid=Number.isFinite(value)&&value>=0?value:0;
+   if(sharedIds.has(id))sharedCustomers+=valid;
+   else customers+=valid;
+ }
  return {
   outages:unique.size,
+  // Verified single-council customer count is a lower bound where events
+  // cross LGA boundaries. For a single-council event it is the exact
+  // customer count reported by the provider's source event.
   customers,
-  crossCouncilEvents:crossCouncilIds.size
+  sharedCustomers,
+  customerUpperBound:customers+sharedCustomers,
+  crossCouncilEvents:sharedIds.size,
+  exactCustomerTotal:sharedIds.size===0
  };
 }

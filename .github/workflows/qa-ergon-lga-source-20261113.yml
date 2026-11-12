@@ -1,0 +1,23 @@
+name: Audit Ergon official council allocation and ArcGIS incident coverage
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/audit-ergon-lga-official-counts-20261113.mjs'
+      - '.github/workflows/qa-ergon-lga-source-20261113.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Compare real Ergon council listing and ArcGIS event source
+        run: node scripts/audit-ergon-lga-official-counts-20261113.mjs

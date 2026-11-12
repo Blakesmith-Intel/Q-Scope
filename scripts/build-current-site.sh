@@ -249,7 +249,7 @@ version_once("src/context-layers/power-outage-suburb-explorer-v1.js",
 # A new incident/report presentation must not silently reuse a browser-cached
 # V10.2.51 outage module. Bust ONLY the small outage import chain and the
 # html entrypoint's module identity; never change radar science or tile URLs.
-outage_cache_identity="-20261104-power-provider-reconciliation-v1"
+outage_cache_identity="-20261104-power-provider-reconciliation-v1-20261113-verified-council-customers-v1"
 for relative,marker in (
     ("src/live3d-operational-v9.js",
         "power-outages-operational-v1.js?v=council-customers-20261017-v1"),

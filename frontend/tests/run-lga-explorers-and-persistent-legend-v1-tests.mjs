@@ -44,7 +44,7 @@ assert.equal(council.at(-1).name,UNKNOWN_LGA);
 assert.equal(filterLgaGroups(council,"Coomera").length,1);
 assert.equal(filterLgaGroups(council,"GOLD COAST CITY").length,1);
 assert.deepEqual(councilOutageCustomerSummary(gold,council),
- {outages:1,customers:44,crossCouncilEvents:0},
+ {outages:1,customers:44,sharedCustomers:0,customerUpperBound:44,crossCouncilEvents:0,exactCustomerTotal:true},
  "multiple suburbs in the same council share one provider event total");
 const sharedCouncilGroups=groupOutagesByLga(groupOutagesBySuburb([
   outage(7,"Ormeau, Coomera, Eagleby"),
@@ -53,13 +53,33 @@ const sharedCouncilGroups=groupOutagesByLga(groupOutagesBySuburb([
 const goldWithCross=sharedCouncilGroups.find(x=>x.name==="GOLD COAST CITY");
 const loganWithCross=sharedCouncilGroups.find(x=>x.name==="LOGAN CITY");
 assert.deepEqual(councilOutageCustomerSummary(goldWithCross,sharedCouncilGroups),
- {outages:2,customers:88,crossCouncilEvents:1});
+ {outages:2,customers:44,sharedCustomers:44,customerUpperBound:88,crossCouncilEvents:1,exactCustomerTotal:false});
 assert.deepEqual(councilOutageCustomerSummary(loganWithCross,sharedCouncilGroups),
- {outages:1,customers:44,crossCouncilEvents:1});
+ {outages:1,customers:0,sharedCustomers:44,customerUpperBound:44,crossCouncilEvents:1,exactCustomerTotal:false});
 const justCoomera=filterLgaGroups(sharedCouncilGroups,"Coomera")[0];
 assert.deepEqual(councilOutageCustomerSummary(justCoomera,sharedCouncilGroups),
- {outages:1,customers:44,crossCouncilEvents:1},
+ {outages:1,customers:0,sharedCustomers:44,customerUpperBound:44,crossCouncilEvents:1,exactCustomerTotal:false},
  "search-filtered counts reflect matching incidents but shared flag uses full LGA dataset");
+
+// A provider incident spanning LGA boundaries cannot contribute its full
+// customer count to BOTH council totals. The upper bound is separately shown.
+const southBurnett={key:"SOUTH BURNETT",name:"South Burnett",
+ items:[{id:"ergon:LOCAL",summary:{customersAffected:1550}},
+        {id:"ergon:SHARED",summary:{customersAffected:813}}]};
+const northBurnett={key:"NORTH BURNETT",name:"North Burnett",
+ items:[{id:"ergon:SHARED",summary:{customersAffected:813}}]};
+const burnettResult=councilOutageCustomerSummary(southBurnett,
+ [southBurnett,northBurnett]);
+assert.equal(burnettResult.customers,1550,
+ "Do not inflate South Burnett using cross-council whole-event customers");
+assert.equal(burnettResult.sharedCustomers,813);
+assert.equal(burnettResult.customerUpperBound,2363,
+ "The previous inflated figure is retained ONLY as a labelled upper bound");
+assert.equal(burnettResult.crossCouncilEvents,1);
+assert.equal(burnettResult.exactCustomerTotal,false);
+assert.equal(councilOutageCustomerSummary(northBurnett,[southBurnett,northBurnett]).customers,0);
+assert.match(read("../src/context-layers/power-outage-suburb-explorer-v1.js"),
+ /shared unallocated/);
 
 function road(id,localGovernmentArea,locality){
  return {properties:{id,road_summary:{
