@@ -329,6 +329,15 @@ jobs:
           cp _site/preview/rainfall-aep/data/qld-rainfall-basins-v1.json _site/data/qld-rainfall-basins-v1.json
           test -s _site/data/qld-rainfall-basins-v1.json
           grep -Fq '"543013"' _site/data/qld-rainfall-basins-v1.json
+          # The old 2022 station list omits active BoM rain gauges (e.g. 042123).
+          # Inventory the SAME seven genuine regional map sources as the live
+          # rainfall relay; this is a one-time build action, never browser polling.
+          python scripts/test-qscope-live-rainfall-inventory-v1.py
+          python scripts/build-qscope-live-rainfall-inventory-v1.py \
+            --base _site/data/qld-rainfall-basins-v1.json \
+            --out _site/data/qscope-rainfall-gauge-inventory-v1.json \
+            --require-station 042123
+          test -s _site/data/qscope-rainfall-gauge-inventory-v1.json
           node --check _site/src/context-layers/rainfall-catchment-v1.js
           grep -Fq 'queueIfdLookups' _site/src/context-layers/significant-rainfall-operational-v1.js
           grep -Fq '"Catchment"' _site/src/context-layers/significant-rainfall-operational-v1.js
@@ -344,7 +353,7 @@ jobs:
           python -m pip install --disable-pip-version-check 'pyshp==2.3.1' 'shapely==2.1.2' 'pyproj==3.7.2'
           python scripts/test-bom-rainfall-forecast-districts-v1.py
           python scripts/build-bom-rainfall-forecast-districts-v1.py \
-            --stations _site/data/qld-rainfall-basins-v1.json \
+            --stations _site/data/qscope-rainfall-gauge-inventory-v1.json \
             --out _site/data/qld-rainfall-forecast-districts-v1.json
           python scripts/apply-rainfall-forecast-district-report-v1.py
           node --check _site/src/context-layers/rainfall-forecast-district-v1.js
@@ -361,7 +370,7 @@ jobs:
           python scripts/test-qscope-ses-rainfall-regions-v1.py
           python scripts/test-qscope-ses-nearest-crossborder-v1.py
           python scripts/build-qscope-ses-nearest-crossborder-v1.py \
-            --stations _site/data/qld-rainfall-basins-v1.json \
+            --stations _site/data/qscope-rainfall-gauge-inventory-v1.json \
             --out _site/data/qld-rainfall-ses-regions-v1.json
           python scripts/apply-rainfall-ses-region-report-v1.py
           python scripts/apply-qscope-ses-nearest-crossborder-v1.py
@@ -376,21 +385,33 @@ jobs:
           grep -Fq 'Q-SCOPE SEVEN QLD SES ADMINISTRATIVE REGIONS' _site/BUILD.txt
 
           grep -Fq 'Q-SCOPE SES NEAREST AND NSW CROSS-BORDER' _site/BUILD.txt
-          grep -Fq 'CROSS-BORDER GAUGE (NSW)' _site/src/context-layers/significant-rainfall-operational-v1.js
+          grep -Fq 'CROSS-BORDER GAUGE (' _site/src/context-layers/significant-rainfall-operational-v1.js
           python - <<'PY'
           import json
           from pathlib import Path
           data=json.loads(Path("_site/data/qld-rainfall-ses-regions-v1.json").read_text())
-          assert data["matchedStationCount"]==len(data["stations"])==2086
+          inventory=json.loads(Path("_site/data/qscope-rainfall-gauge-inventory-v1.json").read_text())
+          assert data["matchedStationCount"]==len(data["stations"])==len(inventory["stations"])
+          assert inventory["liveStationCount"]>=1500
+          assert inventory["additionalLiveStations"]>=1
+          assert "042123" in data["stations"]
+          auburn=data["stations"]["042123"]
+          assert auburn["region"] in data["regions"]
+          assert abs(auburn["latitude"]-(-25.7448))<0.005
+          assert abs(auburn["longitude"]-150.589)<0.005
+          # Every station currently present in the BoM live maps must also
+          # have exactly one accessible SES reporting region. No unassigned UI.
+          assert all(sid in data["stations"] for sid in inventory["stations"])
           assert data["unmatchedStationCount"]==0
           assert data["nearestAssignedCount"]>0
           assert data["crossBorderCount"]>0
           assert all(g["region"] in data["regions"] for g in data["stations"].values())
-          assert all(g.get("crossBorder") is True
-                     for g in data["stations"].values() if g.get("state")=="NSW")
+          assert all(g.get("crossBorder") is (g.get("state")!="QLD")
+                     for g in data["stations"].values() if g.get("state"))
           print("SES release coverage",data["matchedStationCount"],
                 "nearest",data["nearestAssignedCount"],
-                "NSW cross-border",data["crossBorderCount"])
+                "NSW cross-border",data["crossBorderCount"],
+                "Auburn River TM",auburn["region"])
           PY
 
       - name: Package separate browser-accessible radar refresh review

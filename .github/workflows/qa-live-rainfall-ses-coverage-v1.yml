@@ -1,0 +1,70 @@
+name: Verify complete live BoM rainfall station SES coverage
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/build-qscope-live-rainfall-inventory-v1.py'
+      - 'scripts/test-qscope-live-rainfall-inventory-v1.py'
+      - '.github/workflows/qa-live-rainfall-ses-coverage-v1.yml'
+      - '.github/workflows/pages.yml'
+      - 'scripts/build-qscope-ses-nearest-crossborder-v1.py'
+      - 'frontend/src/context-layers/rainfall-ses-region-v1.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-source-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compare exact live rainfall gauge inventory with old 2022 register
+        run: |
+          set -euo pipefail
+          python scripts/test-qscope-live-rainfall-inventory-v1.py
+          python scripts/build-bom-rainfall-basins.py --out /tmp/qscope-base.json
+          python scripts/build-qscope-live-rainfall-inventory-v1.py \
+            --base /tmp/qscope-base.json \
+            --out /tmp/qscope-inventory.json \
+            --require-station 042123
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          orig=json.loads(Path("/tmp/qscope-base.json").read_text())
+          inventory=json.loads(Path("/tmp/qscope-inventory.json").read_text())
+          print("042123 in 2022 gauge register?", "042123" in orig["stations"])
+          print("042123 in merged live inventory?", "042123" in inventory["stations"])
+          assert inventory["liveStationCount"]>=400
+          assert inventory["additionalLiveStations"]>=1
+          PY
+      - name: Verify all live stations have SES region and Auburn River TM is covered
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'shapely==2.1.2' 'pyproj==3.7.2'
+          python scripts/test-qscope-ses-nearest-crossborder-v1.py
+          python scripts/build-qscope-ses-nearest-crossborder-v1.py \
+            --stations /tmp/qscope-inventory.json \
+            --out /tmp/qscope-ses-all-live.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          inventory=json.loads(Path("/tmp/qscope-inventory.json").read_text())
+          ses=json.loads(Path("/tmp/qscope-ses-all-live.json").read_text())
+          assert ses["matchedStationCount"]==len(inventory["stations"])
+          assert ses["unmatchedStationCount"]==0
+          assert set(ses["stations"])==set(inventory["stations"])
+          auburn=ses["stations"]["042123"]
+          assert auburn["region"] in ses["regions"]
+          assert abs(auburn["latitude"]+25.7448)<0.005
+          assert abs(auburn["longitude"]-150.589)<0.005
+          print("PASS ALL-LIVE SES COVERAGE",
+            "gauges",ses["matchedStationCount"],
+            "newIDs",inventory["additionalLiveStations"],
+            "AUBURN",auburn["region"],
+            "crossBorder",auburn.get("crossBorder",False))
+          PY

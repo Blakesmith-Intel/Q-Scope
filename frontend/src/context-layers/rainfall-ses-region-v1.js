@@ -1,6 +1,6 @@
 // Official SES Regions layer (Queensland Emergency Services QFES_Boundaries/8).
 // Static publication-time station mapping, never new requests on rainfall refresh.
-export const SES_REGION_REGISTRY_URL="./data/qld-rainfall-ses-regions-v1.json";
+export const SES_REGION_REGISTRY_URL="./data/qld-rainfall-ses-regions-v1.json?v=20261113-complete-live-gauge-inventory-042123";
 export const SES_REGION_SCHEMA="QscopeQldSESRegionStationRegistryV1";
 export const SES_REGION_NAMES=Object.freeze([
  "Brisbane Region","Central Region","Far Northern Region","North Coast Region",
@@ -32,8 +32,8 @@ export function sesRegionForStation(record,registry,{maxSeparationKm=2}={}){
  const assignment=station.assignment??"within";
  if(!["within","nearest"].includes(assignment))return null;
  if(assignment==="nearest" &&
-    (!["NSW","QLD"].includes(station.state) ||
-     station.crossBorder!==(station.state==="NSW") ||
+    (!["NSW","QLD","SA","NT","WA"].includes(station.state) ||
+     station.crossBorder!==(station.state!=="QLD") ||
      !Number.isFinite(station.distanceKm) || station.distanceKm<0))
   return null;
  if(assignment==="within" && station.crossBorder===true)return null;

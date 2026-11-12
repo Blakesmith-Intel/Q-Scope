@@ -49,4 +49,7 @@ try:
     raise AssertionError("Unknown NSW/QLD state should block publication")
 except ValueError:
     pass
+assert nearest.classify_station("017123",{
+    "name":"Moomba Airport","latitude":-28.0997,"longitude":140.1956
+},lookup=lambda lat,lon:"SA")[0]=="SA"
 print("PASS closest official SES polygon, NSW cross-border, QLD edge and unknown-state protections")
