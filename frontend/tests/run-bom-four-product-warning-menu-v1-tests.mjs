@@ -59,13 +59,13 @@ const cell={id:"cell",type:"severe-thunderstorm-cell",official:true,
 const invalidCell={...cell,id:"not-a-real-cell",sourceProduct:"IDQ65654"};
 const cells=[cell,invalidCell];
 assert.deepEqual(selectVisibleOfficialBoMGeometry(mixed,cells,"IDQ21033").map(w=>w.id),
- ["regional","cap-regional"],"21033 displays NO 21035 polygon or cell");
+ ["regional"],"21033 draws its genuine polygon once and NO 21035 cell");
 assert.deepEqual(selectVisibleOfficialBoMGeometry(mixed,cells,"IDQ21035").map(w=>w.id),
- ["detailed","cell"],"21035 displays only its own threat areas and valid cells");
+ ["detailed","cell"],"Exact duplicate regional geometry is drawn only once; detailed source remains authoritative");
 assert.deepEqual(selectVisibleOfficialBoMGeometry(mixed,cells,"all").map(w=>w.id),
- ["detailed","regional","cap-regional","cell"],"All displays every verified regional/detailed polygon and cell");
+ ["detailed","cell"],"All draws exact identical polygon rings only once; original per-product reports stay separate");
 assert.deepEqual(selectVisibleOfficialBoMGeometry(mixed,cells,"IDQ21033").map(w=>w.id),
- ["regional","cap-regional"],"Repeated switching All -> 21033 leaves no stale 21035 entries");
+ ["regional"],"Repeated switching All -> 21033 leaves no stale 21035 entries");
 const statuses=Object.fromEntries(codes.map(code=>[code,{status:"no-active"}]));
 for(const code of codes){
  const state=describeOfficialBomWarningState({products:statuses,selected:code});
