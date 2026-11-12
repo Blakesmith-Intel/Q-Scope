@@ -89,7 +89,7 @@ const importer=readFileSync(new URL("../src/context-layers/bom-warning-operation
  import.meta.url),"utf8");
 assert(importer.includes("20261102-unified-terrain-warning-polygon-v1"));
 const build=readFileSync(new URL("../../scripts/build-current-site.sh",import.meta.url),"utf8");
-assert(build.includes("20261112-source-exact-regional-detailed-context-v1"),
+assert(build.includes("20261112-live-warning-edition-watch-v1"),
  "New source-qualified warning controller must bust previously cached modules");
 assert(build.includes("idq-source-isolation-20261102-v1"),
  "Every new browser page must force the latest source-qualified controller");
