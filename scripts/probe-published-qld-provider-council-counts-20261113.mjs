@@ -1,3 +1,4 @@
+import {validatePublishedProviderLga} from "../frontend/src/context-layers/power-outage-published-lga-v1.js";
 // One-time read-only test of the independently published provider-verified
 // council snapshot. No polling job; browser CORS is mandatory before adoption.
 const origins=[
@@ -46,6 +47,16 @@ for(const [name,base] of origins){
      total:official.total_customers,lgaCount:listed.size,individual,unverified,
      southBurnett:listed.get("south burnett regional"),events:rows.filter(f=>f.properties?.provider_code===pCode).length});
   }
+  const verified=validatePublishedProviderLga(manifest,geo,{nowMs:Date.now()});
+  if(verified.verifiedProviders.size!==2)
+    throw Error("Both live official provider sources must be verified: "+JSON.stringify(verified.errors));
+  console.log("EXTERNAL_LGA_SOURCE_MODEL_PASS",JSON.stringify({
+   source:name,snapshot:verified.snapshotUtc,
+   providers:[...verified.verifiedProviders.keys()],
+   lgas:verified.byLga.size,
+   southBurnett:verified.byLga.get("SOUTHBURNETT")?.customers??0,
+   exactErgonSplit:verified.byEventLga.get("Ergon:26FN11158|CARPENTARIA")??null
+  }));
   console.log("EXTERNAL_LGA_SOURCE_RECONCILIATION",JSON.stringify({source:name,generated:manifest.generated_utc,audit}));
  }catch(e){console.log("EXTERNAL_LGA_SOURCE_FAILURE",JSON.stringify({source:name,error:e.message}));}
 }
