@@ -9,6 +9,8 @@ on:
       - "relay/qld-bom-gauge-reference-20261110-v1.js"
       - "relay/relay-efficiency-v1.js"
       - "relay/bom-warning-polygons-v1.js"
+      - "relay/bom-warning-editions-v1.js"
+      - "relay/bom-warning-qld-current-index-v1.js"
       - "relay/bom-warning-gis2web-replica-v1.js"
       - "relay/bom-warning-product-reconcile-v1.js"
       - "frontend/src/context-layers/bom-warning-cap-source-v1.js"
