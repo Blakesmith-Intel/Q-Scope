@@ -106,7 +106,7 @@ export function sourceExactQldBomWfsFeatures(collection,notice,{nowMs=Date.now()
 // Fetch the ORIGINAL WFS-derived polygons independently for each QLD warning
 // product. Do not make retrieval depend on being in the first 22 national CAP
 // entries: simultaneous regional and detailed warnings can otherwise disappear.
-async function fetchProductCollection(code,{fetchImpl=fetch}={}){
+async function fetchProductCollection(code,{fetchImpl=fetch,force=false}={}){
  const source=allowed(code);
  if(!source)return null;
  const url=new URL(QLD_BOM_GIS_WARNING_REPLICA+"/"+source.layer+"/query");
@@ -118,7 +118,8 @@ async function fetchProductCollection(code,{fetchImpl=fetch}={}){
  url.searchParams.set("resultRecordCount","500");
  const response=await fetchImpl(url.toString(),{
   headers:{Accept:"application/json"},
-  signal:AbortSignal.timeout(14500)
+  signal:AbortSignal.timeout(14500),
+  ...(force?{cf:{cacheEverything:false,cacheTtl:0}}:{})
  });
  if(!response.ok)throw Error("Queensland BoM WFS derivative HTTP "+response.status);
  const body=await response.text();
@@ -128,9 +129,9 @@ async function fetchProductCollection(code,{fetchImpl=fetch}={}){
  if(collection?.error)throw Error("Government BoM GIS unavailable: "+String(collection.error.code??"API error"));
  return collection;
 }
-export async function fetchQldBomWfsGeometry(notice,{fetchImpl=fetch,nowMs=Date.now()}={}){
+export async function fetchQldBomWfsGeometry(notice,{fetchImpl=fetch,nowMs=Date.now(),force=false}={}){
  if(!allowed(notice?.productCode))return [];
- const collection=await fetchProductCollection(notice.productCode,{fetchImpl});
+ const collection=await fetchProductCollection(notice.productCode,{fetchImpl,force});
  return sourceExactQldBomWfsFeatures(collection,notice,{nowMs});
 }
 // A verified, fresh BoM Queensland CURRENT-products index plus the original,
@@ -171,14 +172,14 @@ export function indexVerifiedQldBomWfsFeatures(collection,code,index,{nowMs=Date
  return {notice,warnings};
 }
 export async function fetchQldBomWfsCurrentIndexGeometry(code,index,{
- fetchImpl=fetch,nowMs=Date.now()
+ fetchImpl=fetch,nowMs=Date.now(),force=false
 }={}){
  const checked=timeMs(index?.checkedUtc);
  if(!allowed(code)||index?.verified!==true||
    !Array.isArray(index.activeCodes)||!index.activeCodes.includes(code)||
    !Number.isFinite(checked)||checked>nowMs+5*60000||
    nowMs-checked>20*60000)return null;
- const collection=await fetchProductCollection(code,{fetchImpl});
+ const collection=await fetchProductCollection(code,{fetchImpl,force});
  return indexVerifiedQldBomWfsFeatures(collection,code,index,{nowMs});
 }
 
@@ -221,7 +222,7 @@ export function sourceExactQldBomStormLocations(collection,notice,{nowMs=Date.no
  }
  return out;
 }
-export async function fetchQldBomStormLocations(notice,{fetchImpl=fetch,nowMs=Date.now()}={}){
+export async function fetchQldBomStormLocations(notice,{fetchImpl=fetch,nowMs=Date.now(),force=false}={}){
  if(notice?.productCode!=="IDQ21035")return [];
  const url=new URL(QLD_BOM_GIS_WARNING_REPLICA+"/3/query");
  url.searchParams.set("f","geojson");
@@ -231,7 +232,8 @@ export async function fetchQldBomStormLocations(notice,{fetchImpl=fetch,nowMs=Da
  url.searchParams.set("returnGeometry","true");
  url.searchParams.set("resultRecordCount","500");
  const response=await fetchImpl(url.toString(),{
-  headers:{Accept:"application/json"},signal:AbortSignal.timeout(14500)
+  headers:{Accept:"application/json"},signal:AbortSignal.timeout(14500),
+  ...(force?{cf:{cacheEverything:false,cacheTtl:0}}:{})
  });
  if(!response.ok)throw Error("Original BoM storm-location source HTTP "+response.status);
  const body=await response.text();
