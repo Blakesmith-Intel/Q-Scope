@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'scripts/probe-official-ergon-lga-api-20261113.mjs'
+      - 'scripts/audit-official-outage-council-service-catalogue-20261113.mjs'
       - 'frontend/src/context-layers/power-outage-official-lga-allocation-v1.js'
       - 'frontend/tests/run-power-outage-official-lga-allocation-v1-tests.mjs'
       - '.github/workflows/probe-official-ergon-lga-api-20261113.yml'
@@ -23,6 +24,8 @@ jobs:
           node-version: '24'
       - name: Assert official LGA customer allocation reconciliation contract
         run: node frontend/tests/run-power-outage-official-lga-allocation-v1-tests.mjs
+      - name: Discover first-party GIS per-council customer allocation services
+        run: node scripts/audit-official-outage-council-service-catalogue-20261113.mjs
       # Official domain rejects automated access with 403. Never repeat the
       # blocked source probes on normal PR updates; manual diagnostics only.
       - name: Manual public provider API reachability probe
