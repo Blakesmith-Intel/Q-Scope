@@ -3,6 +3,11 @@ import {formatAgencyTimestamp} from "./agency-source-time-v1.js?v=20261027-agenc
 import {QLD_WARNING_PRODUCTS} from "./bom-qld-warning-product-catalogue-v1.js?v=20261102-idq-source-isolation-v1";
 const SOURCE="https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev/bom-official-warning-polygons";
 const SCHEMA="StormTrackerOfficialBoMWarningPolygonsV1",INTERVAL_MS=15*60*1000;
+const EDITION_SOURCE="https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev/bom-official-warning-editions";
+export const WARNING_EDITION_SCHEMA="QScopeBoMWarningEditionsV1";
+export const WARNING_EDITION_POLL_MS=60*1000;
+export const WARNING_ACTIVE_FULL_BACKSTOP_MS=5*60*1000;
+export const WARNING_EDITION_RETRY_MS=2*60*1000;
 export const PRODUCT_FILTERS=Object.freeze(["all","IDQ21035","IDQ21033","IDQ21037","IDQ21038"]);
 export function filterOfficialWarnings(warnings,productCode="all"){
  if(!PRODUCT_FILTERS.includes(productCode))return [];
@@ -185,7 +190,54 @@ export function officialWarningRefreshInterval({
  // negative warning result and never unbounded request amplification.
  if(temporaryFailures>0&&temporaryFailures<3)
    return WARNING_GEOMETRY_RECOVERY_MS;
+ // The original 15-minute baseline is still correct when warnings are clear.
+ // While ACTIVE, a five-minute full verification backs up the small 60-second
+ // source-issue watcher and catches CAP-only textual reissues without page reload.
+ if(Object.values(products).some(p=>["active","listed-active","geometry-unavailable"]
+    .includes(p?.status)))return WARNING_ACTIVE_FULL_BACKSTOP_MS;
  return INTERVAL_MS;
+}
+
+const editionSourceIds=(rows,code)=>rows.filter(w=>w.productCode===code&&
+ w.sourceProduct!=null).map(w=>String(w.id??"").split(":").at(-1)).sort();
+// Compare only independently verified *published* editions. A BoM CAP reissue
+// can precede original GIS2Web publication; never pretend missing geometry
+// is a published polygon or treat a transient metadata failure as all-clear.
+export function hasNewOfficialBoMWarningEdition(signal,products={},warnings=[],cells=[]){
+ if(signal?.schema!==WARNING_EDITION_SCHEMA||signal.indexStatus!=="verified"||
+    !Array.isArray(signal.activeCodes))return false;
+ const active=new Set(signal.activeCodes);
+ for(const code of WARNING_CODES){
+  const localStatus=products?.[code]?.status??"unavailable";
+  const localActive=["active","listed-active","geometry-unavailable"].includes(localStatus);
+  if(active.has(code)!==localActive)return true;
+  if(!active.has(code))continue;
+  const remote=signal.products?.[code];
+  if(remote?.status!=="verified")continue;
+  const localRows=(warnings??[]).filter(w=>w.productCode===code&&w.sourceProduct!=null);
+  const localLatest=localRows.length?Math.max(...localRows.map(w=>Date.parse(w.issuedUtc))):0;
+  const remoteIssue=Date.parse(remote.issuedUtc);
+  if(Number.isFinite(remoteIssue)&&remoteIssue>localLatest+1000)return true;
+  if(Number.isFinite(remoteIssue)&&localLatest>remoteIssue+1000)continue;
+  if(remote.count!==localRows.length)return true;
+  const localIds=editionSourceIds(localRows,code);
+  if(remote.sourceIds?.length&&localIds.length===remote.sourceIds.length&&
+      JSON.stringify(localIds)!==JSON.stringify(remote.sourceIds))return true;
+ }
+ const cellSignal=signal.products?.["IDQ21035:cells"];
+ if(active.has("IDQ21035")&&cellSignal?.status==="verified"){
+  const local=(cells??[]).filter(c=>c.sourceProduct==="IDQ65652");
+  const last=local.length?Math.max(...local.map(c=>Date.parse(c.issuedUtc))):0;
+  const remote=Date.parse(cellSignal.issuedUtc);
+  if(Number.isFinite(remote)&&remote>last+1000)return true;
+  if(!Number.isFinite(remote)||remote>=last-1000){
+   if(cellSignal.count!==local.length)return true;
+   const localIds=local.map(c=>String(c.cellSourceId??"")).sort();
+   if(cellSignal.sourceIds?.length&&
+      JSON.stringify(localIds)!==JSON.stringify(cellSignal.sourceIds))return true;
+  }
+ }
+ return false;
 }
 const THUNDERSTORM_CODES=Object.freeze(["IDQ21035","IDQ21033"]);
 const warningName=code=>code==="IDQ21035"?"IDQ21035 (Detailed SEQ storms)":
@@ -276,6 +328,7 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   return {destroy(){}};
  let warnings=[],stormCells=[],stormCellSourceStatus="unavailable",warningPolygons=null,lastAttemptAt=0,pending=null,timer=null,activeId="",destroyed=false,sourceStatus="unavailable",productStatuses={};
  let geometryRecoveryPolls=0,geometryRecoverySignature="",temporaryFailures=0;
+ let editionPending=null,lastEditionCheckAt=0,lastEditionTriggerAt=0,lastEditionTriggerKey="";
  const currentRefreshMs=()=>officialWarningRefreshInterval({
    products:productStatuses,warnings,recoveryPolls:geometryRecoveryPolls,
    temporaryFailures
@@ -441,6 +494,38 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   })();
   return pending;
  }
+
+ // A *metadata-only* source-edition check runs while this layer is visible.
+ // It does not download geometries, CAP national history or district joins.
+ // One successful changed issue forces the established atomic full refresh.
+ async function checkWarningEditions(){
+  if(destroyed||!toggle.checked||document.hidden||editionPending||pending)return;
+  if(lastEditionCheckAt&&now()-lastEditionCheckAt<WARNING_EDITION_POLL_MS)return;
+  lastEditionCheckAt=now();
+  editionPending=(async()=>{
+   try{
+    const response=await fetchImpl(EDITION_SOURCE,{
+      cache:"no-store",signal:AbortSignal.timeout(14000)
+    });
+    if(!response.ok)return;
+    const signal=await response.json();
+    if(!hasNewOfficialBoMWarningEdition(signal,productStatuses,warnings,stormCells))return;
+    // If source metadata is ahead of its accompanying CAP issue, retry only
+    // every two minutes rather than hammering the entire full source relay.
+    const key=JSON.stringify({active:signal.activeCodes,
+      products:signal.products});
+    if(key===lastEditionTriggerKey&&
+       now()-lastEditionTriggerAt<WARNING_EDITION_RETRY_MS)return;
+    lastEditionTriggerKey=key;
+    lastEditionTriggerAt=now();
+    await refresh({force:true});
+   }catch{
+    // A failed edition probe is unverified, NOT a verified cancellation.
+    // Normal full-source polling and the manual refresh remain operational.
+   }finally{editionPending=null;}
+  })();
+  return editionPending;
+ }
  const groupLabel=code=>code==="IDQ21035"?
     "IDQ21035 — Detailed SEQ thunderstorms":code==="IDQ21033"?
     "IDQ21033 — Regional QLD thunderstorms":code==="IDQ21037"?
@@ -571,6 +656,7 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
    geometryRecoveryPolls=0;geometryRecoverySignature="";temporaryFailures=0;
    locateBtn.hidden=true;discard();openInfo(null);renderGroupsReport();
    report("BoM warning polygons off");return;}
+  lastEditionCheckAt=0;
   void refresh({force:true});
  };
  const onLocate=()=>{
@@ -642,14 +728,29 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
  window.addEventListener("pointermove",move,{capture:true,passive:true});
  window.addEventListener("pointerup",up,{capture:true,passive:true});
  window.addEventListener("pointercancel",clearPointer,{capture:true,passive:true});
+ const onForeground=()=>{
+  if(!document.hidden&&toggle.checked){lastEditionCheckAt=0;
+   void checkWarningEditions();}
+ };
+ window.addEventListener("pageshow",onForeground);
+ document.addEventListener("visibilitychange",onForeground);
+ window.__qscopePollClock?.observe("warnings",()=>toggle.checked?
+  Math.min(lastAttemptAt+currentRefreshMs(),
+   (lastEditionCheckAt||now())+WARNING_EDITION_POLL_MS):0);
  timer=setInterval(()=>{
   trimExpired();
-  if(toggle.checked&&now()-lastAttemptAt>=currentRefreshMs())void refresh();
+  if(!toggle.checked||document.hidden)return;
+  if(now()-lastAttemptAt>=currentRefreshMs())void refresh();
+  void checkWarningEditions();
  },60000);
  locateBtn.hidden=true;
  report("BoM warning polygons off");
  return {refresh,destroy(){
-  destroyed=true;if(timer)clearInterval(timer);discard();warnings=[];stormCells=[];openInfo(null);
+  destroyed=true;if(timer)clearInterval(timer);
+  window.removeEventListener("pageshow",onForeground);
+  document.removeEventListener("visibilitychange",onForeground);
+  window.__qscopePollClock?.stop("warnings");
+  discard();warnings=[];stormCells=[];openInfo(null);
   toggle.removeEventListener("change",onToggle);
   filter.removeEventListener("change",onProductChange);
   reportButton.removeEventListener("click",openGroups);
