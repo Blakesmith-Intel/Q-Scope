@@ -61,6 +61,11 @@ try{
    product:n.productCode,status:n.status,issued:n.issuedUtc,expires:n.expiresUtc,
    polygonsDirectFromCAP:x.value.polygons
   }));
+  if(n.productCode==="IDQ21035") console.log("IDQ21035_AUTHENTIC_CAP_SOURCE",JSON.stringify({
+    issued:n.issuedUtc,expires:n.expiresUtc,status:n.status,
+    exactCapAreaPolygons:x.value.polygons,
+    originalIdentifier:n.originalIdentifier,area:n.areaDescription?.slice(0,200)
+  }));
   const prior=notices.get(n.productCode);
   if(!prior||Date.parse(prior.issuedUtc)<Date.parse(n.issuedUtc))
     notices.set(n.productCode,n);
