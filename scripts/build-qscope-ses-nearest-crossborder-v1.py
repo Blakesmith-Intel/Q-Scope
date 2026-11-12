@@ -34,7 +34,7 @@ def lookup_official_state(latitude,longitude):
         "geometryType":"esriGeometryPoint",
         "inSR":"4326",
         "spatialRel":"esriSpatialRelIntersects",
-        "where":"state_code_2021 IN ('1','3')",
+        "where":"state_code_2021 IN ('1','3','4','5','7')",
         "outFields":"state_code_2021,state_name_2021",
         "returnGeometry":"false"
     })
@@ -55,6 +55,12 @@ def lookup_official_state(latitude,longitude):
             states.add("NSW")
         elif state=="3" and label=="Queensland":
             states.add("QLD")
+        elif state=="4" and label=="South Australia":
+            states.add("SA")
+        elif state=="5" and label=="Western Australia":
+            states.add("WA")
+        elif state=="7" and label=="Northern Territory":
+            states.add("NT")
         else:
             raise ValueError("Unexpected ABS state: "+repr(attrs))
     if len(states)>1:
@@ -74,7 +80,7 @@ QLD_COASTAL_EDGE_IDS={
 def classify_station(sid,station,lookup=lookup_official_state):
     lat,lon=station["latitude"],station["longitude"]
     official=lookup(lat,lon)
-    if official in ("QLD","NSW"):
+    if official in ("QLD","NSW","SA","NT","WA"):
         return official,"ABS state polygon"
     marker=QLD_COASTAL_EDGE_IDS.get(str(sid))
     if marker and abs(lat-marker[0])<0.001 and abs(lon-marker[1])<0.001:
@@ -108,7 +114,7 @@ def assign_nearest(initial,stations,polygons,state_lookup=lookup_official_state)
         state,evidence=states[sid]
         registered[sid]={
             "latitude":lat,"longitude":lon,"region":name,
-            "assignment":"nearest","state":state,"crossBorder":state=="NSW",
+            "assignment":"nearest","state":state,"crossBorder":state!="QLD",
             "distanceKm":round(distance/1000,3),"stateEvidence":evidence,
         }
     if len(registered)!=len(stations):
@@ -136,7 +142,7 @@ def main():
     path.parent.mkdir(parents=True,exist_ok=True)
     path.write_text(json.dumps(result,ensure_ascii=False,separators=(",",":"))+"\n",encoding="utf-8")
     print("Q_SCOPE_SES_NEAREST",result["nearestAssignedCount"],
-          "CROSS_BORDER_NSW",result["crossBorderCount"],
+          "CROSS_BORDER",result["crossBorderCount"],
           "COVERED",result["matchedStationCount"],
           "UNASSIGNED",result["unmatchedStationCount"])
     for sid,row in sorted(result["stations"].items()):
