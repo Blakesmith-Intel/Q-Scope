@@ -47,6 +47,33 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: relay
           command: deploy --config wrangler.jsonc
+      - name: Verify production live BoM warning edition heartbeat
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const url='https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev/bom-official-warning-editions';
+          let result=null,lastError='';
+          for(let attempt=0;attempt<3;attempt++){
+            try{
+              const response=await fetch(url,{
+                headers:{Origin:'https://blakesmith-intel.github.io'},
+                cache:'no-store',signal:AbortSignal.timeout(16000)});
+              if(!response.ok)throw Error('edition HTTP '+response.status);
+              const data=await response.json();
+              assert.equal(data.schema,'QScopeBoMWarningEditionsV1');
+              assert.equal(data.indexStatus,'verified');
+              assert(Array.isArray(data.activeCodes));
+              for(const code of ['IDQ21033','IDQ21035','IDQ21037','IDQ21038'])
+                assert.equal(data.products?.[code]?.status,'verified',code);
+              result={checkedAt:data.checkedAt,activeCodes:data.activeCodes,
+                products:Object.fromEntries(Object.entries(data.products).map(
+                  ([code,p])=>[code,{issuedUtc:p.issuedUtc,count:p.count}]))};
+              break;
+            }catch(e){lastError=String(e);if(attempt<2)await new Promise(r=>setTimeout(r,2000));}
+          }
+          assert(result,'Production BoM warning edition monitor unavailable: '+lastError);
+          console.log('PRODUCTION_QSCOPE_WARNING_EDITIONS_PASS',JSON.stringify(result));
+          NODE
       - name: Verify production flood station reference is fast, available, and explicitly incomplete
         run: |
           node --input-type=module <<'NODE'
