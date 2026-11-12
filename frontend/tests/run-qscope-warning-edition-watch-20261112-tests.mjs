@@ -43,7 +43,8 @@ const fake=async(url,options)=>{
  if(url.includes("/2/query"))return new Response(JSON.stringify({features:[]}),{status:200});
  throw Error("Unexpected upstream request "+url);
 };
-const signal=await produceOfficialBoMWarningEditionSignal({fetchImpl:fake,nowMs:now});
+const signal=await produceOfficialBoMWarningEditionSignal({fetchImpl:fake,nowMs:now,
+ ftpCapFetcher:async()=>{throw Error("No real network access in GIS fixture")}});
 assert.equal(signal.schema,BOM_WARNING_EDITIONS_SCHEMA);
 assert.equal(WARNING_EDITION_SCHEMA,BOM_WARNING_EDITIONS_SCHEMA);
 assert.equal(signal.indexStatus,"verified");

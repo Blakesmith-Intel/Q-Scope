@@ -66,15 +66,17 @@ jobs:
               assert(Array.isArray(data.activeCodes));
               for(const code of ['IDQ21033','IDQ21035','IDQ21037','IDQ21038'])
                 assert.equal(data.products?.[code]?.status,'verified',code);
+              for(const code of data.activeCodes){
+                assert.equal(typeof data.products?.[code]?.bulletinIssuedUtc,'string',
+                  'No original BoM FWO CAP issue verified for active '+code);
+              }
+              // Only declare success AFTER genuine original FWO edition validation.
+              // The prior code set result before asserting, allowing a failed
+              // assertion to leave a stale success result after final retries.
               result={checkedAt:data.checkedAt,activeCodes:data.activeCodes,
                 products:Object.fromEntries(Object.entries(data.products).map(
                   ([code,p])=>[code,{issuedUtc:p.issuedUtc,count:p.count,
                    bulletinIssuedUtc:p.bulletinIssuedUtc??null}]))};
-              if(data.activeCodes.length){
-                assert(data.activeCodes.some(code=>
-                  typeof data.products?.[code]?.bulletinIssuedUtc==='string'),
-                  'Original BoM FTP CAP edition unavailable for all active warning products');
-              }
               break;
             }catch(e){lastError=String(e);if(attempt<2)await new Promise(r=>setTimeout(r,2000));}
           }
