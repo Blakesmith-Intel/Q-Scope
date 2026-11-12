@@ -301,7 +301,11 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   const result=describeOfficialBomWarningState({
     products:productStatuses,warnings,selected:filter.value
   });
-  report(result.message,result.kind);
+  const sharedRegional=filter.value==="IDQ21035"&&
+   selectVisibleOfficialBoMGeometry(warnings,stormCells,filter.value)
+    .some(w=>w.productCode==="IDQ21033");
+  report(result.message+(sharedRegional?
+    " · IDQ21033 overlapping regional area also displayed":""),result.kind);
  }
  const discard=()=>{
   if(warningPolygons){
@@ -443,12 +447,19 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   // no-current result. Never hide a clear product just because its map has
   // zero polygons, and never combine 21037 and 21038 into a generic "other".
   const codes=filter.value==="all"?WARNING_CODES:[filter.value];
+  // When the detailed view includes a shared regional warning, also show
+  // that original region as a SEPARATE sourced report, never as IDQ21035.
+  if(filter.value==="IDQ21035"&&
+     selectVisibleOfficialBoMGeometry(warnings,stormCells,filter.value)
+      .some(w=>w.productCode==="IDQ21033"))codes.push("IDQ21033");
   for(const code of codes){
    const subset=filterOfficialWarnings(warnings,code);
    const result=warningProductAffectedGroups(subset);
    const productStatus=productStatuses[code]?.status??"unavailable";
    const section=document.createElement("section");
-   const heading=document.createElement("h3");heading.textContent=groupLabel(code);
+   const heading=document.createElement("h3");heading.textContent=groupLabel(code)+
+    (filter.value==="IDQ21035"&&code==="IDQ21033"?
+     " — overlapping regional context (independent product)":"");
    section.append(heading);
    const count=document.createElement("p");
    count.textContent=sourceStatus==="unavailable"||productStatus==="unavailable"?
