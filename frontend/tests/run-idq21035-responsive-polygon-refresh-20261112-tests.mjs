@@ -20,8 +20,8 @@ const fetchCells=relay.indexOf("stormCells=await fetchQldBomStormLocations(");
 const finishBoundary=relay.indexOf("const enriched=await enrichedPending");
 assert(startBoundary>0&&startBoundary<fetchCells&&fetchCells<finishBoundary,
  "Boundary intersections and detailed source storm cells are no longer sequential");
-assert.match(relay,/boundaryIntersectionRequest\(warning\.geometry,LGA_URL/);
-assert.match(relay,/boundaryIntersectionRequest\(warning\.geometry,DDMG_URL/);
+assert.match(relay,/governmentIntersections\(warning\.geometry,LGA_URL/);
+assert.match(relay,/governmentIntersections\(warning\.geometry,DDMG_URL/);
 assert.match(relay,/sourceFailures>0\|\|gisFailures>0/,
  "Partial source failures must remain explicitly unverified");
 // The browser's original safeguard remains: a request has a deadline,
