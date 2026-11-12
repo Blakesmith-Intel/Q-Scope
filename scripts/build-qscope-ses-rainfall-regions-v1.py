@@ -63,6 +63,7 @@ def fetch_ses_regions():
         "outFields":"SES_Region,OBJECTID",
         "returnGeometry":"true",
         "outSR":"4326",
+        "geometryPrecision":"5",
         "f":"geojson",
     })
     errors=[]
@@ -76,9 +77,9 @@ def fetch_ses_regions():
             with urllib.request.urlopen(request,timeout=40) as reply:
                 if reply.status!=200: raise ValueError(f"HTTP {reply.status}")
                 length=reply.headers.get("Content-Length")
-                if length and int(length)>15_000_000: raise ValueError("SES spatial feed too large")
-                raw=reply.read(15_000_001)
-            if len(raw)>15_000_000:raise ValueError("SES spatial feed too large")
+                if length and int(length)>80_000_000: raise ValueError("SES spatial feed too large")
+                raw=reply.read(80_000_001)
+            if len(raw)>80_000_000:raise ValueError("SES spatial feed too large")
             payload=json.loads(raw)
             if payload.get("type")!="FeatureCollection" or not payload.get("features"):
                 raise ValueError("SES service returned no GeoJSON features: "+str(payload)[:250])
