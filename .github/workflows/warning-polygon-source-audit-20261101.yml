@@ -9,6 +9,7 @@ on:
       - "relay/bom-warning-editions-v1.js"
       - "relay/bom-warning-ftp-v1.js"
       - "scripts/audit-ems-warning-arcgis-public-layers-20261112.mjs"
+      - "scripts/diagnose-direct-bom-fwo-worker-transport-20261112.mjs"
       - "scripts/probe-live-qscope-warning-editions-20261112.mjs"
       - "relay/bom-warning-product-reconcile-v1.js"
       - "frontend/src/context-layers/bom-warning-cap-source-v1.js"
@@ -40,3 +41,6 @@ jobs:
         run: |
           node --check scripts/audit-ems-warning-arcgis-public-layers-20261112.mjs
           node scripts/audit-ems-warning-arcgis-public-layers-20261112.mjs
+      - name: Probe actual published BoM FWO HTTPS availability and existing Worker FTP transport
+        run: |
+          node scripts/diagnose-direct-bom-fwo-worker-transport-20261112.mjs
