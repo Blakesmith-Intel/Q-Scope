@@ -101,7 +101,7 @@ def merge_inventory(base,regional):
             stations[id_]={"basin":"","source":"BoM live flood-map rainfall gauge",
                            **record}
             added.append(id_)
-    if len(live)<400:
+    if len(live)<1500:
         raise ValueError(f"Live BoM rainfall map inventory unexpectedly small ({len(live)})")
     missed=[id_ for id_ in live if id_ not in stations]
     if missed:raise ValueError("Live inventory not covered: "+repr(missed[:10]))
