@@ -5,7 +5,7 @@ import {
  WARNING_GEOMETRY_RECOVERY_MS,WARNING_GEOMETRY_RECOVERY_MAX
 } from "../src/context-layers/bom-warning-operational-v1.js";
 
-const normal=15*60*1000;
+const normal=15*60*1000,activeBackstop=5*60*1000;
 const pending=code=>({[code]:{status:"geometry-unavailable",
  issuedUtc:"2026-11-01T06:26:11Z"}});
 const listed=code=>({[code]:{status:"listed-active",issuedUtc:null}});
@@ -28,11 +28,11 @@ for(const code of ["IDQ21033","IDQ21035","IDQ21037","IDQ21038"]){
   }),120000,"Active warning geometry should recover after 2 minutes");
  assert.equal(officialWarningRefreshInterval({
   products:pending(code),recoveryPolls:9
- }),normal,"Bounded retries must revert to approved regular 15-minute cadence");
+ }),activeBackstop,"Bounded two-minute recovery reverts to the active-warning backstop");
 }
 assert.equal(officialWarningRefreshInterval({
  products:active("IDQ21033"),warnings:[warning("IDQ21033")],recoveryPolls:2
-}),normal,"Verified active polygon returns to normal polling immediately");
+}),activeBackstop,"Verified active polygons retain a five-minute CAP text catch-up backstop");
 assert.equal(officialWarningRefreshInterval({
  products:{IDQ21033:{status:"cancelled"}},recoveryPolls:2
 }),normal,"A cancelled source must not trigger continued recovery checks");
@@ -53,4 +53,4 @@ assert(source.includes('sourceStatus=data.status'),
  "Source verification and negative reporting must remain distinct");
 assert(source.includes('isVerifiedActiveBomWarning(w,now())'),
  "Do not display source-unverified, stale or fabricated warning geometry");
-console.log("PASS: missing IDQ21033/35 geometry gets bounded 2-min catch-up, normal 15-min feed unchanged, no cancelled/healthy false positives, no synthetic polygons.");
+console.log("PASS: 2-min missing-geometry recovery, 60s source-edition check, 5-min active full verification, 15-min inactive baseline, no synthetic polygons.");
