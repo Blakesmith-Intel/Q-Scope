@@ -2,6 +2,7 @@ import {bomCapRssLinks,parseOfficialBomCap,parseBomCapProductNotice}
  from "../frontend/src/context-layers/bom-warning-cap-source-v1.js";
 import {reconcileLatestBoMWarnings}
  from "./bom-warning-product-reconcile-v1.js";
+import {fetchOriginalBoMFtpWarning} from "./bom-warning-ftp-v1.js";
 import {fetchCurrentQldBoMWarningsIndex}
  from "./bom-warning-qld-current-index-v1.js";
 import {fetchQldBomWfsGeometry,fetchQldBomWfsCurrentIndexGeometry,fetchQldBomStormLocations}
@@ -111,6 +112,11 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
     qldCurrentIndex.activeCodes:[]).filter(code=>
       ["IDQ21033","IDQ21035","IDQ21037","IDQ21038"].includes(code));
   const indexed=new Set(indexedCodes);
+  // The original BoM FTP CAP is a second, independently authenticated issue
+  // pathway; it supplies bulletin text ONLY, never polygons. It is cached for
+  // 75 seconds across clients and errors do not affect existing WMO/ArcGIS paths.
+  const ftpPending=Promise.allSettled(indexedCodes.map(code=>
+    fetchOriginalBoMFtpWarning(code,{nowMs:now,force})));
   const indexedRequests=indexedCodes.map(code=>({code,
     run:()=>fetchQldBomWfsCurrentIndexGeometry(code,qldCurrentIndex,{nowMs:now,force})}));
   const indexedResultsPending=Promise.allSettled(indexedRequests.map(r=>r.run()));
@@ -120,13 +126,22 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
   // When the bound is reached it is NOT a complete national BoM alert index.
   // Never convert "not encountered in the sample" to an official all-clear.
   const indexPossiblyTruncated=links.length>=22;
-  const found=await Promise.allSettled(links.map(url=>textResponse(url,1500000,{force}).then(xml=>({
-   notice:parseBomCapProductNotice(xml,{nowMs:now}),
-   warnings:parseOfficialBomCap(xml,{nowMs:now})
-  }))));
+  const [found,ftpResults]=await Promise.all([
+   Promise.allSettled(links.map(url=>textResponse(url,1500000,{force}).then(xml=>({
+    notice:parseBomCapProductNotice(xml,{nowMs:now}),
+    warnings:parseOfficialBomCap(xml,{nowMs:now})
+   })))),
+   ftpPending
+  ]);
   const sourceFailures=found.filter(x=>x.status==="rejected").length+
    (rssResult.status==="rejected"?1:0);
   const messageRecords=found.map(x=>x.status==="fulfilled"?x.value:{failed:true});
+  let ftpVerified=0;
+  for(const row of ftpResults){
+   if(row.status!=="fulfilled"||!row.value?.notice)continue;
+   ftpVerified++;
+   messageRecords.push(row.value);
+  }
   // Obtain source-exact genuine GIS2Web-derived warning polygons only for
   // authenticated, active Bureau CAP issues, not arbitrary geographic guesses.
   // A separate WFS outage never converts a live CAP warning to "no warning".
@@ -197,6 +212,11 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
   // network stages serially.
   const enrichedPending=enrichAllWarningBoundaries(qld);
   const products=reconciled.products;
+  // Issue time belongs to the bulletin, NOT the independently issued GIS
+  // feature. The watcher compares both clocks and never invents geometry.
+  for(const [code,notice] of latestIssued){
+   if(products[code])products[code].bulletinIssuedUtc=notice.issuedUtc;
+  }
   // IDQ65652 is the separate detailed storm-LOCATION product. A published
   // IDQ65650 threat-area polygon must never be treated as an individual cell.
   // A source outage or no available cell geometries never implies "no storms".
@@ -222,6 +242,9 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
      enriched.length?"active":"no-verified-current-polygons",
    source:"WMO registered Australian Bureau of Meteorology CAP authority",
    sourceUrl:BOM_CAP_RSS,sourceFailures,gisFailures,
+   ftpBulletinSourceStatus:indexedCodes.length===0?"not-requested":
+     ftpVerified===indexedCodes.length?"verified":
+     ftpVerified>0?"partial":"unavailable",
    qldCurrentIndexStatus:qldCurrentIndex?"verified-current-products":"unavailable",
    qldCurrentIndexCheckedAt:qldCurrentIndex?.checkedUtc??null,
    geospatialSource:"Queensland emergency-management WFS-derived Bureau GIS2Web warnings",
