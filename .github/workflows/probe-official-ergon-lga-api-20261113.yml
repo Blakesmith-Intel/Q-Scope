@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'scripts/probe-official-ergon-lga-api-20261113.mjs'
+      - 'frontend/src/context-layers/power-outage-official-lga-allocation-v1.js'
+      - 'frontend/tests/run-power-outage-official-lga-allocation-v1-tests.mjs'
       - '.github/workflows/probe-official-ergon-lga-api-20261113.yml'
   workflow_dispatch:
 
@@ -19,5 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Assert official LGA customer allocation reconciliation contract
+        run: node frontend/tests/run-power-outage-official-lga-allocation-v1-tests.mjs
       - name: Verify official customer allocation API path
         run: node scripts/probe-official-ergon-lga-api-20261113.mjs
