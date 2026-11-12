@@ -386,7 +386,7 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   if(!force&&lastAttemptAt&&now()-lastAttemptAt<currentRefreshMs()){
    trimExpired();return;
   }
-  report("Checking issued Bureau of Meteorology warning polygons…","loading");
+  report("Checking latest BoM warning polygons (up to 27 seconds)…","loading");
   lastAttemptAt=now(); // Respect 15-minute cadence after timeouts as well.
   pending=(async()=>{
    try{
@@ -401,7 +401,10 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
     catch(firstError){
      // iOS Safari can transiently return "Load failed" on mobile networks.
      // Retry once, without changing the 15-minute automatic cadence.
-     if(!/load failed|failed to fetch|network|abort|timeout/i.test(String(
+     // An already-expired 27-second request is not transient: repeating a
+     // whole relay source crawl adds another 27-second apparent freeze.
+     // Retry only Safari's intermittent immediate transport failures.
+     if(!/load failed|failed to fetch|network/i.test(String(
        firstError?.message??firstError)))throw firstError;
      data=await retrieve();
     }
@@ -431,7 +434,9 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
     locateBtn.hidden=true;display();renderGroupsReport();openInfo(null);
     // An unverified check is NOT a confirmed no-warning report.
     // Keep a neutral operational advisory, rather than an alarming red error.
-    report("Unable to confirm current BoM warnings — try refresh or check BoM","warning");
+    report(/timeout|abort/i.test(String(error?.message??error))?
+      "BoM polygon check timed out — warning geometry unverified; try again or check BoM":
+      "Unable to confirm current BoM warnings — try refresh or check BoM","warning");
    }finally{pending=null;}
   })();
   return pending;
