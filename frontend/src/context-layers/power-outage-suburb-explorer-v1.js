@@ -9,6 +9,9 @@ import {groupOutagesByVerifiedGeometry,resolveOutageEventLgas,
  from "./outage-lga-spatial-v2.js?v=outage-geometry-lga-20261020-v1";
 import {groupOutagesBySuburb,filterOutageSuburbGroups,outageLocation}
   from "./power-outage-suburb-model-v1.js?v=suburb-explorer-20261017-v1";
+import {fetchPublishedProviderLga,publishedLgaKey,PUBLISHED_LGA_REFRESH_MS,
+ PUBLISHED_LGA_MAX_SNAPSHOT_AGE_MS,PUBLISHED_LGA_MAX_PROVIDER_AGE_MS}
+ from "./power-outage-published-lga-v1.js?v=official-publisher-snapshot-20261113-v1";
 
 // View over the EXISTING layer snapshot; no duplicate requests, no map pick,
 // no new Cesium entities, no weather-frame redraws.
@@ -85,6 +88,45 @@ export function createPowerOutageSuburbExplorer({
 
   let groups=[],suburbGroups=[],unlocated=[];
   let localityLgas=new Map(),eventLgas=new Map(),attemptedLocalities=new Set();
+  // The provider-published council snapshot is fetched DIRECTLY from public
+  // GitHub Pages, not through a Q-Scope Worker. Exactly once per existing
+  // 15-minute layer-refresh window. Never manufacture an LGA customer total
+  // from shared polygons when official publisher allocations are unavailable.
+  let publishedCouncil=null,providerCouncilSourceStatus="Checking provider council figures…";
+  let publishedAttemptAt=0,publishedLoadBusy=false;
+  function freshPublishedCouncil(){
+    const snapshot=publishedCouncil;
+    if(!snapshot)return null;
+    const now=Date.now();
+    if(now-Date.parse(snapshot.snapshotUtc)>PUBLISHED_LGA_MAX_SNAPSHOT_AGE_MS)return null;
+    for(const source of snapshot.verifiedProviders.values()){
+      const age=now-Date.parse(source.sourceUpdatedUtc);
+      if(age>PUBLISHED_LGA_MAX_PROVIDER_AGE_MS || age< -5*60000)return null;
+    }
+    return snapshot;
+  }
+  function refreshPublishedCouncil(){
+    if(disposed||!hasSnapshot)return;
+    const now=Date.now();
+    if(publishedLoadBusy||now-publishedAttemptAt<PUBLISHED_LGA_REFRESH_MS)return;
+    publishedAttemptAt=now;
+    publishedLoadBusy=true;
+    fetchPublishedProviderLga({nowMs:now}).then(data=>{
+      if(disposed)return;
+      publishedCouncil=data;
+      providerCouncilSourceStatus=Object.keys(data.errors).length?
+        "Partial official council source (see affected provider)": "Verified publisher council figures";
+      rebuildSpatialGroups();
+      if(dialog.open)render();
+    }).catch(error=>{
+      if(disposed)return;
+      providerCouncilSourceStatus="Official council figures unavailable: "+
+        String(error?.message??error).slice(0,110);
+      // Keep a previously validated snapshot ONLY until its ORIGINAL
+      // publisher timestamp expires. Never renew its TTL on failure.
+      if(dialog.open)render();
+    }).finally(()=>{publishedLoadBusy=false;});
+  }
   let lookupBusy=false,sourceChangedDuringLookup=false;
   let status={kind:"loading",message:"Waiting for live outage feed…"};
   let openKeys=new Set(),visibleLimit=60,hasSnapshot=false;
@@ -218,12 +260,17 @@ export function createPowerOutageSuburbExplorer({
     if(!dialog.open || disposed)return;
     if(providerView){renderProviderReport();return;}
     results.replaceChildren();
+    const published=freshPublishedCouncil();
     const matching=filterLgaGroups(groups,search.value);
     const listed=matching.slice(0,visibleLimit);
     const unique=new Set([...matching.flatMap(g=>g.items.map(i=>i.id)),
       ...unlocated.map(item=>item.id)]);
     summary.textContent=hasSnapshot
-      ? `${matching.length} verified council areas · ${unique.size} distinct outages`+
+      ? `${matching.length} council areas · ${unique.size} distinct mapped outages`+
+        (published?
+          " · official Ergon/Energex LGA customers as published"+
+          (published.verifiedProviders.size<2?" (partial provider coverage)":""):
+          " · "+providerCouncilSourceStatus)+
         (unlocated.length?` · ${unlocated.length} awaiting location`:"")
       : "Waiting for outage information";
     if(!hasSnapshot){
@@ -240,27 +287,44 @@ export function createPowerOutageSuburbExplorer({
         ?openKeys.add("lga:"+council.key):openKeys.delete("lga:"+council.key));
       const parentTitle=create("summary","outage-suburb-title");
       const totals=councilOutageCustomerSummary(council,groups);
+      const officialCouncil=published?.byLga.get(publishedLgaKey(council.name));
+      const officialCustomers=published?officialCouncil?.customers??0:null;
+      const officialEvents=published?officialCouncil?.events.size??0:null;
       const badges=create("span","outage-council-metrics");
       badges.append(
         create("span","outage-suburb-count",
-          `${totals.outages} outage${totals.outages===1?"":"s"}`),
+          `${officialEvents??totals.outages} outage${(officialEvents??totals.outages)===1?"":"s"}`),
         create("span","outage-council-customers",
-          totals.exactCustomerTotal ? `${number(totals.customers)} customer${totals.customers===1?"":"s"}` : `${number(totals.customers)} confirmed + shared unallocated`)
+          officialCustomers===null?
+            "Provider LGA customers unavailable":
+            `${number(officialCustomers)} Ergon/Energex customer${officialCustomers===1?"":"s"}`)
       );
-      if(totals.crossCouncilEvents){
-        badges.append(create("span","outage-council-shared",`${totals.crossCouncilEvents} shared*`));
-        badges.title="Shared incident customer totals are not allocated to individual councils by this source. Only verified single-council customers are counted.";
-      } else {
-        badges.title="Unique outage IDs inside this council; customers affected as reported by the provider.";
-      }
+      badges.title=published?
+        "Official Ergon/Energex council allocations as published via a verified public snapshot. Map locations and event totals can have different retrieval times.":
+        "Official council totals not verified. Map outage event totals are not a safe substitute for council-specific customers.";
       parentTitle.append(create("span","outage-suburb-name",council.name),badges);
       parent.append(parentTitle);
       const parentInner=create("div","outage-suburb-inner outage-lga-inner");
       // All listed councils are verified by intersecting the actual mapped
       // outage geometry with Queensland Government LGA boundary polygons.
-      if(totals.crossCouncilEvents)
+      if(published){
+        const sourceTimes=[...published.verifiedProviders.values()].map(p=>
+          p.name+" "+formatIncidentRefreshTime(Date.parse(p.sourceUpdatedUtc))).join(" · ");
         parentInner.append(create("p","outage-suburb-note",
-          "* Confirmed exclusive-council customers: "+number(totals.customers)+". "+totals.crossCouncilEvents+" shared outage"+(totals.crossCouncilEvents===1?"":"s")+" cannot be allocated using this source. Whole-event customers across shared incidents: "+number(totals.sharedCustomers)+" (NOT additional council customers). Upper bound if all affected were in this LGA: "+number(totals.customerUpperBound)+". Consult the official provider Outage Finder for its council-specific figure."));
+          "Provider-published LGA customers (not estimated from outage polygons). "+
+          sourceTimes+" · Source: published Ergon/Energex text-view allocations, "+
+          "independently verified and mirrored at gowlettluke.github.io/qldpoweroutages. "+
+          (published.verifiedProviders.size<2?
+            "Provider coverage PARTIAL; the displayed count excludes unavailable provider data. ":"")+
+          "Essential Energy allocations, if present, are not included."));
+      }else{
+        parentInner.append(create("p","outage-suburb-note",
+          "Exact customer total unavailable. Provider council data have not passed the current source validation. "+
+          "No polygon-based customer estimate or artificial zero is shown."));
+      }
+      if(council.providerOnly)
+        parentInner.append(create("p","outage-suburb-note",
+          "Provider confirms affected customers in this council, but Q-Scope has no independently mapped incident to show here."));
       for(const group of council.suburbs){
       const section=create("details","outage-suburb outage-locality");
       section.open=openKeys.has(group.key);
@@ -344,8 +408,14 @@ export function createPowerOutageSuburbExplorer({
           actions.append(official);
         }
         detail.append(actions);eventCell.append(detail);
-        const customers=create("td","outage-customers",number(info.customersAffected));
-        if(item.shared||groups.some(other=>other.key!==council.key&&other.items.some(otherItem=>otherItem.id===item.id)))customers.title="Whole event count, NOT a council/suburb customer allocation";
+        const actualCouncilCustomers=published?.byEventLga.get(
+          info.provider+":"+String(info.eventId??"")+"|"+publishedLgaKey(council.name));
+        const customers=create("td","outage-customers",
+          actualCouncilCustomers===undefined?
+            number(info.customersAffected):number(actualCouncilCustomers));
+        customers.title=actualCouncilCustomers===undefined?
+          "Whole map-event count, NOT verified as an individual council allocation":
+          "Exact provider-published LGA customer allocation for this outage. This is NOT a suburb-specific count.";
         const eta=create("td","outage-eta",
           formatTime(info.estimatedFix,info.provider)||"Not supplied");
         row.append(eventCell,customers,eta);
@@ -404,6 +474,19 @@ export function createPowerOutageSuburbExplorer({
   function rebuildSpatialGroups(){
     const grouped=groupOutagesByVerifiedGeometry(suburbGroups,eventLgas,localityLgas);
     groups=grouped.groups;unlocated=grouped.unlocated;
+    const snapshot=freshPublishedCouncil();
+    if(snapshot){
+      const known=new Set(groups.map(g=>publishedLgaKey(g.name)));
+      for(const [key,council] of snapshot.byLga){
+        if(known.has(key))continue;
+        // Source-only LGA rows keep the official customer count visible even
+        // when Ergon/Energex did not publish a matching map polygon.
+        groups.push({name:council.name,key:localityKey(council.name),
+          suburbs:[],items:[],shared:false,providerOnly:true});
+        known.add(key);
+      }
+      groups.sort((a,b)=>a.name.localeCompare(b.name,"en-AU"));
+    }
   }
   function updateFeaturesFromLatest(){updateFeatures(latestFeatures);}
   function updateFeatures(features){
@@ -453,6 +536,7 @@ export function createPowerOutageSuburbExplorer({
       });
     }
     hasSnapshot=true;
+    refreshPublishedCouncil();
     if(dialog.open)render();
   }
   function updateStatus(next){
