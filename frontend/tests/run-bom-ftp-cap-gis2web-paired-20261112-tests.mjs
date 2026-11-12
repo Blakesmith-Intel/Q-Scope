@@ -43,6 +43,19 @@ const ftpRead=async code=>{
 const verified=await fetchOriginalBoMFtpWarning("IDQ21035",{
  nowMs:now,ftpRead,cache:null});
 assert.equal(ftpReads,1);
+let httpsCalled="";
+const originalHttps=await fetchOriginalBoMFtpWarning("IDQ21035",{
+ nowMs:now,cache:null,
+ fetchImpl:async(url,options)=>{
+  httpsCalled=String(url);
+  assert.equal(options.cf.cacheTtl,75);
+  assert.equal(options.redirect,"manual");
+  return new Response(xml,{status:200,headers:{"content-type":"text/xml"}});
+ }
+});
+assert.equal(httpsCalled,"https://www.bom.gov.au/fwo/IDQ21035.cap.xml",
+ "Runtime uses the original BoM HTTPS FWO product, not a hanging FTP socket");
+assert.equal(originalHttps.notice.issuedUtc,new Date(newIssue).toISOString());
 assert.equal(verified.notice.productCode,"IDQ21035");
 assert.equal(verified.warnings.length,0);
 await assert.rejects(()=>fetchOriginalBoMFtpWarning("IDQ21039",{
