@@ -355,6 +355,24 @@ jobs:
           grep -Fq 'id="significantRainfallDistrictFilter"' _site/live3d-operational-v9.html
           grep -Fq 'Q-SCOPE BOM IDM00001 FORECAST DISTRICT RAINFALL REPORTS' _site/BUILD.txt
 
+          # Add the operator-requested Queensland SES administrative regions
+          # as a second classification. Static official polygons only at
+          # release time; no extra Cloudflare requests during rainfall refresh.
+          python scripts/test-qscope-ses-rainfall-regions-v1.py
+          python scripts/build-qscope-ses-rainfall-regions-v1.py \
+            --stations _site/data/qld-rainfall-basins-v1.json \
+            --out _site/data/qld-rainfall-ses-regions-v1.json
+          python scripts/apply-rainfall-ses-region-report-v1.py
+          node --check _site/src/context-layers/rainfall-ses-region-v1.js
+          node --check _site/src/context-layers/significant-rainfall-operational-v1.js
+          node --check _site/src/live3d-operational-v9.js
+          test -s _site/data/qld-rainfall-ses-regions-v1.json
+          grep -Fq 'SES administrative region' _site/src/context-layers/significant-rainfall-operational-v1.js
+          grep -Fq 'id="significantRainfallRegionGrouping"' _site/live3d-operational-v9.html
+          grep -Fq 'id="significantRainfallSESFilter"' _site/live3d-operational-v9.html
+          grep -Fq 'id="significantRainfallDistrictFilter"' _site/live3d-operational-v9.html
+          grep -Fq 'Q-SCOPE SEVEN QLD SES ADMINISTRATIVE REGIONS' _site/BUILD.txt
+
       - name: Package separate browser-accessible radar refresh review
         run: |
           set -euo pipefail
