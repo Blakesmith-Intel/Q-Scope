@@ -42,10 +42,10 @@ export function parseCurrentQldBoMWarningsIndex(html,{nowMs=Date.now()}={}){
    checkedUtc:new Date(dateMs).toISOString(),
    activeCodes:[...active],verified:true};
 }
-export async function fetchCurrentQldBoMWarningsIndex({fetchImpl=fetch,nowMs=Date.now()}={}){
+export async function fetchCurrentQldBoMWarningsIndex({fetchImpl=fetch,nowMs=Date.now(),force=false}={}){
  const response=await fetchImpl(QLD_WARNING_INDEX_URL,{
   headers:{Accept:"text/html"},signal:AbortSignal.timeout(12500),
-  cf:{cacheTtl:90,cacheEverything:true}
+  cf:{cacheTtl:force?0:90,cacheEverything:!force}
  });
  if(!response.ok)throw Error("BoM Queensland current warnings index HTTP "+response.status);
  const html=await response.text();
