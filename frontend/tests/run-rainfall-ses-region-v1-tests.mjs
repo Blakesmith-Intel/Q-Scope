@@ -36,4 +36,34 @@ assert.equal(group("amount","Brisbane Region").total,2);
 assert.equal(group("amount","South Eastern Region").total,1);
 assert.equal(group("amount","unavailable").total,1);
 assert(amount.groups.flatMap(g=>g.rows).every(x=>x.reportingTier));
+// An NSW cross-border gauge is still listed under its closest Queensland SES
+// region, but remains explicitly identified as outside SES jurisdiction.
+registry.stations["544006"]={
+ latitude:-29.5,longitude:151.0,region:"South Western Region",
+ assignment:"nearest",state:"NSW",crossBorder:true,distanceKm:39.72};
+registry.stations["544007"]={
+ latitude:-26.833611,longitude:153.12,region:"North Coast Region",
+ assignment:"nearest",state:"QLD",crossBorder:false,distanceKm:0.08};
+const nswGauge=row("544006",-29.5,151.0,125,5);
+const qldEdgeGauge=row("544007",-26.833611,153.12,82,10);
+const nsw=sesRegionForStation(nswGauge,registry);
+const qld=sesRegionForStation(qldEdgeGauge,registry);
+assert.equal(nsw?.name,"South Western Region");
+assert.equal(nsw?.crossBorder,true);
+assert.equal(nsw?.state,"NSW");
+assert.equal(nsw?.assignment,"nearest");
+assert.equal(qld?.crossBorder,false);
+assert.equal(qld?.assignment,"nearest");
+assert.equal(sesRegionForStation({...nswGauge,longitude:152},registry),null);
+assert.equal(sesRegionForStation(nswGauge,{...registry,stations:{
+ "544006":{...registry.stations["544006"],state:"QLD"}
+}}),null,"Conflicting NSW label must fail closed");
+const crossBorderReport=groupRainfallBySESRegion(
+ buildSignificantRainfallReport([...items,nswGauge,qldEdgeGauge],"amount"),
+ r=>sesRegionForStation(r,registry));
+assert.equal(crossBorderReport.total,6);
+assert(crossBorderReport.groups.some(g=>g.title==="South Western Region" &&
+ g.rows.some(x=>x.id==="544006")));
+assert(crossBorderReport.groups.some(g=>g.title==="North Coast Region" &&
+ g.rows.some(x=>x.id==="544007")));
 console.log("PASS SES grouping/filtering preserves station totals and AEP calculations");
