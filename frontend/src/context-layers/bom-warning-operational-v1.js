@@ -25,10 +25,71 @@ export function sourceQualifiedOfficialWarnings(warnings,productCode="all"){
  return filterOfficialWarnings(warnings,productCode)
   .filter(isSourceMatchedOfficialWarningPolygon);
 }
-// A single selection contract keeps map, locate and click in sync.
-// 'All' combines genuine areas and valid IDQ21035 storm locations.
+// Source-exact polygon overlap for shared display, never to reassign the
+// IDQ65654 regional warning to IDQ21035 or fabricate new warning geometry.
+// Includes edge-only ("bee's-dick") contact and containment; respects holes.
+// Bounding boxes avoid expensive edge comparisons between distant polygons.
+const polygonParts=g=>g?.type==="Polygon"?[g.coordinates]:
+ g?.type==="MultiPolygon"?g.coordinates:[];
+const validRing=ring=>Array.isArray(ring)&&ring.length>=3&&
+ ring.every(p=>Array.isArray(p)&&Number.isFinite(p[0])&&Number.isFinite(p[1]));
+const outerBounds=geometry=>{
+ const polygons=polygonParts(geometry);
+ if(!polygons.length||polygons.some(p=>!validRing(p?.[0])))return null;
+ let w=Infinity,e=-Infinity,s=Infinity,n=-Infinity;
+ for(const poly of polygons)for(const [lon,lat] of poly[0]){
+  w=Math.min(w,lon);e=Math.max(e,lon);
+  s=Math.min(s,lat);n=Math.max(n,lat);
+ }
+ return {w,e,s,n};
+};
+const boundsMeet=(a,b)=>a&&b&&a.w<=b.e&&b.w<=a.e&&a.s<=b.n&&b.s<=a.n;
+const segCross=(a,b,c,d)=>{
+ const min=Math.min,max=Math.max;
+ if(max(a[0],b[0])<min(c[0],d[0])||max(c[0],d[0])<min(a[0],b[0])||
+    max(a[1],b[1])<min(c[1],d[1])||max(c[1],d[1])<min(a[1],b[1]))
+    return false;
+ const orient=(p,q,r)=>(q[0]-p[0])*(r[1]-p[1])-
+  (q[1]-p[1])*(r[0]-p[0]);
+ const u=orient(a,b,c),v=orient(a,b,d),
+       x=orient(c,d,a),y=orient(c,d,b);
+ const eps=1e-12;
+ return ((u<=eps&&v>=-eps)||(v<=eps&&u>=-eps))&&
+        ((x<=eps&&y>=-eps)||(y<=eps&&x>=-eps));
+};
+export function officialBoMWarningAreasOverlap(first,second){
+ const a=first?.geometry??first,b=second?.geometry??second;
+ if(!boundsMeet(outerBounds(a),outerBounds(b)))return false;
+ const aa=polygonParts(a),bb=polygonParts(b);
+ // Outer-ring containment is sufficient when boundaries do not cross.
+ // Source polygon holes must not count as threatened interior space.
+ for(const part of aa)if(warningContainsPoint(b,...part[0][0]))return true;
+ for(const part of bb)if(warningContainsPoint(a,...part[0][0]))return true;
+ const ringsA=aa.flatMap(part=>part),ringsB=bb.flatMap(part=>part);
+ for(const ar of ringsA)for(let i=0;i<ar.length-1;i++){
+  for(const br of ringsB)for(let j=0;j<br.length-1;j++)
+   if(segCross(ar[i],ar[i+1],br[j],br[j+1]))return true;
+ }
+ return false;
+}
+// Map display may include verified overlapping regional context while a
+// detailed warning is selected. Source attribution and per-product counts
+// never change; a shared original geometry is drawn just once.
+// 'All' combines source-exact warning areas with genuine IDQ65652 cells.
 export function selectVisibleOfficialBoMGeometry(warnings,stormCells,selected="all"){
- const areas=sourceQualifiedOfficialWarnings(warnings,selected);
+ const own=sourceQualifiedOfficialWarnings(warnings,selected);
+ const shared=selected==="IDQ21035"&&own.length?
+  sourceQualifiedOfficialWarnings(warnings,"IDQ21033").filter(region=>
+   own.some(detail=>officialBoMWarningAreasOverlap(region,detail))):[];
+ // Put regional context behind the detailed footprint. Deduplicate identical
+ // source polygons for drawing only: reports still count each real product.
+ const areas=[],drawn=new Set();
+ const detailedShapes=new Set(own.map(w=>JSON.stringify(w.geometry)));
+ for(const item of [...shared.filter(w=>!detailedShapes.has(JSON.stringify(w.geometry))),...own]){
+  const key=JSON.stringify(item.geometry);
+  if(drawn.has(key))continue;
+  drawn.add(key);areas.push(item);
+ }
  const cells=(selected==="all"||selected==="IDQ21035"?
   (Array.isArray(stormCells)?stormCells:[]):[]).filter(cell=>
    cell?.official===true&&cell.productCode==="IDQ21035"&&
@@ -240,7 +301,11 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   const result=describeOfficialBomWarningState({
     products:productStatuses,warnings,selected:filter.value
   });
-  report(result.message,result.kind);
+  const sharedRegional=filter.value==="IDQ21035"&&
+   selectVisibleOfficialBoMGeometry(warnings,stormCells,filter.value)
+    .some(w=>w.productCode==="IDQ21033");
+  report(result.message+(sharedRegional?
+    " · IDQ21033 overlapping regional area also displayed":""),result.kind);
  }
  const discard=()=>{
   if(warningPolygons){
@@ -326,7 +391,8 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   pending=(async()=>{
    try{
     const retrieve=async()=>{
-     const res=await fetchImpl(SOURCE,{cache:"no-store",signal:AbortSignal.timeout(27000)});
+     const url=force?SOURCE+"?force=1":SOURCE;
+     const res=await fetchImpl(url,{cache:"no-store",signal:AbortSignal.timeout(27000)});
      if(!res.ok)throw Error("Official warning transport HTTP "+res.status);
      return res.json();
     };
@@ -382,12 +448,19 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   // no-current result. Never hide a clear product just because its map has
   // zero polygons, and never combine 21037 and 21038 into a generic "other".
   const codes=filter.value==="all"?WARNING_CODES:[filter.value];
+  // When the detailed view includes a shared regional warning, also show
+  // that original region as a SEPARATE sourced report, never as IDQ21035.
+  if(filter.value==="IDQ21035"&&
+     selectVisibleOfficialBoMGeometry(warnings,stormCells,filter.value)
+      .some(w=>w.productCode==="IDQ21033"))codes.push("IDQ21033");
   for(const code of codes){
    const subset=filterOfficialWarnings(warnings,code);
    const result=warningProductAffectedGroups(subset);
    const productStatus=productStatuses[code]?.status??"unavailable";
    const section=document.createElement("section");
-   const heading=document.createElement("h3");heading.textContent=groupLabel(code);
+   const heading=document.createElement("h3");heading.textContent=groupLabel(code)+
+    (filter.value==="IDQ21035"&&code==="IDQ21033"?
+     " — overlapping regional context (independent product)":"");
    section.append(heading);
    const count=document.createElement("p");
    count.textContent=sourceStatus==="unavailable"||productStatus==="unavailable"?

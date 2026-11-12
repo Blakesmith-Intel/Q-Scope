@@ -11,9 +11,10 @@ export const BOM_CAP_RSS="https://severeweather.wmo.int/v2/cap-alerts/au-bom-en/
 const LGA_URL="https://spatial-gis.information.qld.gov.au/arcgis/rest/services/Boundaries/AdministrativeBoundaries/MapServer/1/query";
 const DDMG_URL="https://spatial-gis.information.qld.gov.au/arcgis/rest/services/Boundaries/AdminBoundariesFramework/MapServer/240/query";
 const NAME="StormTrackerOfficialBoMWarningPolygonsV1";
-async function textResponse(url,max=1500000){
+async function textResponse(url,max=1500000,{force=false}={}){
  const res=await fetch(url,{headers:{Accept:"application/xml,text/xml,application/rss+xml"},
-  signal:AbortSignal.timeout(13500),redirect:"manual",cf:{cacheEverything:true,cacheTtl:120}});
+  signal:AbortSignal.timeout(13500),redirect:"manual",
+  cf:{cacheEverything:!force,cacheTtl:force?0:120}});
  if(!res.ok)throw Error("WMO CAP HTTP "+res.status);
  const text=await res.text();
  if(text.length>max||text.length<50)throw Error("Unexpected CAP feed size");
@@ -86,7 +87,9 @@ async function enrichAllWarningBoundaries(warnings){
  return results;
 }
 export async function relayBomWarningPolygons(request,origin,corsHeaders){
- const head={"Content-Type":"application/json; charset=utf-8","Cache-Control":"public,max-age=90"};
+ const force=new URL(request.url).searchParams.get("force")==="1";
+ const head={"Content-Type":"application/json; charset=utf-8",
+  "Cache-Control":force?"no-store":"public,max-age=90"};
  let payload;
  try{
   const now=Date.now();
@@ -94,8 +97,8 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
   // issue history. Query concurrently; failure to confirm it does NOT
   // override valid CAP geometry or fabricate negative reporting.
   const [rssResult,indexResult]=await Promise.allSettled([
-   textResponse(BOM_CAP_RSS,3000000),
-   fetchCurrentQldBoMWarningsIndex({nowMs:now})
+   textResponse(BOM_CAP_RSS,3000000,{force}),
+   fetchCurrentQldBoMWarningsIndex({nowMs:now,force})
   ]);
   const qldCurrentIndex=indexResult.status==="fulfilled"?indexResult.value:null;
   if(rssResult.status==="rejected"&&!qldCurrentIndex)
@@ -106,7 +109,7 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
   // When the bound is reached it is NOT a complete national BoM alert index.
   // Never convert "not encountered in the sample" to an official all-clear.
   const indexPossiblyTruncated=links.length>=22;
-  const found=await Promise.allSettled(links.map(url=>textResponse(url).then(xml=>({
+  const found=await Promise.allSettled(links.map(url=>textResponse(url,1500000,{force}).then(xml=>({
    notice:parseBomCapProductNotice(xml,{nowMs:now}),
    warnings:parseOfficialBomCap(xml,{nowMs:now})
   }))));
@@ -136,9 +139,9 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
   const capOnly=[...latestIssued.values()].filter(n=>!indexed.has(n.productCode));
   const requests=[
    ...indexedCodes.map(code=>({code,run:()=>fetchQldBomWfsCurrentIndexGeometry(
-     code,qldCurrentIndex,{nowMs:now})})),
+     code,qldCurrentIndex,{nowMs:now,force})})),
    ...capOnly.map(notice=>({code:notice.productCode,
-     run:()=>fetchQldBomWfsGeometry(notice,{nowMs:now})
+     run:()=>fetchQldBomWfsGeometry(notice,{nowMs:now,force})
        .then(warnings=>({notice,warnings}))}))
   ];
   const gisResults=await Promise.allSettled(requests.map(r=>r.run()));
@@ -193,7 +196,7 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
   if(detailedNotice&&products.IDQ21035?.status!=="cancelled"&&
     products.IDQ21035?.status!=="no-active"){
    try{
-    stormCells=await fetchQldBomStormLocations(detailedNotice,{nowMs:now});
+    stormCells=await fetchQldBomStormLocations(detailedNotice,{nowMs:now,force});
     stormCellSourceStatus=stormCells.length?"source-verified":"no-verified-cell-geometry";
    }catch{
     stormCellSourceStatus="unavailable";
