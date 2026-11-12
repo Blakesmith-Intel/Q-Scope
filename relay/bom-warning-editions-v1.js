@@ -68,10 +68,21 @@ async function fetchEditionLayer(layer,products,{fetchImpl=fetch,nowMs=Date.now(
 export async function produceOfficialBoMWarningEditionSignal({
  fetchImpl=fetch,nowMs=Date.now(),ftpCapFetcher=fetchOriginalBoMFtpWarning
 }={}){
- const [idx,thunder,weather]=await Promise.allSettled([
-  fetchCurrentQldBoMWarningsIndex({fetchImpl,nowMs}),
+ // Begin optional FTP bulletin retrieval as soon as the current Queensland
+ // product index resolves. Run it ALONGSIDE independent GIS metadata reads,
+ // never serially after them (browser metadata deadline is 14 seconds).
+ const indexPending=fetchCurrentQldBoMWarningsIndex({fetchImpl,nowMs});
+ const ftpPending=indexPending.then(index=>{
+  if(index?.verified!==true)return {active:[],results:[]};
+  const active=WATCH_CODES.filter(code=>index.activeCodes.includes(code));
+  return Promise.allSettled(active.map(code=>
+   ftpCapFetcher(code,{nowMs}))).then(results=>({active,results}));
+ });
+ const [idx,thunder,weather,ftp]=await Promise.allSettled([
+  indexPending,
   fetchEditionLayer(3,["IDQ65654","IDQ65650","IDQ65652"],{fetchImpl,nowMs}),
-  fetchEditionLayer(2,["IDQ65272","IDQ65277"],{fetchImpl,nowMs})
+  fetchEditionLayer(2,["IDQ65272","IDQ65277"],{fetchImpl,nowMs}),
+  ftpPending
  ]);
  const index=idx.status==="fulfilled"&&idx.value?.verified===true?idx.value:null;
  const products={};
@@ -83,10 +94,8 @@ export async function produceOfficialBoMWarningEditionSignal({
  // Direct original BoM FTP issue metadata supplements GIS edition metadata.
  // Active-code check prevents FTP lookups during quiet periods. Source failures
  // are unverified, not cancellations, and never suppress real GIS detections.
- if(index){
-  const active=WATCH_CODES.filter(code=>index.activeCodes.includes(code));
-  const results=await Promise.allSettled(active.map(code=>
-    ftpCapFetcher(code,{nowMs})));
+ if(index&&ftp.status==="fulfilled"){
+  const {active,results}=ftp.value;
   for(const [i,row] of results.entries()){
    const code=active[i];
    if(row.status!=="fulfilled"||row.value?.notice?.productCode!==code)continue;
