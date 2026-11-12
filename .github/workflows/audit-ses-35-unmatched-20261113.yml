@@ -1,4 +1,4 @@
-name: One-off audit: SES rainfall unmatched station geography
+name: "One-off audit of SES rainfall unmatched station geography"
 
 on:
   pull_request:
