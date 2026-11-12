@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'scripts/probe-official-ergon-lga-api-20261113.mjs'
+      - 'scripts/probe-published-qld-provider-council-counts-20261113.mjs'
       - 'scripts/audit-official-outage-council-service-catalogue-20261113.mjs'
       - 'frontend/src/context-layers/power-outage-official-lga-allocation-v1.js'
       - 'frontend/tests/run-power-outage-official-lga-allocation-v1-tests.mjs'
@@ -22,6 +23,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Verify existing public provider-backed LGA snapshot, event totals and CORS
+        run: node scripts/probe-published-qld-provider-council-counts-20261113.mjs
       - name: Assert official LGA customer allocation reconciliation contract
         run: node frontend/tests/run-power-outage-official-lga-allocation-v1-tests.mjs
       - name: Discover first-party GIS per-council customer allocation services
