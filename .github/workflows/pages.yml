@@ -385,7 +385,7 @@ jobs:
           grep -Fq 'Q-SCOPE SEVEN QLD SES ADMINISTRATIVE REGIONS' _site/BUILD.txt
 
           grep -Fq 'Q-SCOPE SES NEAREST AND NSW CROSS-BORDER' _site/BUILD.txt
-          grep -Fq 'CROSS-BORDER GAUGE (NSW)' _site/src/context-layers/significant-rainfall-operational-v1.js
+          grep -Fq 'CROSS-BORDER GAUGE (' _site/src/context-layers/significant-rainfall-operational-v1.js
           python - <<'PY'
           import json
           from pathlib import Path
@@ -406,8 +406,8 @@ jobs:
           assert data["nearestAssignedCount"]>0
           assert data["crossBorderCount"]>0
           assert all(g["region"] in data["regions"] for g in data["stations"].values())
-          assert all(g.get("crossBorder") is True
-                     for g in data["stations"].values() if g.get("state")=="NSW")
+          assert all(g.get("crossBorder") is (g.get("state")!="QLD")
+                     for g in data["stations"].values() if g.get("state"))
           print("SES release coverage",data["matchedStationCount"],
                 "nearest",data["nearestAssignedCount"],
                 "NSW cross-border",data["crossBorderCount"],
