@@ -14,7 +14,9 @@ const MAX_CAP_BYTES=240000;
 const READER=new TextDecoder();
 const WRITER=new TextEncoder();
 const CACHE_ORIGIN="https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev";
-const DEADLINE_MS=19000;
+// This is supplemental, not allowed to delay original GIS/WMO checks.
+// Browser metadata checks have a 14-second total deadline.
+const DEADLINE_MS=8500;
 export function verifyOfficialFtpWarningCap(code,xml,{nowMs=Date.now()}={}){
  if(!FTP_WARNING_CODES.includes(code)||typeof xml!=="string"||
     xml.length<150||xml.length>MAX_CAP_BYTES)throw Error("Unrecognised BoM CAP product");
