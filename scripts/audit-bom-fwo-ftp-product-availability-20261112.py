@@ -28,6 +28,13 @@ def inspect_file(ftp,name):
     found={c:len(re.findall(r"\b"+re.escape(c)+r"\b",txt,re.I))
            for c in CODES+GEOMETRY_CODES if re.search(re.escape(c),txt,re.I)}
     sample=re.sub(r"\s+"," ",txt[:650]).strip()
+    if name in ("IDQ21035.xml","IDQ21035.cap.xml","IDQ21033.xml"):
+        tags=set(re.findall(r"<(?:[\\w-]+:)?([A-Za-z_][\\w-]*)(?:\\s|>)",txt))
+        spatial=[t for t in sorted(tags) if re.search(
+            r"(?:lat|lon|coord|geometry|polygon|point|gml|geocode|spatial|shape|circle)",t,re.I)]
+        candidatePairs=len(re.findall(r"-2\\d(?:\\.\\d+)?\\s*[,/]\\s*15\\d(?:\\.\\d+)?",txt))
+        log("FWO_XML_GEOGRAPHY",{"file":name,"spatialTagNames":spatial,
+            "rawLatitudeLongitudePairCandidates":candidatePairs})
     log("FWO_PRODUCT",{"file":name,"bytes":len(data),
         "references":found,"polygonTags":len(re.findall(r"<(?:[\w-]+:)?polygon(?:\s[^>]*)?>",txt,re.I)),
         "coordinateTags":len(re.findall(r"<(?:[\w-]+:)?coordinates?(?:\s[^>]*)?>",txt,re.I)),
@@ -49,6 +56,17 @@ try:
     shapes=[n for n in names if n.upper().startswith(GEOMETRY_CODES)]
     cyclone=[n for n in names if re.match(r"(?i)^ID[QDNTWSV]2(?:0|1)\d{3}",n)
         or re.search(r"(?i)(cyclone|tropical)",n)]
+    cyclone_slots={
+      "advice":("IDQ20023","IDQ20026","IDQ20029"),
+      "cyclone_cap":("IDQ24500","IDQ24510","IDQ24520"),
+      "issued_track_gml":("IDQ65248","IDQ65249","IDQ65250","IDQ65251","IDQ65252"),
+      "technical_cxml":("IDQ65255","IDQ65256","IDQ65257"),
+      "info":("IDQ20065","IDQ20066","IDQ20067")
+    }
+    log("FWO_CYCLONE_CURRENT_SLOTS",{
+      role:[n for n in names if any(n.upper().startswith(code+".") for code in slots)]
+      for role,slots in cyclone_slots.items()
+    })
     log("FWO_DIRECTORY",{"totalEntries":len(names),
       "warnings":regional[:65],"geometryProducts":shapes[:65],
       "cycloneCandidateFiles":cyclone[:85],
