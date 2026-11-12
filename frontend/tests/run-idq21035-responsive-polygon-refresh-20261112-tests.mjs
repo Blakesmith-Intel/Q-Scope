@@ -6,7 +6,11 @@ const client=readFileSync(new URL("../src/context-layers/bom-warning-operational
 // Index-authenticated IDQ21035 WFS retrieval must begin before national
 // CAP link processing: 22 unrelated CAP files can add an entire timeout window.
 const sourceStart=relay.indexOf("const indexedResultsPending=Promise.allSettled(");
-const capParse=relay.indexOf("const found=await Promise.allSettled(links.map(");
+const capParse=relay.indexOf("const [found,ftpResults]=await Promise.all([");
+assert.match(relay,/const ftpPending=Promise\.allSettled\(indexedCodes\.map/,
+ "Original BoM FTP bulletin source begins alongside original GIS geometry checks");
+assert.match(relay,/Promise\.allSettled\(links\.map/,
+ "WMO CAP remains an independently fetched fallback to original FTP");
 assert(sourceStart>0&&capParse>sourceStart,
  "Verified current-index GIS geometry starts before 22 CAP XML documents resolve");
 const mergeStart=relay.indexOf("const [indexedResults,capOnlyResults]=await Promise.all(");
