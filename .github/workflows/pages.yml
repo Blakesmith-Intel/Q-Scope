@@ -332,6 +332,7 @@ jobs:
           # The old 2022 station list omits active BoM rain gauges (e.g. 042123).
           # Inventory the SAME seven genuine regional map sources as the live
           # rainfall relay; this is a one-time build action, never browser polling.
+          python scripts/test-qscope-live-rainfall-inventory-v1.py
           python scripts/build-qscope-live-rainfall-inventory-v1.py \
             --base _site/data/qld-rainfall-basins-v1.json \
             --out _site/data/qscope-rainfall-gauge-inventory-v1.json \
