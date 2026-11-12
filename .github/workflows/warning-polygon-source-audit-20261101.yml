@@ -6,6 +6,8 @@ on:
       - "scripts/audit-live-bom-warning-polygon-gap-20261101.mjs"
       - "relay/bom-warning-gis2web-replica-v1.js"
       - "relay/bom-warning-polygons-v1.js"
+      - "relay/bom-warning-editions-v1.js"
+      - "scripts/probe-live-qscope-warning-editions-20261112.mjs"
       - "relay/bom-warning-product-reconcile-v1.js"
       - "frontend/src/context-layers/bom-warning-cap-source-v1.js"
       - ".github/workflows/warning-polygon-source-audit-20261101.yml"
@@ -27,3 +29,7 @@ jobs:
         run: |
           node --check scripts/smoke-live-candidate-warning-relay-20261111.mjs
           node scripts/smoke-live-candidate-warning-relay-20261111.mjs
+      - name: Verify genuine live warning editions for regional, detailed and severe weather products
+        run: |
+          node --check scripts/probe-live-qscope-warning-editions-20261112.mjs
+          node scripts/probe-live-qscope-warning-editions-20261112.mjs
