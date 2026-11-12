@@ -25,13 +25,13 @@ def inspect_file(ftp,name):
     except Exception as e:
         log("FWO_RETRIEVE_FAILURE",{"file":name,"error":str(e)[:180]});return
     txt=bytes(data).decode("utf-8",errors="replace")
-    found={c:len(re.findall(r"\\b"+re.escape(c)+r"\\b",txt,re.I))
+    found={c:len(re.findall(r"\b"+re.escape(c)+r"\b",txt,re.I))
            for c in CODES+GEOMETRY_CODES if re.search(re.escape(c),txt,re.I)}
-    sample=re.sub(r"\\s+"," ",txt[:650]).strip()
+    sample=re.sub(r"\s+"," ",txt[:650]).strip()
     log("FWO_PRODUCT",{"file":name,"bytes":len(data),
-        "references":found,"polygonTags":len(re.findall(r"<(?:[\\w-]+:)?polygon(?:\\s[^>]*)?>",txt,re.I)),
-        "coordinateTags":len(re.findall(r"<(?:[\\w-]+:)?coordinates?(?:\\s[^>]*)?>",txt,re.I)),
-        "issueMarkers":re.findall(r"(?i)(?:issued|issue date|issued at)[^\\n<]{0,125}",txt)[:3],
+        "references":found,"polygonTags":len(re.findall(r"<(?:[\w-]+:)?polygon(?:\s[^>]*)?>",txt,re.I)),
+        "coordinateTags":len(re.findall(r"<(?:[\w-]+:)?coordinates?(?:\s[^>]*)?>",txt,re.I)),
+        "issueMarkers":re.findall(r"(?i)(?:issued|issue date|issued at)[^\n<]{0,125}",txt)[:3],
         "preview":sample[:500]})
 socket.setdefaulttimeout(13)
 started=time.monotonic()
@@ -47,7 +47,7 @@ try:
     names=sorted({n.rsplit("/",1)[-1] for n in names})
     regional=[n for n in names if n.upper().startswith(CODES)]
     shapes=[n for n in names if n.upper().startswith(GEOMETRY_CODES)]
-    cyclone=[n for n in names if re.match(r"(?i)^ID[QDNTWSV]2(?:0|1)\\d{3}",n)
+    cyclone=[n for n in names if re.match(r"(?i)^ID[QDNTWSV]2(?:0|1)\d{3}",n)
         or re.search(r"(?i)(cyclone|tropical)",n)]
     log("FWO_DIRECTORY",{"totalEntries":len(names),
       "warnings":regional[:65],"geometryProducts":shapes[:65],
@@ -56,9 +56,9 @@ try:
       "elapsedSecs":round(time.monotonic()-started,2)})
     # Only fixed, source-qualified product IDs. No arbitrary file paths.
     targets=sorted(set(regional+shapes))
-    targets=[n for n in targets if re.search(r"(?i)\\.(?:txt|xml|cap\\.xml|amoc\\.xml|json|geojson|axf)$",n)]
+    targets=[n for n in targets if re.search(r"(?i)\.(?:txt|xml|cap\.xml|amoc\.xml|json|geojson|axf)$",n)]
     # Probe limited cyclone filenames only after source listing; never download PDF.
-    targets+= [n for n in cyclone if re.search(r"(?i)\\.(?:txt|xml|cap\\.xml|amoc\\.xml)$",n)][:12]
+    targets+= [n for n in cyclone if re.search(r"(?i)\.(?:txt|xml|cap\.xml|amoc\.xml)$",n)][:12]
     for name in dict.fromkeys(targets[:36]):
         inspect_file(f,name)
     log("FWO_AUDIT_RESULT",{"retrieved":len(list(dict.fromkeys(targets[:36]))),
