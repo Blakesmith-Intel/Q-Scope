@@ -7,6 +7,8 @@ on:
       - "relay/bom-warning-gis2web-replica-v1.js"
       - "relay/bom-warning-polygons-v1.js"
       - "relay/bom-warning-editions-v1.js"
+      - "relay/bom-warning-ftp-v1.js"
+      - "scripts/audit-ems-warning-arcgis-public-layers-20261112.mjs"
       - "scripts/probe-live-qscope-warning-editions-20261112.mjs"
       - "relay/bom-warning-product-reconcile-v1.js"
       - "frontend/src/context-layers/bom-warning-cap-source-v1.js"
@@ -33,3 +35,8 @@ jobs:
         run: |
           node --check scripts/probe-live-qscope-warning-editions-20261112.mjs
           node scripts/probe-live-qscope-warning-editions-20261112.mjs
+
+      - name: Audit all published EMS warning layers and alternative public ArcGIS views
+        run: |
+          node --check scripts/audit-ems-warning-arcgis-public-layers-20261112.mjs
+          node scripts/audit-ems-warning-arcgis-public-layers-20261112.mjs

@@ -10,6 +10,7 @@ on:
       - "relay/relay-efficiency-v1.js"
       - "relay/bom-warning-polygons-v1.js"
       - "relay/bom-warning-editions-v1.js"
+      - "relay/bom-warning-ftp-v1.js"
       - "relay/bom-warning-qld-current-index-v1.js"
       - "relay/bom-warning-gis2web-replica-v1.js"
       - "relay/bom-warning-product-reconcile-v1.js"
@@ -67,7 +68,13 @@ jobs:
                 assert.equal(data.products?.[code]?.status,'verified',code);
               result={checkedAt:data.checkedAt,activeCodes:data.activeCodes,
                 products:Object.fromEntries(Object.entries(data.products).map(
-                  ([code,p])=>[code,{issuedUtc:p.issuedUtc,count:p.count}]))};
+                  ([code,p])=>[code,{issuedUtc:p.issuedUtc,count:p.count,
+                   bulletinIssuedUtc:p.bulletinIssuedUtc??null}]))};
+              if(data.activeCodes.length){
+                assert(data.activeCodes.some(code=>
+                  typeof data.products?.[code]?.bulletinIssuedUtc==='string'),
+                  'Original BoM FTP CAP edition unavailable for all active warning products');
+              }
               break;
             }catch(e){lastError=String(e);if(attempt<2)await new Promise(r=>setTimeout(r,2000));}
           }

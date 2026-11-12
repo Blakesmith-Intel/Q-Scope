@@ -3,6 +3,7 @@
 // a verified source has changed; the original full relay remains the authority
 // for map objects and LGA/DDMG intersections.
 import {fetchCurrentQldBoMWarningsIndex} from "./bom-warning-qld-current-index-v1.js";
+import {fetchOriginalBoMFtpWarning} from "./bom-warning-ftp-v1.js";
 import {QLD_BOM_GIS_WARNING_REPLICA} from "./bom-warning-gis2web-replica-v1.js";
 
 export const BOM_WARNING_EDITIONS_SCHEMA="QScopeBoMWarningEditionsV1";
@@ -65,12 +66,23 @@ async function fetchEditionLayer(layer,products,{fetchImpl=fetch,nowMs=Date.now(
 }
 
 export async function produceOfficialBoMWarningEditionSignal({
- fetchImpl=fetch,nowMs=Date.now()
+ fetchImpl=fetch,nowMs=Date.now(),ftpCapFetcher=fetchOriginalBoMFtpWarning
 }={}){
- const [idx,thunder,weather]=await Promise.allSettled([
-  fetchCurrentQldBoMWarningsIndex({fetchImpl,nowMs}),
+ // Begin optional FTP bulletin retrieval as soon as the current Queensland
+ // product index resolves. Run it ALONGSIDE independent GIS metadata reads,
+ // never serially after them (browser metadata deadline is 14 seconds).
+ const indexPending=fetchCurrentQldBoMWarningsIndex({fetchImpl,nowMs});
+ const ftpPending=indexPending.then(index=>{
+  if(index?.verified!==true)return {active:[],results:[]};
+  const active=WATCH_CODES.filter(code=>index.activeCodes.includes(code));
+  return Promise.allSettled(active.map(code=>
+   ftpCapFetcher(code,{nowMs}))).then(results=>({active,results}));
+ });
+ const [idx,thunder,weather,ftp]=await Promise.allSettled([
+  indexPending,
   fetchEditionLayer(3,["IDQ65654","IDQ65650","IDQ65652"],{fetchImpl,nowMs}),
-  fetchEditionLayer(2,["IDQ65272","IDQ65277"],{fetchImpl,nowMs})
+  fetchEditionLayer(2,["IDQ65272","IDQ65277"],{fetchImpl,nowMs}),
+  ftpPending
  ]);
  const index=idx.status==="fulfilled"&&idx.value?.verified===true?idx.value:null;
  const products={};
@@ -78,6 +90,18 @@ export async function produceOfficialBoMWarningEditionSignal({
   const result=["IDQ21033","IDQ21035","IDQ21035:cells"].includes(code)?thunder:weather;
   products[code]=result.status==="fulfilled"?
     result.value[code]:{status:"unavailable",issuedUtc:null,count:null,sourceIds:[]};
+ }
+ // Direct original BoM FTP issue metadata supplements GIS edition metadata.
+ // Active-code check prevents FTP lookups during quiet periods. Source failures
+ // are unverified, not cancellations, and never suppress real GIS detections.
+ if(index&&ftp.status==="fulfilled"){
+  const {active,results}=ftp.value;
+  for(const [i,row] of results.entries()){
+   const code=active[i];
+   if(row.status!=="fulfilled"||row.value?.notice?.productCode!==code)continue;
+   const notice=row.value.notice;
+   if(products[code])products[code].bulletinIssuedUtc=notice.issuedUtc;
+  }
  }
  return {schema:BOM_WARNING_EDITIONS_SCHEMA,
   checkedAt:new Date(nowMs).toISOString(),

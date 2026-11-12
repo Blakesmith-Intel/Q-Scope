@@ -107,5 +107,5 @@ assert.match(src,/if\(!toggle\.checked\|\|document\.hidden\)return/);
 assert.match(src,/lastEditionTriggerAt<WARNING_EDITION_RETRY_MS/);
 assert.match(src,/await refresh\(\{force:true\}\)/);
 assert.match(worker,/incoming\.pathname === "\/bom-official-warning-editions"/);
-assert.match(build,/20261112-live-warning-edition-watch-v1/);
+assert.match(build,/20261112-live-warning-edition-watch-v1-ftp-cap-gis2web-v2/);
 console.log("PASS live warning reissue detection, new/cancelled/cell editions, 60s cached metadata watch, 5m active CAP backstop, 15m quiet baseline, no synthetic geometry or redundant national CAP crawls");
