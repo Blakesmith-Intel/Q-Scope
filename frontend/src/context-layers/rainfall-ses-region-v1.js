@@ -29,7 +29,17 @@ export function sesRegionForStation(record,registry,{maxSeparationKm=2}={}){
     !SES_REGION_NAMES.includes(station.region)||
     separationKm(record.latitude,record.longitude,station.latitude,station.longitude)>maxSeparationKm)
   return null;
- return {code:station.region,name:station.region};
+ const assignment=station.assignment??"within";
+ if(!["within","nearest"].includes(assignment))return null;
+ if(assignment==="nearest" &&
+    (!["NSW","QLD"].includes(station.state) ||
+     station.crossBorder!==(station.state==="NSW") ||
+     !Number.isFinite(station.distanceKm) || station.distanceKm<0))
+  return null;
+ if(assignment==="within" && station.crossBorder===true)return null;
+ return {code:station.region,name:station.region,assignment,
+  state:station.state??"QLD",crossBorder:station.crossBorder===true,
+  distanceKm:assignment==="nearest"?station.distanceKm:0};
 }
 export function groupRainfallBySESRegion(report,resolve,selected="all"){
  const groups=new Map();
