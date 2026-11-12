@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'scripts/build-qscope-live-rainfall-inventory-v1.py'
+      - 'scripts/test-qscope-live-rainfall-inventory-v1.py'
       - '.github/workflows/qa-live-rainfall-ses-coverage-v1.yml'
       - '.github/workflows/pages.yml'
       - 'scripts/build-qscope-ses-nearest-crossborder-v1.py'
@@ -25,6 +26,7 @@ jobs:
       - name: Compare exact live rainfall gauge inventory with old 2022 register
         run: |
           set -euo pipefail
+          python scripts/test-qscope-live-rainfall-inventory-v1.py
           python scripts/build-bom-rainfall-basins.py --out /tmp/qscope-base.json
           python scripts/build-qscope-live-rainfall-inventory-v1.py \
             --base /tmp/qscope-base.json \
