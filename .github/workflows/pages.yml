@@ -342,6 +342,7 @@ jobs:
           # The only live rainfall change: immutable, authority-matched station
           # metadata. No new BoM request on any observation refresh.
           python -m pip install --disable-pip-version-check 'pyshp==2.3.1'
+          python scripts/test-bom-rainfall-forecast-districts-v1.py
           python scripts/build-bom-rainfall-forecast-districts-v1.py \
             --stations _site/data/qld-rainfall-basins-v1.json \
             --out _site/data/qld-rainfall-forecast-districts-v1.json
