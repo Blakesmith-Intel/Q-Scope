@@ -1,0 +1,23 @@
+name: Probe official Energy Queensland per-council outage JSON sources
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/probe-official-ergon-lga-api-20261113.mjs'
+      - '.github/workflows/probe-official-ergon-lga-api-20261113.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify official customer allocation API path
+        run: node scripts/probe-official-ergon-lga-api-20261113.mjs
