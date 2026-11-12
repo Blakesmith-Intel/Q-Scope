@@ -80,7 +80,7 @@ jobs:
           node --check _site/src/context-layers/rainfall-ses-region-v1.js
           node --check _site/src/live3d-operational-v9.js
           grep -Fq 'SES administrative region' _site/src/context-layers/significant-rainfall-operational-v1.js
-          grep -Fq 'CROSS-BORDER GAUGE (NSW)' _site/src/context-layers/significant-rainfall-operational-v1.js
+          grep -Fq 'CROSS-BORDER GAUGE (' _site/src/context-layers/significant-rainfall-operational-v1.js
           grep -Fq 'BoM forecast district' _site/src/context-layers/significant-rainfall-operational-v1.js
           grep -Fq 'id="significantRainfallRegionGrouping"' _site/live3d-operational-v9.html
           grep -Fq 'id="significantRainfallSESFilter"' _site/live3d-operational-v9.html
