@@ -1,0 +1,29 @@
+name: Verify exact provider-published Queensland outage LGA customers
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/src/context-layers/power-outage-published-lga-v1.js'
+      - 'frontend/src/context-layers/power-outage-suburb-explorer-v1.js'
+      - 'frontend/tests/run-power-outage-published-lga-v1-tests.mjs'
+      - 'scripts/probe-published-qld-provider-council-counts-20261113.mjs'
+      - '.github/workflows/qa-published-power-outage-lga-v1.yml'
+      - 'scripts/build-current-site.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  published-provider-council-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Prove exact event-to-council counts and fail-closed protection
+        run: node frontend/tests/run-power-outage-published-lga-v1-tests.mjs
+      - name: Verify published Ergon and Energex data, browser CORS, event reconciliation
+        run: node scripts/probe-published-qld-provider-council-counts-20261113.mjs

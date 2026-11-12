@@ -79,7 +79,11 @@ assert.equal(burnettResult.crossCouncilEvents,1);
 assert.equal(burnettResult.exactCustomerTotal,false);
 assert.equal(councilOutageCustomerSummary(northBurnett,[southBurnett,northBurnett]).customers,0);
 assert.match(read("../src/context-layers/power-outage-suburb-explorer-v1.js"),
- /shared unallocated/);
+ /fetchPublishedProviderLga/);
+assert.match(read("../src/context-layers/power-outage-suburb-explorer-v1.js"),
+ /Provider-published LGA customers/);
+assert.doesNotMatch(read("../src/context-layers/power-outage-suburb-explorer-v1.js"),
+ /confirmed \+ shared unallocated/);
 
 function road(id,localGovernmentArea,locality){
  return {properties:{id,road_summary:{
