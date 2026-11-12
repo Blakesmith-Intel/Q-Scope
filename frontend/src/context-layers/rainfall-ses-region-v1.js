@@ -1,6 +1,6 @@
 // Official SES Regions layer (Queensland Emergency Services QFES_Boundaries/8).
 // Static publication-time station mapping, never new requests on rainfall refresh.
-export const SES_REGION_REGISTRY_URL="./data/qld-rainfall-ses-regions-v1.json";
+export const SES_REGION_REGISTRY_URL="./data/qld-rainfall-ses-regions-v1.json?v=20261113-complete-live-gauge-inventory-042123";
 export const SES_REGION_SCHEMA="QscopeQldSESRegionStationRegistryV1";
 export const SES_REGION_NAMES=Object.freeze([
  "Brisbane Region","Central Region","Far Northern Region","North Coast Region",
