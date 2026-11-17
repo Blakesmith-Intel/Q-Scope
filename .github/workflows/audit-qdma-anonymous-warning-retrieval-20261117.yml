@@ -51,9 +51,10 @@ jobs:
             return Array.isArray(polys)&&polys.length>0&&polys.every(p=>Array.isArray(p)&&p.length>0&&p.every(ringOk));
           };
           const current=f=>epoch(f.properties?.validfrom_utc)<=now&&epoch(f.properties?.validto_utc)>now;
-          const [edition,production,...raw]=await Promise.allSettled([
+          const [edition,production,manual,...raw]=await Promise.allSettled([
             get(relay+'/bom-official-warning-editions'),
             get(relay+'/bom-official-warning-polygons'),
+            get(relay+'/bom-official-warning-polygons?force=1'),
             ...Object.entries(layers).map(async([layer,ids])=>{
               const [collection,count]=await Promise.all([query(layer,ids),query(layer,ids,true)]);
               if(collection.type!=='FeatureCollection'||!Array.isArray(collection.features)||collection.exceededTransferLimit||collection.features.length>=500)throw Error('invalid or potentially truncated collection');
@@ -65,7 +66,11 @@ jobs:
           const e=edition.status==='fulfilled'?edition.value:null;
           const p=production.status==='fulfilled'?production.value:null;
           console.log('AUDIT_CONTEXT',JSON.stringify({checkedUtc:new Date(now).toISOString(),indexStatus:e?.indexStatus??'unavailable',activeCodes:e?.activeCodes??null,productionAvailable:!!p}));
-          let fail=false,positive=0;
+          const m=manual.status==='fulfilled'?manual.value:null;
+          const manualOk=m?.schema==='StormTrackerOfficialBoMWarningPolygonsV1'&&m.status!=='unavailable'&&Array.isArray(m.warnings);
+          const productionOk=p?.schema==='StormTrackerOfficialBoMWarningPolygonsV1'&&p.status!=='unavailable'&&Array.isArray(p.warnings);
+          console.log('LIVE_RELAY_MANUAL_CHECK',JSON.stringify({normalOk:productionOk,manualOk,normalStatus:p?.status??null,manualStatus:m?.status??null,normalCounts:Object.fromEntries(Object.entries(p?.products??{}).map(([k,v])=>[k,v.count])),manualCounts:Object.fromEntries(Object.entries(m?.products??{}).map(([k,v])=>[k,v.count]))}));
+          let fail=!manualOk||!productionOk||e?.indexStatus!=='verified',positive=0;
           for(const [i,result] of raw.entries()){
             const layer=Object.keys(layers)[i];
             if(result.status!=='fulfilled'){
