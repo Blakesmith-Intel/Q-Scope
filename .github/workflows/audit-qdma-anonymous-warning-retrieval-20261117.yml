@@ -1,0 +1,99 @@
+name: QDMA anonymous warning geometry retrieval audit
+on:
+  push:
+    branches: [audit/qdma-anonymous-warning-retrieval-20261117]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Anonymous geometry audit and existing relay comparison
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import {sourceExactQldBomWfsFeatures,indexVerifiedQldBomWfsFeatures,sourceExactQldBomStormLocations} from './relay/bom-warning-gis2web-replica-v1.js';
+          const base='https://services1.arcgis.com/vkTwD8kHw2woKBqV/ArcGIS/rest/services/BOM_Land_Warnings_RO/FeatureServer';
+          const relay='https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev';
+          const mappings={IDQ65654:'IDQ21033',IDQ65650:'IDQ21035',IDQ65652:'IDQ21035',IDQ65272:'IDQ21037',IDQ65277:'IDQ21038'};
+          const layers={2:['IDQ65272','IDQ65277'],3:['IDQ65654','IDQ65650','IDQ65652']};
+          const now=Date.now();
+          const get=async(url)=>{
+            const r=await fetch(url,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(20000),redirect:'error'});
+            if(!r.ok)throw Error('HTTP '+r.status);
+            const body=await r.text();
+            if(body.length>5000000)throw Error('response too large');
+            const j=JSON.parse(body);
+            if(j.error)throw Error('ArcGIS/API error '+(j.error.code??'unknown'));
+            return j;
+          };
+          const query=(layer,ids,count=false)=>{
+            const u=new URL(base+'/'+layer+'/query');
+            u.searchParams.set('where','product IN ('+ids.map(p=>"'"+p+"'").join(',')+')');
+            u.searchParams.set('f',count?'json':'geojson');
+            if(count)u.searchParams.set('returnCountOnly','true');
+            else{
+              u.searchParams.set('outFields','OBJECTID,product,warning,gml_id,gml_parent_id,validfrom_utc,validto_utc,phenomena');
+              u.searchParams.set('returnGeometry','true');
+              u.searchParams.set('outSR','4326');
+              u.searchParams.set('resultRecordCount','500');
+            }
+            return get(u);
+          };
+          const epoch=x=>typeof x==='number'?x:Date.parse(x);
+          const ringOk=r=>Array.isArray(r)&&r.length>=4&&r.every(p=>Array.isArray(p)&&Number.isFinite(p[0])&&Number.isFinite(p[1])&&p[0]>=-180&&p[0]<=180&&p[1]>=-90&&p[1]<=90)&&r[0][0]===r.at(-1)[0]&&r[0][1]===r.at(-1)[1]&&new Set(r.slice(0,-1).map(p=>p.slice(0,2).join(','))).size>=3;
+          const geometryOk=g=>{
+            const polys=g?.type==='Polygon'?[g.coordinates]:g?.type==='MultiPolygon'?g.coordinates:[];
+            return Array.isArray(polys)&&polys.length>0&&polys.every(p=>Array.isArray(p)&&p.length>0&&p.every(ringOk));
+          };
+          const current=f=>epoch(f.properties?.validfrom_utc)<=now&&epoch(f.properties?.validto_utc)>now;
+          const [edition,production,...raw]=await Promise.allSettled([
+            get(relay+'/bom-official-warning-editions'),
+            get(relay+'/bom-official-warning-polygons'),
+            ...Object.entries(layers).map(async([layer,ids])=>{
+              const [collection,count]=await Promise.all([query(layer,ids),query(layer,ids,true)]);
+              if(collection.type!=='FeatureCollection'||!Array.isArray(collection.features)||collection.exceededTransferLimit||collection.features.length>=500)throw Error('invalid or potentially truncated collection');
+              if(!Number.isInteger(count.count)||count.count!==collection.features.length)throw Error('count mismatch or source updated between queries');
+              if(collection.features.some(f=>!ids.includes(f.properties?.product)))throw Error('unexpected product identifier');
+              return {layer,ids,collection,count:count.count};
+            })
+          ]);
+          const e=edition.status==='fulfilled'?edition.value:null;
+          const p=production.status==='fulfilled'?production.value:null;
+          console.log('AUDIT_CONTEXT',JSON.stringify({checkedUtc:new Date(now).toISOString(),indexStatus:e?.indexStatus??'unavailable',activeCodes:e?.activeCodes??null,productionAvailable:!!p}));
+          let fail=false,positive=0;
+          for(const [i,result] of raw.entries()){
+            const layer=Object.keys(layers)[i];
+            if(result.status!=='fulfilled'){
+              console.log('LAYER_QUERY_FAILED',JSON.stringify({layer,reason:String(result.reason).slice(0,120)}));fail=true;continue;
+            }
+            const {collection,count,ids}=result.value;
+            console.log('LAYER_ANONYMOUS_PASS',JSON.stringify({layer,count,geojson:true,countMatches:true}));
+            for(const id of ids){
+              const code=mappings[id];
+              const rows=collection.features.filter(f=>f.properties.product===id);
+              const live=rows.filter(current);
+              const valid=live.filter(f=>geometryOk(f.geometry));
+              const ep=e?.products?.[code];
+              const issued=ep?.bulletinIssuedUtc;
+              const expiry=ep?.bulletinExpiresUtc??ep?.expiresUtc;
+              const index={verified:e?.indexStatus==='verified',activeCodes:e?.activeCodes??[],checkedUtc:new Date(now).toISOString()};
+              const byIndex=id==='IDQ65652'?null:indexVerifiedQldBomWfsFeatures(collection,code,index,{nowMs:now})?.warnings?.length??0;
+              let byIssue=null;
+              if(Number.isFinite(epoch(issued))&&Number.isFinite(epoch(expiry))){
+                const notice={productCode:code,status:'issued',issuedUtc:issued,expiresUtc:expiry};
+                byIssue=(id==='IDQ65652'?sourceExactQldBomStormLocations(collection,notice,{nowMs:now}):sourceExactQldBomWfsFeatures(collection,notice,{nowMs:now})).length;
+              }
+              const active=Array.isArray(e?.activeCodes)?e.activeCodes.includes(code):null;
+              if(valid.length>0)positive++;
+              if(live.length!==valid.length)fail=true;
+              console.log('PRODUCT_AUDIT',JSON.stringify({product:id,warningCode:code,active,returned:rows.length,current:live.length,validGeometry:valid.length,distinctIds:new Set(live.map(f=>f.properties.gml_id??f.properties.OBJECTID)).size,categoryCounts:Object.fromEntries([...new Set(rows.map(f=>f.properties.warning))].map(k=>[String(k),rows.filter(f=>f.properties.warning===k).length])),acceptedByIndex:byIndex,acceptedByBulletinIssue:byIssue,productionCount:id==='IDQ65652'?null:p?.products?.[code]?.count??null,assessment:active===true&&valid.length===0?'ACTIVE_BULLETIN_SOURCE_GEOMETRY_MISSING':active===true&&valid.length>0&&byIndex===0&&id!=='IDQ65652'?'SOURCE_PRESENT_EXISTING_VALIDATION_REJECTS':active===false?'NO_ACTIVE_BULLETIN':valid.length?'GEOMETRY_PRESENT':'NO_POSITIVE_SAMPLE'}));
+            }
+          }
+          console.log('AUDIT_RESULT',JSON.stringify({transport:fail?'FAIL':'PASS',productsWithCurrentValidGeometry:positive,lifecycle:positive?'PARTIAL_LIVE_SAMPLE_ONLY':'NOT_TESTABLE_WITHOUT_ACTIVE_GEOMETRY',deployment:false}));
+          if(fail)process.exitCode=1;
+          NODE
