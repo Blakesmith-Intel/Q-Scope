@@ -75,6 +75,7 @@ export function initialiseOperationalBomWindObservations({
   const gale=qualifying.filter(x=>windStationSeverity(x)==="gale").length;
   say((checkedAt?"BoM observed winds · ":"No verified observations · ")+
    qualifying.length+" qualifying observed winds / daily peaks"+
+   " · BoM product updates every 10 min"+
    (destructive?" · "+destructive+" destructive":"")+
    (damaging?" · "+damaging+" damaging":"")+
    (gale?" · "+gale+" sustained gale":"")+
@@ -98,7 +99,8 @@ export function initialiseOperationalBomWindObservations({
   labelRow(infoRows,"Observation time",asTime(record.observedUtc));
   labelRow(infoRows,"BoM station ID",record.stationId||"Unavailable");
   labelRow(infoRows,"WMO station ID",record.wmo);
-  labelRow(infoRows,"Source status","Automatic BoM observation, limited quality control");
+  labelRow(infoRows,"Source status","Official BoM station measurement · provisional");
+  labelRow(infoRows,"Interpretation","Measured at this station only · not a warning or radar estimate");
   const a=document.createElement("a"),stationUrl=officialWindStationUrl(record);
   a.href=stationUrl??WIND_OBS_SOURCE_URL;
   a.rel="noopener noreferrer";a.target="_blank";a.textContent=stationUrl?"Official BoM station observations · previous 72 hours":"Official BoM Queensland observations";
@@ -224,7 +226,7 @@ export function initialiseOperationalBomWindObservations({
  timer=setInterval(()=>{if(!document.hidden&&(source.show||dialog?.open))
   void refresh().catch(()=>{});},refreshMs);
  window.addEventListener("pagehide",()=>{clearInterval(timer);},{once:true});
- say("Off by default · official BoM station winds");
+ say("Off by default · official BoM station winds · 10-minute updates");
  return {dataSource:source,refresh,stop(){clearInterval(timer);},
   get observations(){return stations.slice();},get qualifying(){return qualifying.slice();}};
 }

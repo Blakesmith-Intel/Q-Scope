@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import {
- windSeverity,windStationSeverity,windStationBasis,windDisplay,gustKmh,parseUtc,
+ WIND_OBS_REFRESH_MS,windSeverity,windStationSeverity,windStationBasis,windDisplay,gustKmh,parseUtc,
  parseQueenslandWindXml
 } from "../src/context-layers/qscope-bom-wind-observation-model-v1.js";
 import {officialWindStationUrl} from "../src/context-layers/qscope-bom-wind-observations-operational-v1.js";
@@ -10,6 +10,7 @@ assert.equal(officialWindStationUrl({wmo:"94576",stationId:"040913"}),"https://w
 assert.equal(officialWindStationUrl({wmo:"94182"}),"https://www.bom.gov.au/products/IDQ60801/IDQ60801.94182.shtml");
 assert.equal(officialWindStationUrl({wmo:"040913"}),null);
 assert.equal(officialWindStationUrl({wmo:"../bad"}),null);
+assert.equal(WIND_OBS_REFRESH_MS,600000,"Match official BoM IDQ60920 ten-minute publication cadence");
 const NOW=Date.parse("2026-11-11T12:30:00Z");
 assert.equal(windSeverity(89,0),"below");
 assert.equal(windSeverity(90,null),"damaging");
@@ -66,6 +67,8 @@ assert.match(relayFile,/IDQ60920\.xml/,"One BoM statewide source remains authori
 assert.doesNotMatch(relayFile,/IDQ60801|sampledWindPeak24h|CACHE_HISTORY_SECONDS/,"No station history peak queries");
 assert.doesNotMatch(operatorFile,/fetchHistory|loadReportPeaks|sampleCount|24.hour|\?wmo=/i,"Report never generates 24h peaks");
 assert.match(operatorFile,/BoM highest wind gust today/);
+assert.match(operatorFile,/Measured at this station only/);
+assert.match(operatorFile,/refreshMs=WIND_OBS_REFRESH_MS/);
 assert.match(operatorFile,/stations\.slice\(\)/,"Report includes all source-published stations");
 assert.match(html,/highest gust today since midnight AEST/i);
 assert.doesNotMatch(html,/rolling 24.hour sample peaks|highest available sample in the station history/i);

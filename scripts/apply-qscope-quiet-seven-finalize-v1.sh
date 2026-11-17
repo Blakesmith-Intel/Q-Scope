@@ -34,5 +34,9 @@ grep -Fq 'qscope-seal' _site/live3d-operational-v9.html
 grep -Fq 'id="sidebarToggle"' _site/live3d-operational-v9.html
 grep -Fq 'id="showOfficialBomWarnings"' _site/live3d-operational-v9.html
 grep -Fq 'id="showBomWindObservations"' _site/live3d-operational-v9.html
-grep -Fq 'qscopeOperationalWindEvents.queueWindow(mode,frames.length)' _site/src/live3d-operational-v9.js
+! grep -Eq 'qscopeOperationalWindEvents|qscopeWindScheduleAnalysis|createOperationalWindBridge' _site/src/live3d-operational-v9.js
+! grep -Fq 'qscope-reviewable-event-inbox' _site/live3d-operational-v9.html
+grep -Fq 'Q-SCOPE EXPERIMENTAL WIND ALERTS RETIRED 20261117' _site/BUILD.txt
+grep -Fq 'initialiseOperationalBomWindObservations({viewer})' _site/src/live3d-operational-v9.js
+grep -Fq 'WIND_OBS_REFRESH_MS=10*60*1000' _site/src/context-layers/qscope-bom-wind-observation-model-v1.js
 
