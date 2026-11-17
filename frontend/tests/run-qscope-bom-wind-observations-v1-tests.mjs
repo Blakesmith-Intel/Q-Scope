@@ -5,6 +5,11 @@ import {
  windSeverity,windStationSeverity,windStationBasis,windDisplay,gustKmh,parseUtc,
  parseQueenslandWindXml
 } from "../src/context-layers/qscope-bom-wind-observation-model-v1.js";
+import {officialWindStationUrl} from "../src/context-layers/qscope-bom-wind-observations-operational-v1.js";
+assert.equal(officialWindStationUrl({wmo:"94576",stationId:"040913"}),"https://www.bom.gov.au/products/IDQ60801/IDQ60801.94576.shtml");
+assert.equal(officialWindStationUrl({wmo:"94182"}),"https://www.bom.gov.au/products/IDQ60801/IDQ60801.94182.shtml");
+assert.equal(officialWindStationUrl({wmo:"040913"}),null);
+assert.equal(officialWindStationUrl({wmo:"../bad"}),null);
 const NOW=Date.parse("2026-11-11T12:30:00Z");
 assert.equal(windSeverity(89,0),"below");
 assert.equal(windSeverity(90,null),"damaging");

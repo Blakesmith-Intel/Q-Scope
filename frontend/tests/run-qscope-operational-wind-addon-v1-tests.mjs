@@ -67,10 +67,14 @@ assert(!script.includes("src/live3d-operational-v9.js\",\n"),
 assert(script.includes('if site.as_posix()!="_site"'));
 assert(script.includes("if target.exists():raise ValueError"),
   "Prevent overwriting existing pinned operational science modules");
-assert(build.includes("python3 scripts/apply-qscope-operational-wind-v10-6-8.py"));
-assert(build.indexOf("python3 scripts/apply-qscope-operational-wind-v10-6-8.py")>
-       build.indexOf('review_next="_site/preview/wind-hook-v10-6"'),
- "Promote only after all preceding pinned science/preview checks");
+assert(!build.includes("python3 scripts/apply-qscope-operational-wind-v10-6-8.py"),
+ "Archived detector must never mount on operational root");
+assert(build.includes("Q-SCOPE EXPERIMENTAL WIND ALERTS RETIRED 20261117"));
+assert(build.includes("! grep -Eq 'qscopeOperationalWindEvents|qscopeWindScheduleAnalysis|createOperationalWindBridge'"));
+assert(build.includes('review_next="_site/preview/wind-hook-v10-6"'),
+ "Keep historical preview isolated");
+assert(build.includes("python3 scripts/apply-qscope-bom-wind-observations-v1.py"),
+ "Retain measured wind observations");
 assert(bridge.includes("screenResearchWindArtefacts"));
 assert(bridge.includes("captureResearchSourceThumbnail"));
 assert(bridge.includes("FRESH")==false,
@@ -84,4 +88,4 @@ assert(!/autoPromoteToBoMWarning|dispatchOfficialWarning/.test(bridge));
 assert(build.includes("SECONDARY_WIND_PROVIDER_CACHE_SIZE=8")&&
  build.includes("OFFICIAL_FLOOD_STORAGE_KEY"),
  "All other accepted source checks remain in the final package");
-console.log("PASS isolated V10.6.8 operational promotion, preview-storage separation, artefact gate, strict source build and existing radar/compass/flood guards");
+console.log("PASS archived V10.6.8 research, operational retirement, preview-storage separation, artefact gate, strict source build and existing radar/compass/flood guards");

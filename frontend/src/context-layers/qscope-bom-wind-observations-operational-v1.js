@@ -10,6 +10,11 @@ const asTime=v=>v&&Number.isFinite(Date.parse(v))?
  new Date(v).toLocaleString("en-AU",{timeZone:"Australia/Brisbane",
  day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit",hour12:false})+" AEST":"Unavailable";
 const severityRank=s=>windDisplay[s]?.priority??0;
+// IDQ60801 is the official Queensland 72-hour station page keyed by WMO, not the six-digit BoM station ID.
+export function officialWindStationUrl(record){
+ const wmo=String(record?.wmo??"");
+ return /^\d{5}$/.test(wmo)?`https://www.bom.gov.au/products/IDQ60801/IDQ60801.${wmo}.shtml`:null;
+}
 function markerSvg(record){
  const band=windDisplay[windStationSeverity(record)]??windDisplay.below;
  const basis=windStationBasis(record);
@@ -84,16 +89,19 @@ export function initialiseOperationalBomWindObservations({
   infoRows.replaceChildren();
   labelRow(infoRows,"Observed gust",gustKmh(record.gustKmh));
   labelRow(infoRows,"Mean wind speed",gustKmh(record.sustainedKmh));
+  labelRow(infoRows,"Wind direction",record.windDirection||"Unavailable");
   labelRow(infoRows,"Averaging period",record.windAveragingMinutes===10?"Verified 10 minutes":"Not verified by source");
   labelRow(infoRows,"Measured wind severity",windDisplay[windStationSeverity(record)].label+
    (windStationBasis(record)==="today-since-midnight"?" · from today\'s peak, not latest gust":
     windStationBasis(record)==="verified-10-minute-mean"?" · verified 10-minute mean":""));
   labelRow(infoRows,"Highest gust today (since midnight)",gustKmh(record.todayMaximumGustKmh));
   labelRow(infoRows,"Observation time",asTime(record.observedUtc));
-  labelRow(infoRows,"BoM WMO station",record.wmo);
+  labelRow(infoRows,"BoM station ID",record.stationId||"Unavailable");
+  labelRow(infoRows,"WMO station ID",record.wmo);
   labelRow(infoRows,"Source status","Automatic BoM observation, limited quality control");
-  const a=document.createElement("a");a.href=WIND_OBS_SOURCE_URL;
-  a.rel="noopener noreferrer";a.target="_blank";a.textContent="Official BoM observations";
+  const a=document.createElement("a"),stationUrl=officialWindStationUrl(record);
+  a.href=stationUrl??WIND_OBS_SOURCE_URL;
+  a.rel="noopener noreferrer";a.target="_blank";a.textContent=stationUrl?"Official BoM station observations · previous 72 hours":"Official BoM Queensland observations";
   infoRows.append(a);info.hidden=false;
  }
  function renderReport(){
@@ -122,7 +130,9 @@ export function initialiseOperationalBomWindObservations({
    const li=document.createElement("li"),top=document.createElement("div");
    top.className="rainfall-report-entry";
    const name=document.createElement("strong"),value=document.createElement("span");
-   name.textContent=station.name;
+   const stationUrl=officialWindStationUrl(station);
+   if(stationUrl){const link=document.createElement("a");link.href=stationUrl;link.target="_blank";link.rel="noopener noreferrer";link.textContent=station.name;name.append(link);}
+   else name.textContent=station.name;
    value.className="rainfall-report-mm";
    value.textContent=gustKmh(station.todayMaximumGustKmh);
    top.append(name,value);

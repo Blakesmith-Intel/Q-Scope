@@ -10,7 +10,7 @@ from pathlib import Path
 import re
 import shutil
 
-VERSION = "20261111-bom-wind-observations-v1"
+VERSION = "20261111-bom-wind-observations-v1-station-links-20261117"
 SOURCE = Path("frontend")
 SITE = Path("_site")
 MODULES = (
@@ -50,8 +50,8 @@ def main() -> None:
     if not (SITE / "BUILD.txt").is_file():
         raise ValueError("The accepted production site must be assembled first")
     marker = (SITE / "BUILD.txt").read_text(encoding="utf-8")
-    if "Q-SCOPE ACCEPTED MAIN WIND EVENTS V10.6.8" not in marker:
-        raise ValueError("Accepted passive-wind addon must remain in place")
+    if "Q-SCOPE EXPERIMENTAL WIND ALERTS RETIRED 20261117" not in marker:
+        raise ValueError("Operational experimental alert retirement must be applied first")
     if "BO_M WIND OBSERVATION PRODUCT" in marker:
         raise ValueError("The BoM observation overlay is already installed")
 
@@ -96,9 +96,10 @@ def main() -> None:
             raise ValueError("Wind control is not inside the approved Severe Weather menu")
     if not all(item in js for item in (
         "PUBLISHED_PRODUCTION_RUNTIME",
-        "initialiseOperationalSignificantRainfall({viewer})",
-        "qscopeOperationalWindEvents.queueWindow(mode,frames.length)")):
+        "initialiseOperationalSignificantRainfall({viewer})")):
         raise ValueError("Expected operator-accepted runtime not found")
+    if "qscopeOperationalWindEvents" in js or "createOperationalWindBridge" in js:
+        raise ValueError("Experimental wind alerts must not be mounted on the root")
     if "id=\"severeWeatherDetails\"" not in html or (
         'id="officialBomWarningsStatus"' not in html):
         raise ValueError("Expected severe-weather source status not found")
@@ -152,7 +153,7 @@ def main() -> None:
     index_path.write_text(index, encoding="utf-8")
     with (SITE / "BUILD.txt").open("a", encoding="utf-8") as build:
         build.write("BO_M WIND OBSERVATION PRODUCT " + VERSION +
-                    " | ON-DEMAND STATION PEAKS | PASSIVE ALERTS UNTOUCHED\n")
+                    " | ON-DEMAND STATION PEAKS | EXPERIMENTAL ALERTS RETIRED\n")
 
 if __name__ == "__main__":
     main()

@@ -1073,26 +1073,13 @@ grep -Fq '<title>Q-SCOPE | Queensland Situational Awareness</title>' "_site/inde
 ! grep -Fq 'enableWindHookResearch' "$review_next/src/live3d-operational-v9.js"
 test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6
 
-# Promoted V10.6.8 operator-approved wind signatures are a LAST, ADDITIVE
-# root overlay. All previously frozen operational/QA checks above complete
-# before this stage. No original BoM radar/Doppler/3D/flood/warning modules,
-# historical previews, or Cloudflare code is replaced.
-python3 scripts/apply-qscope-operational-wind-v10-6-8.py
-node --check _site/src/qscope-operational-wind-bridge-v1.js
-node --check _site/src/qscope-reviewable-event-inbox-v10-6.js
-node --check _site/src/qscope-wind-artefact-guard-v10-6.js
-node --check _site/src/severe-storm-v10.js
-node --check _site/src/doppler-persistence-v10-3.js
+# Operator-approved retirement: keep research previews and source history,
+# but never mount experimental detection, event UI or pause on the root.
+printf '%s\n' 'Q-SCOPE EXPERIMENTAL WIND ALERTS RETIRED 20261117' >> _site/BUILD.txt
 node --check _site/src/live3d-operational-v9.js
-node frontend/tests/run-qscope-wind-artefact-guard-v10-6-tests.mjs
-node frontend/tests/run-qscope-operational-wind-addon-v1-tests.mjs
-grep -Fq 'Q-SCOPE ACCEPTED MAIN WIND EVENTS V10.6.8' _site/BUILD.txt
-grep -Fq 'qscopeOperationalWindEvents.queueWindow(mode,frames.length)' _site/src/live3d-operational-v9.js
-grep -Fq 'new MutationObserver(qscopeWindScheduleAnalysis)' _site/src/live3d-operational-v9.js
-grep -Fq 'window.setInterval(qscopeWindScheduleAnalysis,60*1000)' _site/src/live3d-operational-v9.js
-grep -Fq 'Q-SCOPE V10.6.8 ACCEPTED PASSIVE RADAR SIGNATURES' _site/src/live3d-operational-v9.js
-grep -Fq 'wind-alerts-v10-6-8-main' _site/index.html
-grep -Fq 'wind-alerts-v10-6-8-main' _site/live3d-operational-v9.html
+! grep -Eq 'qscopeOperationalWindEvents|qscopeWindScheduleAnalysis|createOperationalWindBridge' _site/src/live3d-operational-v9.js
+! grep -Fq 'qscope-reviewable-event-inbox' _site/live3d-operational-v9.html
+grep -Fq 'severeStormAlertOverlay.setEnabled(false);' _site/src/live3d-operational-v9.js
 grep -Fq 'PUBLISHED_PRODUCTION_RUNTIME' _site/src/live3d-operational-v9.js
 grep -Fq 'initialiseOperationalSignificantRainfall({viewer})' _site/src/live3d-operational-v9.js
 grep -Fq 'createOperationalCyclonePanel' _site/src/live3d-operational-v9.js
@@ -1104,7 +1091,7 @@ grep -Fq 'SECONDARY_WIND_PROVIDER_CACHE_SIZE=8' _site/src/multi-doppler-display-
 test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6
 
 # Q-SCOPE V10.7 official measured wind observations are mounted ONLY after
-# the operator-accepted passive-event runtime and all six archived previews.
+# the operational alert retirement and all six archived previews.
 # No pinned 3D/radar source, old menu handler or existing Worker route changes.
 python3 scripts/apply-qscope-bom-wind-observations-v1.py
 node --check _site/src/context-layers/qscope-bom-wind-observation-model-v1.js
@@ -1114,7 +1101,7 @@ grep -Fq 'BO_M WIND OBSERVATION PRODUCT 20261111-bom-wind-observations-v1' _site
 grep -Fq 'initialiseOperationalBomWindObservations({viewer})' _site/src/live3d-operational-v9.js
 grep -Fq 'id="showBomWindObservations"' _site/live3d-operational-v9.html
 grep -Fq 'id="bomWindGustReport"' _site/live3d-operational-v9.html
-grep -Fq 'qscopeOperationalWindEvents.queueWindow(mode,frames.length)' _site/src/live3d-operational-v9.js
+! grep -Fq 'qscopeOperationalWindEvents' _site/src/live3d-operational-v9.js
 test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6
 
 
@@ -1130,5 +1117,5 @@ grep -Fq 'Q-SCOPE POWER REPORT COUNTDOWN 20261112' _site/BUILD.txt
 grep -Fq 'id="powerOutageExplorerCountdown"' _site/live3d-operational-v9.html
 ! grep -Fq 'id="refreshPowerOutageExplorer"' _site/live3d-operational-v9.html
 grep -Fq 'id="showBomWindObservations"' _site/live3d-operational-v9.html
-grep -Fq 'qscopeOperationalWindEvents.queueWindow(mode,frames.length)' _site/src/live3d-operational-v9.js
+! grep -Fq 'qscopeOperationalWindEvents' _site/src/live3d-operational-v9.js
 test "$(find _site/preview -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 6

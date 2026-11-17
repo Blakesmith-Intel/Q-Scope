@@ -954,22 +954,18 @@ jobs:
             "$base/preview/wind-hook-v10-6/BUILD.txt" \
             | grep -F 'Q-SCOPE V10.6.8 REJECT FRAGMENTED DOPPLER ARTEFACTS' >/dev/null
           echo "PUBLIC Q-SCOPE V10.6.8 TWO-SCAN DOPPLER CLUTTER SUPPRESSION VERIFIED; OPERATIONAL RADAR UNCHANGED"
-          # V10.6.8 was approved for the MAIN operational UI after research
-          # artefact/interaction verification. Check the generated ROOT files,
-          # not merely the experimental /preview route.
-          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
-            "$base/src/live3d-operational-v9.js" \
-            | grep -F 'qscopeOperationalWindEvents=createOperationalWindBridge' >/dev/null
-          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
-            "$base/src/qscope-operational-wind-bridge-v1.js" \
-            | grep -F 'screenResearchWindArtefacts' >/dev/null
-          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
-            "$base/src/qscope-wind-artefact-guard-v10-6.js" \
-            | grep -F 'minConnectedHigh:12' >/dev/null
-          curl --fail --silent --show-error --location --retry 7 --retry-delay 2 --retry-all-errors \
-            "$base/BUILD.txt" \
-            | grep -F 'Q-SCOPE ACCEPTED MAIN WIND EVENTS V10.6.8' >/dev/null
-          echo "PUBLIC Q-SCOPE MAIN WIND EVENTS V10.6.8 DELIVERED; PRE-APPROVED PRODUCT SOURCES UNCHANGED"
+          # Verify that the actual published root no longer mounts research alerts.
+          engine="$(curl -fsSL --retry 7 --retry-delay 2 --retry-all-errors "$base/src/live3d-operational-v9.js?wind-retired=$GITHUB_SHA")"
+          page="$(curl -fsSL --retry 7 --retry-delay 2 --retry-all-errors "$base/live3d-operational-v9.html?wind-retired=$GITHUB_SHA")"
+          grep -Fq 'PUBLISHED_PRODUCTION_RUNTIME' <<< "$engine"
+          grep -Fq 'initialiseOperationalBomWindObservations({viewer})' <<< "$engine"
+          grep -Fq 'severeStormAlertOverlay.setEnabled(false);' <<< "$engine"
+          ! grep -Eq 'qscopeOperationalWindEvents|qscopeWindScheduleAnalysis|createOperationalWindBridge' <<< "$engine"
+          ! grep -Fq 'qscope-reviewable-event-inbox' <<< "$page"
+          grep -Fq 'id="showBomWindObservations"' <<< "$page"
+          curl -fsSL --retry 7 --retry-delay 2 --retry-all-errors "$base/BUILD.txt?wind-retired=$GITHUB_SHA" | grep -F 'Q-SCOPE EXPERIMENTAL WIND ALERTS RETIRED 20261117' >/dev/null
+          curl -fsSL --retry 7 --retry-delay 2 --retry-all-errors "$base/src/context-layers/qscope-bom-wind-observations-operational-v1.js?wind-retired=$GITHUB_SHA" | grep -F 'IDQ60801.' >/dev/null
+          echo "PUBLIC Q-SCOPE EXPERIMENTAL ALERTS RETIRED; OFFICIAL WIND STATIONS RETAINED"
 
 
 
