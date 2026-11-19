@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package the separate Q-SCOPE wallboard; do not change the map entrypoint."""
+"""Package the separate wallboard and one-link navigation; leave map logic unchanged."""
 from pathlib import Path
 from shutil import copy2
 import subprocess
@@ -14,6 +14,24 @@ for name in ("dashboard.html","src/qscope-wallboard-v1.css","src/qscope-wallboar
         subprocess.run(["node","--check",str(dest)],check=True)
 html=(site/"dashboard.html").read_text()
 assert html.count('class="panel"')==8
+assert 'id="qscopeMapView" class="view-switch" href="./"' in html
+# The production map lives inside the root page's iframe. Navigate the TOP
+# window, not the iframe, so switching does not leave a hidden map polling.
+map_page=site/"live3d-operational-v9.html"
+map_html=map_page.read_text(encoding="utf-8")
+nav_start=map_html.index('<div id="nav">')
+nav_end=map_html.index('</div>',nav_start)
+assert 'id="sidebarToggle"' in map_html[nav_start:nav_end]
+assert 'id="qscopeDashboardView"' not in map_html
+map_html=map_html[:nav_end]+'<a id="qscopeDashboardView" href="./dashboard.html" target="_top" aria-label="Switch to operations dashboard">Dashboard</a>'+map_html[nav_end:]
+style='<style>#qscopeDashboardView{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;white-space:nowrap;min-height:29px;padding:4px 8px;border:1px solid #40a7ae;border-radius:6px;background:#0a3948;color:#ddfffc;text-decoration:none;font-size:11px;font-weight:700;line-height:1.2}#qscopeDashboardView:focus-visible{outline:2px solid #75eee2;outline-offset:2px}#qscopeDashboardView:hover{background:#145563}@media(max-width:700px){#nav #qscopeDashboardView{font-size:10px;padding:3px 5px}}</style>'
+assert map_html.count('</head>')==1
+map_page.write_text(map_html.replace('</head>',style+'\n</head>',1),encoding="utf-8")
+# Bust only the iframe document cache, never scientific module identities.
+index=site/"index.html"
+index_html=index.read_text(encoding="utf-8")
+assert index_html.count('live3d-operational-v9.html?v=')==1
+index.write_text(index_html.replace('live3d-operational-v9.html?v=','live3d-operational-v9.html?v=view-switch-20261120-v2-',1),encoding="utf-8")
 # Produce a separate headless copy from the FINAL approved source engine.
 # Never modify the operational map module or its cache identity.
 map_engine=site/"src/context-layers/river-gauge-layer-v1.js"
@@ -42,31 +60,11 @@ assert map_engine.read_text()==original
 subprocess.run(["node","--check",str(headless)],check=True)
 assert not any(x in html for x in ("<button","<select","<input","<iframe"))
 # Verify the published module graph using the same files the browser imports.
-subprocess.run(["node","--experimental-default-type=module","--input-type=module","-e",
+subprocess.run(["node","--input-type=module","-e",
 'import {formatCountdown,summariseRoads,summariseRain,summariseWind,summariseFloods} from "./_site/src/qscope-wallboard-model-v1.js"; if(formatCountdown(61000,0)!=="01:01")throw Error("countdown"); if(summariseRoads([],null).total!==0)throw Error("road count"); if(summariseFloods([],[],null).total!==0)throw Error("flood count"); if(summariseWind([]).total!==0)throw Error("wind count"); const r=summariseRain({observations:{since9am:[],last24Hours:[]}},{}); if(r.total||r.notable)throw Error("rain count");'],check=True)
-# Import the real browser module, including all its transitive dependencies,
-# with a minimal inert DOM. Hidden startup must create all eight clocks
-# without issuing a fetch or requiring Cesium, WebGL, or the operational map.
-subprocess.run(["node","--experimental-default-type=module","--input-type=module","-e",'''
-import assert from "node:assert/strict";
-const nodes=new Map();
-const create=()=>({textContent:"",dataset:{},style:{},children:[],append(...x){this.children.push(...x);},replaceChildren(...x){this.children=x;},closest(){return this;}});
-globalThis.document={hidden:true,createElement:create,getElementById(id){if(!nodes.has(id))nodes.set(id,create());return nodes.get(id);},addEventListener(){}};
-globalThis.window={addEventListener(){}};
-Object.defineProperty(globalThis,"localStorage",{value:{getItem(){return null;},setItem(){}},configurable:true});
-globalThis.fetch=()=>{throw Error("Wallboard must not fetch while hidden");};
-globalThis.setInterval=()=>1;
-await import("./_site/src/qscope-wallboard-v1.js");
-for(const id of ["powerStatus","warningStatus","cycloneStatus","windStatus","floodStatus","rainStatus","aepStatus","roadStatus"]){
- const f=nodes.get(id);
- assert.equal(f.children.length,2,id);
- assert.equal(f.children[1].children[1].textContent,"—",id);
-}
-console.log("PASS wallboard browser module starts headlessly with eight integrated countdowns");
-'''],check=True)
 # Exercise the actual entry module without network access. This catches named
 # import errors and proves every panel receives its own real countdown node.
-subprocess.run(["node","--experimental-default-type=module","--input-type=module","-e",r'''
+subprocess.run(["node","--input-type=module","-e",r'''
 import assert from "node:assert/strict";
 const nodes=new Map();
 function node(tag="div"){
@@ -79,6 +77,7 @@ function node(tag="div"){
 globalThis.document={hidden:true,createElement:node,addEventListener(){},
  getElementById(id){if(!nodes.has(id))nodes.set(id,node());return nodes.get(id);}};
 globalThis.window={addEventListener(){}};
+Object.defineProperty(globalThis,"localStorage",{value:{getItem(){return null;},setItem(){}},configurable:true});
 const realInterval=globalThis.setInterval;
 globalThis.setInterval=()=>1;
 globalThis.fetch=()=>{throw Error("Unexpected background or clock-only request");};
@@ -93,4 +92,4 @@ globalThis.setInterval=realInterval;
 console.log("All eight wallboard countdowns mounted; hidden clocks do not fetch");
 '''],check=True)
 with (site/"BUILD.txt").open("a") as f:
-    f.write("\nQ-SCOPE OPERATIONS WALLBOARD V1 2026-11-20: eight source-backed panels, independent refresh clocks, map unchanged.\n")
+    f.write("\nQ-SCOPE OPERATIONS WALLBOARD V1 2026-11-20: eight source-backed panels, independent refresh clocks, bidirectional same-tab navigation; map logic unchanged.\n")
