@@ -112,9 +112,9 @@ export function wallboardFloodHealth(status={},coverage={},summary={}){
   return {kind:"warning",message:"Partial data coverage · station locations "+meta.matched+"/"+meta.total};
  const affected=Math.max(0,Number(status.historyScreeningAlertsAffected)||0);
  if(affected)return {kind:"ok",message:"Monitoring active · "+affected+" signal"+(affected===1?"":"s")+" awaiting rise checks"};
- if(coverage.pending||coverage.checking||status.screeningIncomplete)
-  return {kind:"ok",message:"Monitoring active · additional station checks underway"};
  if(coverage.sourceMissing||status.historySourceMissing)
   return {kind:"warning",message:"Partial data coverage · some station references unavailable"};
+ if(coverage.pending||coverage.checking||status.screeningIncomplete)
+  return {kind:"ok",message:"Monitoring active · additional station checks underway"};
  return {kind:"ok",message:"Monitoring active"};
 }
