@@ -1,0 +1,43 @@
+name: Seal operator-approved Q-SCOPE 20 November 2026 restore point
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/seal-qscope-20261120.yml
+permissions:
+  contents: write
+  actions: read
+jobs:
+  seal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Independently verify exact deployed source and immutable refs
+        env:
+          GH_TOKEN: ${{ secrets.STORMTRACKER_RELEASE_TOKEN || github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha=638b30e429b8a36993fd06ab50455ce808e6a9f7
+          tag=qscope-2026-11-20
+          branch=restore/qscope-2026-11-20
+          for run in 44605148251 44605148028; do
+            test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" --jq '.head_sha')" = "$sha"
+            test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" --jq '.conclusion')" = success
+          done
+          test "$(git ls-remote origin "refs/heads/$branch" | cut -f1)" = "$sha"
+          test "$(git cat-file -t "$sha")" = commit
+          existing="$(git ls-remote origin "refs/tags/$tag" | cut -f1)"
+          if [ -z "$existing" ]; then
+            object="$(gh api --method POST "repos/$GITHUB_REPOSITORY/git/tags" -f tag="$tag" -f object="$sha" -f type=commit -f message="Q-SCOPE 20 November 2026 operator-approved exact website and relay production restore source; Pages run 44605148251; relay run 44605148028." --jq '.sha')"
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$tag" -f sha="$object" >/dev/null
+          fi
+          git fetch --no-tags origin "refs/tags/$tag:refs/tags/$tag"
+          test "$(git cat-file -t "refs/tags/$tag")" = tag
+          test "$(git rev-parse "$tag^{}")" = "$sha"
+          test "$(git ls-remote origin "refs/heads/$branch" | cut -f1)" = "$sha"
+          echo "SEALED Q-SCOPE $tag and $branch => $sha"
