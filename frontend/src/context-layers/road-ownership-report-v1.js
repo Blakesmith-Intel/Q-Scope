@@ -35,12 +35,32 @@ export function groupedRoadOwnershipFeatures(features,snapshot){
  }
  return groups;
 }
+// Group by official structured classifications; never infer a cause from prose.
+export function groupRoadClosureItemsByHazard(items){
+ const groups=new Map(),seen=new Set();
+ const clean=value=>String(value??"").trim().replace(/\s+/g," ");
+ for(const record of items??[]){
+   const id=String(record?.id??"").trim();
+   if(!id||seen.has(id))continue;seen.add(id);
+   const s=record.summary??{};
+   const type=clean(s.eventType),subtype=clean(s.eventSubtype),cause=clean(s.eventDueTo);
+   const parts=[subtype||type,cause].filter(v=>v&&!/^n\/?a$/i.test(v));
+   const unique=parts.filter((v,i)=>parts.findIndex(x=>x.toLowerCase()===v.toLowerCase())===i);
+   const name=unique.join(" — ")||(type&&!/^n\/?a$/i.test(type)?type:"Cause not supplied");
+   const key=JSON.stringify([type,subtype,cause].map(v=>v.toLowerCase()));
+   if(!groups.has(key))groups.set(key,{key,name,items:[]});
+   groups.get(key).items.push(record);
+ }
+ return [...groups.values()].sort((a,b)=>b.items.length-a.items.length||
+   a.name.localeCompare(b.name,"en-AU"));
+}
 export function createRoadOwnershipReport({CesiumRef,mapCamera,councilDialog,
   refresh=()=>Promise.resolve(),getLoadedAt=()=>0}={}){
  const dialog=$("roadTypeReport"),trigger=$("openRoadTypeReport"),
    close=$("closeRoadTypeReport"),back=$("backRoadTypeReport"),
    reload=$("refreshRoadTypeReport"),search=$("roadTypeSearch"),
-   summary=$("roadTypeSummary"),status=$("roadTypeStatus"),results=$("roadTypeResults");
+   summary=$("roadTypeSummary"),status=$("roadTypeStatus"),results=$("roadTypeResults"),
+   grouping=$("roadTypeGrouping");
  if(![dialog,trigger,close,back,reload,search,summary,status,results].every(Boolean))
    return {updateFeatures(){},updateStatus(){},destroy(){}};
  let features=[],snapshot=null,lastAt=0,loading=null,destroyed=false;
@@ -71,13 +91,15 @@ export function createRoadOwnershipReport({CesiumRef,mapCamera,councilDialog,
      const section=item("details","outage-suburb outage-council");
      section.open=true;
      const councils=searchRoadCouncilGroups(groupRoadClosuresByLga(groups[key]),q);
-     const total=councils.reduce((n,g)=>n+g.items.length,0);
+     const sections=grouping?.value==="hazard"?
+       groupRoadClosureItemsByHazard(councils.flatMap(g=>g.items)):councils;
+     const total=sections.reduce((n,g)=>n+g.items.length,0);
      const header=item("summary","outage-suburb-title");
      header.append(item("span","outage-suburb-name",heading),
        item("span","outage-suburb-count",total+" closure"+(total===1?"":"s")));
      section.append(header);
      if(!total)section.append(item("p","outage-empty",q?"No matches in this section.":"No qualifying closures."));
-     for(const council of councils){
+     for(const council of sections){
        const sub=item("details","outage-suburb outage-locality");
        sub.open=false;
        const subHead=item("summary","outage-suburb-title");
@@ -161,6 +183,7 @@ export function createRoadOwnershipReport({CesiumRef,mapCamera,councilDialog,
  back.addEventListener("click",returnToCouncil);
  reload.addEventListener("click",doRefresh);
  search.addEventListener("input",render);
+ grouping?.addEventListener("change",render);
  return {updateFeatures(next){features=Array.isArray(next)?next.slice():[];render();},
    updateStatus(next){
      if(next?.kind==="error"&&/source expired|old closure markers removed/i.test(next.message??""))
@@ -171,6 +194,7 @@ export function createRoadOwnershipReport({CesiumRef,mapCamera,councilDialog,
      back.removeEventListener("click",returnToCouncil);
      reload.removeEventListener("click",doRefresh);
      search.removeEventListener("input",render);
+     grouping?.removeEventListener("change",render);
      if(dialog.open)dialog.close();
    }};
 }
