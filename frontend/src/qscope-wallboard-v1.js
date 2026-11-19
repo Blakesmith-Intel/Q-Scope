@@ -1,9 +1,9 @@
 import {loadPowerOutages,DEFAULT_POWER_OUTAGE_REFRESH_MS} from "./context-layers/power-outages-v1.js";
 import {loadFloodRoadClosures} from "./context-layers/flood-road-closures-v1.js";
 import {ROAD_OWNERSHIP_SCHEMA} from "./context-layers/road-ownership-report-v1.js";
-import {createRiverGaugeLayer} from "./context-layers/river-gauge-layer-v1.js";
+import {createRiverGaugeLayer} from "./context-layers/river-gauge-wallboard-v1.js?v=20261120-v1";
 import {DEFAULT_RIVER_GAUGE_REFRESH_MS} from "./context-layers/river-gauges-v1.js";
-import {loadPersistedIfdCells,verifiedPersistentIfdCell} from "./context-layers/rainfall-ifd-aep-v1.js";
+import {loadPersistedIfdCells} from "./context-layers/rainfall-ifd-aep-v1.js";
 import {SIGNIFICANT_RAINFALL_RELAY,SIGNIFICANT_RAINFALL_REFRESH_MS} from "./context-layers/significant-rainfall-operational-v1.js";
 import {WIND_OBSERVATION_RELAY} from "./context-layers/qscope-bom-wind-observations-operational-v1.js";
 import {WIND_OBS_REFRESH_MS} from "./context-layers/qscope-bom-wind-observation-model-v1.js";
@@ -22,7 +22,7 @@ const statusIds=["powerStatus","warningStatus","cycloneStatus","windStatus","flo
 const statusMap=new Map();
 for(const id of statusIds){
  const footer=$(id),health=el("span",footer.textContent,"health"),timer=el("span",null,"countdown");
- const value=el("b","—");timer.append(el("small","Next refresh"),value);
+ const value=el("b","—");timer.append(el("small",id==="warningStatus"?"Next check":"Next refresh"),value);
  footer.replaceChildren(health,timer);statusMap.set(id,{health,timer:value,footer});
 }
 function health(id,kind,message,at=0){
@@ -154,7 +154,7 @@ function renderFlood(){
   floodStatus?.screeningIncomplete?"Rise checks incomplete":"BoM observations · screening only";
  health("floodStatus",floodStatus?.kind==="error"?"error":floodStatus?.partial||cov?.pending||floodStatus?.screeningIncomplete?"warning":"ok",issue,floodLayer.lastLoadedAt);
 }
-floodLayer=createRiverGaugeLayer({readOnly:true,onUpdate:()=>renderFlood(),onStatus:s=>{if(s.kind!=="loading"){floodStatus=s;renderFlood();}}});
+floodLayer=createRiverGaugeLayer({onUpdate:()=>renderFlood(),onStatus:s=>{if(s.kind!=="loading"){floodStatus=s;renderFlood();}}});
 async function getCrossings(){
  if(catalogue||now()-catalogueAt<15*60000&&catalogueAt)return;
  catalogueAt=now();
@@ -177,6 +177,8 @@ function renderWarnings(){
  const at=now(),current=Object.fromEntries(Object.entries(products).map(([k,p])=>[k,active(p)&&p.expiresUtc&&Date.parse(p.expiresUtc)<=at?{status:"unavailable"}:p]));
  const count=range=>{const p=range.map(([k])=>current[k]);const n=p.filter(active).length;return p.every(x=>active(x)||clear(x))?String(n):n?n+"+":"—";};
  set("thunderCount",count(codes.slice(0,2)));set("weatherCount",count(codes.slice(2)));
+ $("thunderCount").parentElement.dataset.active=String(codes.slice(0,2).some(([k])=>active(current[k])));
+ $("weatherCount").parentElement.dataset.active=String(codes.slice(2).some(([k])=>active(current[k])));
  const list=[];
  for(const [k,name] of codes){
   const p=current[k];if(clear(p))continue;
