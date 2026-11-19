@@ -247,6 +247,7 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
      ftpVerified>0?"partial":"unavailable",
    qldCurrentIndexStatus:qldCurrentIndex?"verified-current-products":"unavailable",
    qldCurrentIndexCheckedAt:qldCurrentIndex?.checkedUtc??null,
+   cycloneWarnings:qldCurrentIndex?.cycloneWarnings??null,
    geospatialSource:"Queensland emergency-management WFS-derived Bureau GIS2Web warnings",
    products,sourceComplete:reconciled.sourceComplete,
    nswWithheld:reconciled.warnings.filter(x=>x.state==="NSW").length,

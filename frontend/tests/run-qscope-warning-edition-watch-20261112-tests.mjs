@@ -53,6 +53,8 @@ assert.equal(signal.products.IDQ21033.issuedUtc,new Date(t2).toISOString());
 assert.equal(signal.products.IDQ21035.count,1);
 assert.equal(signal.products.IDQ21037.count,0);
 assert.equal(calls.length,3,"One Queensland CURRENT index, exactly two shared no-geometry GIS reads");
+assert.equal(signal.cycloneWarnings.status,"no-active");
+assert.deepEqual(signal.cycloneWarnings.headlines,[]);
 for(const call of calls.filter(x=>x.url.includes("/query"))){
  const u=new URL(call.url);
  assert.equal(u.searchParams.get("returnGeometry"),"false");

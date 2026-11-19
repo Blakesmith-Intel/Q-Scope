@@ -107,6 +107,7 @@ export async function produceOfficialBoMWarningEditionSignal({
   checkedAt:new Date(nowMs).toISOString(),
   indexStatus:index?"verified":"unavailable",
   activeCodes:index?WATCH_CODES.filter(c=>index.activeCodes.includes(c)):null,
+  cycloneWarnings:index?.cycloneWarnings??null,
   products};
 }
 

@@ -22,7 +22,7 @@ const statusIds=["powerStatus","warningStatus","cycloneStatus","windStatus","flo
 const statusMap=new Map();
 for(const id of statusIds){
  const footer=$(id),health=el("span",footer.textContent,"health"),timer=el("span",null,"countdown");
- const value=el("b","—");timer.append(el("small",id==="warningStatus"?"Next check":"Next refresh"),value);
+ const value=el("b","—");timer.append(el("small",["warningStatus","cycloneStatus"].includes(id)?"Next check":"Next refresh"),value);
  const detail=id==="warningStatus"?el("small","Full update —"):null;
  if(detail)timer.append(detail);
  footer.replaceChildren(health,timer);statusMap.set(id,{health,timer:value,footer,detail,last:0});
@@ -206,6 +206,7 @@ function renderWarnings(){
 async function fullWarnings(){
  try{
   const d=await json(relay+"/bom-official-warning-polygons",27000);
+  if(d?.schema==="StormTrackerOfficialBoMWarningPolygonsV1") updateCycloneWarnings(d.cycloneWarnings);
   if(d?.schema!=="StormTrackerOfficialBoMWarningPolygonsV1"||!Array.isArray(d.warnings)||!["active","no-verified-current-polygons","partial-source-unavailable"].includes(d.status))throw Error("Invalid warning source");
   warnings=d.warnings.filter(w=>isVerifiedActiveBomWarning(w,now())&&isSourceMatchedOfficialWarningPolygon(w));
   cells=(d.stormCells??[]).filter(c=>c.official===true&&c.issuer==="Bureau of Meteorology"&&c.sourceProduct==="IDQ65652"&&Date.parse(c.expiresUtc)>now());
@@ -216,41 +217,78 @@ async function fullWarnings(){
   products={};warnings=[];cells=[];temporaryFailures=Math.min(3,temporaryFailures+1);
   fullDue=now()+officialWarningRefreshInterval({products,warnings,recoveryPolls,temporaryFailures});
   unavailable(["warningStatus"],clearWarnings,"BoM warnings unavailable");
+  if(!cycloneCheckedAt||now()-cycloneCheckedAt>120000) updateCycloneWarnings(null);
  }
 }
-task("warnings",WARNING_EDITION_POLL_MS,["warningStatus"],async()=>{
+task("warnings",WARNING_EDITION_POLL_MS,["warningStatus","cycloneStatus"],async()=>{
  if(now()>=fullDue){await fullWarnings();return;}
  try{
   const d=await json(relay+"/bom-official-warning-editions",14000);
+  updateCycloneWarnings(d?.schema==="QScopeBoMWarningEditionsV1"?d.cycloneWarnings:null);
   if(hasNewOfficialBoMWarningEdition(d,products,warnings,cells)){
    const key=JSON.stringify({active:d.activeCodes,products:d.products});
    if(key!==editionKey||now()-editionAt>=WARNING_EDITION_RETRY_MS){editionKey=key;editionAt=now();await fullWarnings();return;}
   }
- }catch{/* Failed metadata-only probe is not a cancellation. */}
+ }catch{/* Failed metadata-only probe is not a cancellation. */
+  updateCycloneWarnings(null);
+ }
  renderWarnings();
 },()=>unavailable(["warningStatus"],clearWarnings,"BoM warnings unavailable"));
 
-function clearCyclones(){$("cycloneRows").replaceChildren(el("div","Cyclone forecasts unavailable · check BoM directly","empty"));}
-task("cyclone",5*60000,["cycloneStatus"],async()=>{
- // Existing issued-source feed. Never fetch credentials or assume a missing
- // internal feed is a verified absence of a tropical cyclone.
- const data=await json("/internal/cyclones.json",18000);
- const d=validateInternalCycloneSnapshot(data,{nowUtc:new Date().toISOString()});
- if(d.status==="unavailable")throw Error(d.message);
- if(d.status==="no-active-products"){
-  $("cycloneRows").replaceChildren(el("div","No current verified cyclone forecast products","empty"));
-  health("cycloneStatus","ok","Issued forecast products · warnings separate",now());return;
+// Official warning state is independent of GML forecasts. Reuse the
+// existing Queensland warning-index check; do not poll unavailable maps
+// while the official warning listing is clear.
+let cycloneCheckedAt=0,cycloneState=null,cycloneTracks=[],cycloneTrackAt=0,cycloneTrackBusy=false,cycloneGeneration=0;
+function renderCyclones(){
+ const rows=$("cycloneRows");
+ if(!cycloneState){
+  rows.replaceChildren(el("div","Warning status unavailable","empty"));
+  health("cycloneStatus","error","BoM warning status unavailable");return;
  }
- const cards=d.storms.map(s=>{
+ if(cycloneState.status==="no-active"){
+  rows.replaceChildren(el("div","No current warnings","empty"));
+  health("cycloneStatus","ok","BoM",cycloneCheckedAt);return;
+ }
+ const notices=cycloneState.headlines.map(w=>{
   const c=el("div",null,"storm");
-  c.append(el("strong",s.cycloneName),el("span","BoM "+s.productId+" · issued "+stamp(Date.parse(s.issueUtc))));
+  c.append(el("strong",w.headline));return c;
+ });
+ const tracks=cycloneTracks.filter(t=>Date.parse(t.expiresUtc)>now()).map(s=>{
+  const c=el("div",null,"storm");
+  c.append(el("strong",s.cycloneName),el("span","BoM forecast · issued "+stamp(Date.parse(s.issueUtc))));
   const fix=s.features.filter(f=>f.role==="observed_fix").sort((a,b)=>Date.parse(b.validUtc)-Date.parse(a.validUtc))[0];
   if(fix){const [lon,lat]=fix.geometry.coordinates;c.append(el("span",(fix.category?"Category "+fix.category+" · ":"")+Math.abs(lat).toFixed(1)+"° "+(lat<0?"S":"N")+", "+lon.toFixed(1)+"° E"));}
-  c.append(el("span","Expires "+stamp(Date.parse(s.expiresUtc))+" · original issued forecast"));return c;
+  return c;
  });
- $("cycloneRows").replaceChildren(...cards);
- health("cycloneStatus",d.status==="active-partial"?"warning":"ok",d.status==="active-partial"?"Partial BoM forecast coverage":"BoM original source · warnings separate",now());
-},()=>unavailable(["cycloneStatus"],clearCyclones,"Cyclone source not verified · no all-clear implied"));
+ rows.replaceChildren(...notices,...tracks);
+ health("cycloneStatus","ok","BoM current warnings",cycloneCheckedAt);
+}
+function updateCycloneWarnings(value){
+ const at=Date.parse(value?.checkedUtc), valid=Number.isFinite(at)&&at<=now()+300000&&now()-at<=20*60000;
+ const heads=Array.isArray(value?.headlines)?value.headlines:null;
+ const state=valid&&heads&&((value.status==="no-active"&&heads.length===0)||
+  (value.status==="active"&&heads.length&&heads.every(w=>typeof w?.headline==="string"&&w.headline.trim())))?value:null;
+ if(!state||state.status!=="active"){
+  cycloneGeneration++;cycloneTracks=[];cycloneTrackAt=0;
+ }else if(cycloneState?.status!=="active"){
+  cycloneGeneration++;cycloneTracks=[];cycloneTrackAt=0;
+ }
+ cycloneState=state;
+ if(state)cycloneCheckedAt=at;
+ renderCyclones();
+ if(state?.status==="active"&&!cycloneTrackBusy&&(!cycloneTrackAt||now()-cycloneTrackAt>=5*60000)){
+  cycloneTrackBusy=true;cycloneTrackAt=now();
+  const generation=cycloneGeneration;
+  // Optional existing issued forecast source; a failed or empty GML result
+  // must never erase an independently verified active warning.
+  void json("/internal/cyclones.json",18000).then(data=>{
+   const d=validateInternalCycloneSnapshot(data,{nowUtc:new Date().toISOString()});
+   if(generation===cycloneGeneration&&cycloneState?.status==="active"){
+    cycloneTracks=d.storms??[];renderCyclones();
+   }
+  }).catch(()=>{}).finally(()=>{cycloneTrackBusy=false;});
+ }
+}
 
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick();});
 const clock=setInterval(tick,1000);
