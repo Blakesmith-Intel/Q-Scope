@@ -7,7 +7,7 @@ import {loadPersistedIfdCells} from "./context-layers/rainfall-ifd-aep-v1.js";
 import {SIGNIFICANT_RAINFALL_RELAY,SIGNIFICANT_RAINFALL_REFRESH_MS} from "./context-layers/significant-rainfall-operational-v1.js";
 import {WIND_OBSERVATION_RELAY} from "./context-layers/qscope-bom-wind-observations-operational-v1.js";
 import {WIND_OBS_REFRESH_MS} from "./context-layers/qscope-bom-wind-observation-model-v1.js";
-import {isVerifiedActiveBomWarning,isSourceMatchedOfficialWarningPolygon,officialWarningRefreshInterval,hasNewOfficialBoMWarningEdition,WARNING_EDITION_POLL_MS,WARNING_EDITION_RETRY_MS} from "./context-layers/bom-warning-operational-v1.js";
+import {isVerifiedActiveBomWarning,isSourceMatchedOfficialWarningPolygon,officialWarningRefreshInterval,hasNewOfficialBoMWarningEdition,WARNING_EDITION_POLL_MS,WARNING_EDITION_RETRY_MS} from "./context-layers/bom-warning-operational-v1.js?v=20261120-warning-transition-v1";
 import {validateInternalCycloneSnapshot} from "./internal-cyclone-feed-v1.js";
 import {summarisePower,summariseRoads,summariseFloods,wallboardFloodHealth,summariseRain,summariseWind,formatCountdown} from "./qscope-wallboard-model-v1.js?v=20261120-flood-status-v4";
 
@@ -191,7 +191,8 @@ function renderWarnings(){
   if(active(p)){
    const w=warnings.filter(x=>x.productCode===k&&isVerifiedActiveBomWarning(x,at));
    const hazards=Array.isArray(p.hazardAssessment?.highEnd)?p.hazardAssessment.highEnd.join(" · "):"";
-   d.append(el("span",p.headline||"Current warning"+(w.length?" · "+w.length+" verified polygons":" · polygon awaiting verification")));
+   d.append(el("span",p.headline||"Current warning"));
+   d.append(el("span",p.geometryUpdatePending&&w.length?w.length+" last published polygon(s) · update pending":w.length?w.length+" verified polygon(s)":"Polygon awaiting verification"));
    if(hazards)d.append(el("b",hazards));
    if(k==="IDQ21035"){const dangerous=cells.filter(x=>x.veryDangerous===true&&Date.parse(x.expiresUtc)>at).length;if(dangerous)d.append(el("b",dangerous+" VERY DANGEROUS storm cells"));}
   }else d.append(el("span","Status unverified"));
@@ -199,11 +200,11 @@ function renderWarnings(){
  }
  const allClear=codes.every(([k])=>clear(current[k]));
  $("warningRows").replaceChildren(...(list.length?list:[el("div",allClear?"No current severe weather or thunderstorm warnings":"Awaiting official verification")]));
- health("warningStatus",codes.every(([k])=>active(current[k])||clear(current[k]))?"ok":"warning",allClear?"BoM confirmed no current products":"BoM products · not polygon counts",warningAt);
+ health("warningStatus",codes.every(([k])=>clear(current[k])||(current[k]?.status==="active"&&!current[k]?.geometryUpdatePending&&warnings.some(w=>w.productCode===k&&isVerifiedActiveBomWarning(w,at))))?"ok":"warning",allClear?"BoM confirmed no current products":"BoM products · not polygon counts",warningAt);
 }
-async function fullWarnings(){
+async function fullWarnings({force=false}={}){
  try{
-  const d=await json(relay+"/bom-official-warning-polygons",27000);
+  const d=await json(relay+"/bom-official-warning-polygons"+(force?"?force=1":""),27000);
   if(d?.schema==="StormTrackerOfficialBoMWarningPolygonsV1") updateCycloneWarnings(d.cycloneWarnings);
   if(d?.schema!=="StormTrackerOfficialBoMWarningPolygonsV1"||!Array.isArray(d.warnings)||!["active","no-verified-current-polygons","partial-source-unavailable"].includes(d.status))throw Error("Invalid warning source");
   warnings=d.warnings.filter(w=>isVerifiedActiveBomWarning(w,now())&&isSourceMatchedOfficialWarningPolygon(w));
@@ -225,7 +226,7 @@ task("warnings",WARNING_EDITION_POLL_MS,["warningStatus","cycloneStatus"],async(
   updateCycloneWarnings(d?.schema==="QScopeBoMWarningEditionsV1"?d.cycloneWarnings:null);
   if(hasNewOfficialBoMWarningEdition(d,products,warnings,cells)){
    const key=JSON.stringify({active:d.activeCodes,products:d.products});
-   if(key!==editionKey||now()-editionAt>=WARNING_EDITION_RETRY_MS){editionKey=key;editionAt=now();await fullWarnings();return;}
+   if(key!==editionKey||now()-editionAt>=WARNING_EDITION_RETRY_MS){editionKey=key;editionAt=now();await fullWarnings({force:true});return;}
   }
  }catch{/* Failed metadata-only probe is not a cancellation. */
   updateCycloneWarnings(null);
