@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {
- missingActiveBoMWarningGeometry,officialWarningRefreshInterval,
+ missingActiveBoMWarningGeometry,officialWarningRefreshInterval,describeOfficialBomWarningState,
  WARNING_GEOMETRY_RECOVERY_MS,WARNING_GEOMETRY_RECOVERY_MAX
 } from "../src/context-layers/bom-warning-operational-v1.js";
 
@@ -40,6 +40,10 @@ assert.equal(officialWarningRefreshInterval({temporaryFailures:1}),120000);
 assert.equal(officialWarningRefreshInterval({temporaryFailures:2}),120000);
 assert.equal(officialWarningRefreshInterval({temporaryFailures:3}),normal);
 
+const transition={IDQ21033:{status:"active",geometryUpdatePending:true,count:1}};
+assert.equal(officialWarningRefreshInterval({products:transition,warnings:[warning("IDQ21033")]}),120000);
+assert.match(describeOfficialBomWarningState({products:transition,warnings:[warning("IDQ21033")],selected:"IDQ21033"}).message,/last published polygon; update pending/);
+assert.equal(describeOfficialBomWarningState({products:transition,warnings:[warning("IDQ21033")],selected:"IDQ21033"}).kind,"warning");
 const source=readFileSync(new URL("../src/context-layers/bom-warning-operational-v1.js",import.meta.url),"utf8");
 assert(source.includes("lastAttemptAt<currentRefreshMs()"),
  "Actual automatic warning refresh must use the bounded adaptive interval");
