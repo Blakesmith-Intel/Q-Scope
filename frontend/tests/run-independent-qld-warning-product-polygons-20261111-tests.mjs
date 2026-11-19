@@ -108,6 +108,42 @@ try{
  assert.equal(merged.warnings.length,16);
  assert.equal(merged.products.IDQ21033.headline,cap.headline,
   "Preserve authenticated CAP bulletin wording alongside GIS geometry");
+ // 20 November regression: independent original GIS and FWO issue clocks.
+ const oldIssue=now-15*60000,newIssue=now-3*60000;
+ const older=indexVerifiedQldBomWfsFeatures(collection([
+  feature("IDQ21033",0,oldIssue,expires)
+ ]),"IDQ21033",indexed,{nowMs:now});
+ const newNotice={...cap,issuedUtc:new Date(newIssue).toISOString()};
+ const update={notice:newNotice,warnings:[]};
+ const transition=reconcileLatestBoMWarnings([older,update],{nowMs:now,qldCurrentIndex:indexed});
+ assert.equal(transition.products.IDQ21033.status,"active");
+ assert.equal(transition.products.IDQ21033.geometryUpdatePending,true);
+ assert.equal(transition.products.IDQ21033.count,1);
+ assert.equal(transition.products.IDQ21033.issuedUtc,newNotice.issuedUtc);
+ assert.equal(transition.products.IDQ21033.geometryIssuedUtc,older.notice.issuedUtc);
+ assert.equal(transition.warnings[0].geometryUpdatePending,true);
+ assert.deepEqual(transition.warnings[0].geometry,older.warnings[0].geometry);
+ assert.equal(Date.parse(transition.warnings[0].expiresUtc),expires);
+ const newer=indexVerifiedQldBomWfsFeatures(collection([
+  feature("IDQ21033",1,newIssue,expires),feature("IDQ21033",2,newIssue,expires)
+ ]),"IDQ21033",indexed,{nowMs:now});
+ const caughtUp=reconcileLatestBoMWarnings([older,update,newer],{nowMs:now,qldCurrentIndex:indexed});
+ assert.equal(caughtUp.products.IDQ21033.count,2);
+ assert.equal(Boolean(caughtUp.products.IDQ21033.geometryUpdatePending),false);
+ assert.deepEqual(caughtUp.warnings.map(w=>w.id),newer.warnings.map(w=>w.id));
+ for(const badIndex of [null,{...indexed,checkedUtc:new Date(newIssue-60000).toISOString()},
+  {...indexed,checkedUtc:new Date(now-21*60000).toISOString()}]){
+  assert.equal(reconcileLatestBoMWarnings([older,update],{nowMs:now,qldCurrentIndex:badIndex}).warnings.length,0);
+ }
+ assert.equal(reconcileLatestBoMWarnings([older,update],{nowMs:now,qldCurrentIndex:{...indexed,activeCodes:[]}}).warnings.length,0);
+ const cancelled={notice:{...newNotice,status:"cancelled",issuedUtc:new Date(newIssue-60000).toISOString()},warnings:[]};
+ assert.equal(reconcileLatestBoMWarnings([older,cancelled,update],{nowMs:now,qldCurrentIndex:indexed}).warnings.length,0,
+  "A reactivation cannot retain geometry from a cancelled edition");
+ const expired={...older,warnings:older.warnings.map(w=>({...w,geometryExpiresUtc:new Date(now-1).toISOString()}))};
+ assert.equal(reconcileLatestBoMWarnings([expired,update],{nowMs:now,qldCurrentIndex:indexed}).warnings.length,0);
+ const capOnly={...older,warnings:older.warnings.map(w=>({...w,geometryVerification:undefined}))};
+ assert.equal(reconcileLatestBoMWarnings([capOnly,update],{nowMs:now,qldCurrentIndex:indexed}).warnings.length,0,
+  "Previously published CAP shapes are not independently current geometry");
  const worker=readFileSync(new URL("../../relay/bom-warning-polygons-v1.js",import.meta.url),"utf8");
  assert(!worker.includes("qld.slice(0,14)"),"No silent truncation of LGA/DDMG reporting");
  assert(worker.includes("fetchQldBomWfsCurrentIndexGeometry"));
