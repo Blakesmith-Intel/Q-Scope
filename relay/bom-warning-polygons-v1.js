@@ -174,26 +174,32 @@ export async function relayBomWarningPolygons(request,origin,corsHeaders){
    const match=result.value;
    if(!match?.notice||!Array.isArray(match.warnings)||!match.warnings.length)return;
    const cap=latestIssued.get(request.code);
-   // Never render an older, superseded WFS footprint against a newer CAP
-   // issuance if its original GIS coordinates have not yet caught up.
-   if(cap&&Date.parse(cap.issuedUtc)-Date.parse(match.notice.issuedUtc)>120000)return;
+   // A fresh current-index + GIS read can independently authenticate the
+   // last published, unexpired geometry while a newer bulletin arrives.
+   // Keep it as a SEPARATE edition; reconciliation checks cancellation,
+   // current-index freshness and original geometry validity before use.
+   const lagging=cap&&Date.parse(cap.issuedUtc)-Date.parse(match.notice.issuedUtc)>120000;
+   if(lagging&&!indexed.has(request.code))return;
    // CAP's textual bulletin can legitimately precede the latest refreshed
    // source GIS geometry by >2 minutes (11-13 min observed 11 Nov 2026).
    // Preserve its verified *product-level* warning wording and high-end
    // hazard details; NEVER use the CAP time to change GIS source geometry
    // issue, expiry, coordinates or individual cell classification.
    const currentCap=cap&&Date.parse(cap.expiresUtc)>now&&cap.status==="issued"?cap:null;
-   const sourceNotice=currentCap&&indexed.has(request.code)?
+   const sourceNotice=currentCap&&indexed.has(request.code)&&!lagging?
      {...match.notice,headline:currentCap.headline,
       description:currentCap.description,instruction:currentCap.instruction,
       areaDescription:currentCap.areaDescription,
       bulletinUrl:currentCap.bulletinUrl}:match.notice;
-   const sourceWarnings=currentCap&&indexed.has(request.code)?
+   const sourceWarnings=currentCap&&indexed.has(request.code)&&!lagging?
      match.warnings.map(w=>({...w,headline:currentCap.headline,
        description:currentCap.description,instruction:currentCap.instruction,
        areaDescription:currentCap.areaDescription,
        bulletinIssuedUtc:currentCap.issuedUtc,
        bulletinExpiresUtc:currentCap.expiresUtc})):match.warnings;
+   // Preserve independently verified GIS candidate identity. Do not merge
+   // a lagging geometry into an older WMO CAP record or recast its timestamps.
+   if(lagging){messageRecords.push({notice:sourceNotice,warnings:sourceWarnings});return;}
    const row=messageRecords.find(r=>r?.notice?.productCode===request.code&&
      Math.abs(Date.parse(r.notice.issuedUtc)-Date.parse(sourceNotice.issuedUtc))<=120000);
    if(row)row.warnings=[...(row.warnings??[]),...sourceWarnings];
