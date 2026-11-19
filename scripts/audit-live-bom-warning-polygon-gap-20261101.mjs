@@ -61,6 +61,11 @@ try{
    product:n.productCode,status:n.status,issued:n.issuedUtc,expires:n.expiresUtc,
    polygonsDirectFromCAP:x.value.polygons
   }));
+  if(n.productCode==="IDQ21035") console.log("IDQ21035_AUTHENTIC_CAP_SOURCE",JSON.stringify({
+    issued:n.issuedUtc,expires:n.expiresUtc,status:n.status,
+    exactCapAreaPolygons:x.value.polygons,
+    originalIdentifier:n.originalIdentifier,area:n.areaDescription?.slice(0,200)
+  }));
   const prior=notices.get(n.productCode);
   if(!prior||Date.parse(prior.issuedUtc)<Date.parse(n.issuedUtc))
     notices.set(n.productCode,n);
@@ -99,4 +104,19 @@ for(const [code,axf] of Object.entries(CODES)){
   }));
  }catch(error){console.log("SOURCE_GIS_POLYGON_ERROR",JSON.stringify({code,error:String(error)}));}
 }
+// Independent Queensland Government CAP-AU feed, public disaster-map source.
+// Inspect only original product references and presence of real coordinates.
+try{
+ const url="https://publiccontent-qld-alerts.s3.ap-southeast-2.amazonaws.com/content/Feeds/StormFloodCycloneWarnings/StormWarnings_capau.xml";
+ const res=await fetch(url,{signal:AbortSignal.timeout(18000),headers:{Accept:"application/xml,text/xml,*/*"}});
+ const xml=await res.text();
+ const idx=[...xml.matchAll(/IDQ21035/gi)].map(m=>m.index);
+ const polygons=[...xml.matchAll(/<(?:[\\w-]+:)?polygon(?:\\s[^>]*)?>/gi)].length;
+ const geometry=[...xml.matchAll(/<(?:[\\w-]+:)?(?:circle|polygon|coordinate|geometry)(?:\\s[^>]*)?>/gi)].length;
+ console.log("QLD_GOV_CAPAU_ALTERNATIVE",JSON.stringify({
+  status:res.status,bytes:xml.length,idq21035Refs:idx.length,
+  originalPolygonTags:polygons,geometryTags:geometry,
+  previews:idx.slice(0,3).map(i=>xml.slice(Math.max(0,i-150),i+250).replace(/\\s+/g," ").slice(0,400))
+ }));
+}catch(e){console.log("QLD_GOV_CAPAU_ALTERNATIVE_ERROR",String(e));}
 console.log("WARNING_LIVE_AUDIT_COMPLETE",new Date(NOW).toISOString());
