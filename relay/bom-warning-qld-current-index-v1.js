@@ -36,11 +36,33 @@ export function parseCurrentQldBoMWarningsIndex(html,{nowMs=Date.now()}={}){
   if(/\b(?:cancellation|cancelled|canceled|final)\b/i.test(title))continue;
   if(CODES.includes(code))active.add(code);
  }
+ // Cyclone warning bulletins are different products from forecast GML.
+ // Inspect only the SAME timestamp-verified current list, not navigation,
+ // aviation bulletins, tropical cyclone outlooks or historical CAP entries.
+ const cycloneRows=new Map();
+ let cycloneUncertain=false;
+ for(const m of body.matchAll(/<a\s+[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)){
+  const title=m[2].replace(/<[^>]*>/g," ").replace(/&(?:nbsp|amp);/gi," ").replace(/\s+/g," ").trim();
+  if(/\b(?:cancellation|cancelled|canceled|final)\b/i.test(title))continue;
+  let url;
+  try{url=new URL(m[1],QLD_WARNING_INDEX_URL);}catch{continue;}
+  const named=/^(?:queensland\s+)?(?:tropical\s+)?cyclone\s+(?:advice|watch|warning)\b/i.test(title)||
+   /^(?:watch|warning|advice)\s+(?:for|of)\s+(?:a\s+)?tropical\s+cyclone\b/i.test(title);
+  const typed=/^\/warning\/(?:tropical-)?cyclone-(?:advice|watch|warning)\//i.test(url.pathname);
+  if(!named&&!typed)continue;
+  if(!["www.bom.gov.au","bom.gov.au"].includes(url.hostname)||!["http:","https:"].includes(url.protocol)||!title){
+   cycloneUncertain=true;continue;
+  }
+  url.protocol="https:";url.hash="";
+  cycloneRows.set(url.href,{headline:title.slice(0,240),url:url.href});
+ }
+ const cycloneWarnings={status:cycloneRows.size?"active":cycloneUncertain?"unavailable":"no-active",
+  checkedUtc:new Date(dateMs).toISOString(),headlines:[...cycloneRows.values()]};
  // All-clear is asserted only against THIS verified current-product listing,
  // never merely from the absence of a matching item in truncated WMO RSS.
  return {source:"Official BoM Queensland current warnings summary",
    checkedUtc:new Date(dateMs).toISOString(),
-   activeCodes:[...active],verified:true};
+   activeCodes:[...active],verified:true,cycloneWarnings};
 }
 export async function fetchCurrentQldBoMWarningsIndex({fetchImpl=fetch,nowMs=Date.now(),force=false}={}){
  const response=await fetchImpl(QLD_WARNING_INDEX_URL,{
