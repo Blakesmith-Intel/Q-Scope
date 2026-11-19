@@ -549,6 +549,9 @@ jobs:
             road_js="$(curl -fsSL --max-time 20 "$base/src/context-layers/road-closure-lga-explorer-v1.js$suffix" || true)"
             if grep -Fq 'id="roadLgaGrouping"' <<< "$road_html" &&
                grep -Fq 'id="roadTypeGrouping"' <<< "$road_html" &&
+               grep -Fq 'id="roadLgaSort"' <<< "$road_html" &&
+               grep -Fq 'id="roadTypeSort"' <<< "$road_html" &&
+               grep -Fq 'sortRoadReportGroups(searchRoadCouncilGroups' <<< "$road_js" &&
                grep -Fq 'qscope-road-tabs' <<< "$road_html" &&
                grep -Fq 'groupRoadClosureItemsByHazard(group.items)' <<< "$road_js"; then
               roads_published=1
