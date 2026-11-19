@@ -9,7 +9,7 @@ import {WIND_OBSERVATION_RELAY} from "./context-layers/qscope-bom-wind-observati
 import {WIND_OBS_REFRESH_MS} from "./context-layers/qscope-bom-wind-observation-model-v1.js";
 import {isVerifiedActiveBomWarning,isSourceMatchedOfficialWarningPolygon,officialWarningRefreshInterval,hasNewOfficialBoMWarningEdition,WARNING_EDITION_POLL_MS,WARNING_EDITION_RETRY_MS} from "./context-layers/bom-warning-operational-v1.js";
 import {validateInternalCycloneSnapshot} from "./internal-cyclone-feed-v1.js";
-import {summarisePower,summariseRoads,summariseFloods,summariseRain,summariseWind,formatCountdown} from "./qscope-wallboard-model-v1.js?v=20261120-v1";
+import {summarisePower,summariseRoads,summariseFloods,wallboardFloodHealth,summariseRain,summariseWind,formatCountdown} from "./qscope-wallboard-model-v1.js?v=20261120-flood-status-v4";
 
 const relay="https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev";
 const $=id=>document.getElementById(id),now=()=>Date.now(),fmt=n=>Number(n).toLocaleString("en-AU");
@@ -155,11 +155,8 @@ function renderFlood(){
  pie("floodPie","floodLegend",s.rows);
  set("floodTotal",fmt(s.notable)+" current flood signals · "+fmt(s.crossings)+" crossings reached"+(s.staleSignals?" · "+fmt(s.staleSignals)+" stale signals":""));
  const cov=floodLayer.crossingCoverage;
- const issue=floodStatus?.kind==="error"?"Latest check failed; retained observations are not a current all-clear":
-  floodStatus?.partial?"Partial BoM coverage":
-  cov?.pending?"Crossing / rise references incomplete":
-  floodStatus?.screeningIncomplete?"Rise checks incomplete":"BoM observations · screening only";
- health("floodStatus",floodStatus?.kind==="error"?"error":floodStatus?.partial||cov?.pending||floodStatus?.screeningIncomplete?"warning":"ok",issue,floodLayer.lastLoadedAt);
+ const state=wallboardFloodHealth(floodStatus??{},cov??{},s);
+ health("floodStatus",state.kind,state.message,floodLayer.lastLoadedAt);
 }
 floodLayer=createRiverGaugeLayer({onUpdate:()=>renderFlood(),onStatus:s=>{if(s.kind!=="loading"){floodStatus=s;renderFlood();}}});
 async function getCrossings(){
@@ -172,6 +169,7 @@ async function getCrossings(){
 }
 task("flood",DEFAULT_RIVER_GAUGE_REFRESH_MS,["floodStatus"],async()=>{
  // Same existing flood engine, history budget and persistent station caches.
+ floodLayer.enableBackgroundHistoryChecks();
  await Promise.all([floodLayer.refresh(),getCrossings()]);renderFlood();
 },()=>{if(!floodLayer.lastLoadedAt){pie("floodPie","floodLegend",[]);set("floodTotal","No verified flood data");}health("floodStatus","error","BoM river observations unavailable",floodLayer.lastLoadedAt);});
 
@@ -246,7 +244,7 @@ function renderCyclones(){
   health("cycloneStatus","error","BoM warning status unavailable");return;
  }
  if(cycloneState.status==="no-active"){
-  rows.replaceChildren(el("div","No current warnings","empty"));
+  rows.replaceChildren(el("div","No current warnings","cyclone-clear"));
   health("cycloneStatus","ok","BoM",cycloneCheckedAt);return;
  }
  const notices=cycloneState.headlines.map(w=>{
