@@ -574,7 +574,9 @@ jobs:
             if [[ "$(grep -o 'class="panel"' <<< "$board_html" | wc -l)" -eq 8 ]] &&
                grep -Fq 'Next refresh' <<< "$board_js" &&
                grep -Fq 'formatCountdown(t.next,at)' <<< "$board_js" &&
-               grep -Fq '.countdown' <<< "$board_css"; then
+               grep -Fq '.countdown' <<< "$board_css" &&
+               grep -Fq 'id="qscopeMapView" class="view-switch" href="./"' <<< "$board_html" &&
+               grep -Fq 'id="qscopeDashboardView" href="./dashboard.html" target="_top"' <<< "$(curl -fsSL --max-time 20 "$base/live3d-operational-v9.html$suffix" || true)"; then
               board_published=1
               break
             fi
