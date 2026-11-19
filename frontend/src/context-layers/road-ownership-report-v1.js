@@ -54,13 +54,46 @@ export function groupRoadClosureItemsByHazard(items){
  return [...groups.values()].sort((a,b)=>b.items.length-a.items.length||
    a.name.localeCompare(b.name,"en-AU"));
 }
+// Sorting never mutates the source or changes event eligibility. Count unique
+// official event IDs and use the exact same hazard keys as the report grouping.
+const roadSortCompare=(a,b)=>String(a??"").localeCompare(String(b??""),"en-AU",{numeric:true,sensitivity:"base"});
+function roadItemCount(items){return new Set((items??[]).map(i=>String(i?.id??"").trim()).filter(Boolean)).size;}
+export function sortRoadReportGroups(groups,mode){
+ const copy=[...groups];
+ if(!["closures-asc","closures-desc","hazards-asc","hazards-desc","name-asc","name-desc"].includes(mode))return copy;
+ const direction=mode.endsWith("-desc")?-1:1;
+ const ranked=copy.map(g=>({g,count:roadItemCount(g.items),hazards:groupRoadClosureItemsByHazard(g.items).length}));
+ return ranked.sort((a,b)=>{
+   const names=roadSortCompare(a.g.name,b.g.name);
+   const primary=mode.startsWith("closures")?a.count-b.count:mode.startsWith("hazards")?a.hazards-b.hazards:names;
+   return direction*primary||names||roadSortCompare(a.g.key,b.g.key);
+ }).map(x=>x.g);
+}
+export function sortRoadReportItems(items,mode){
+ const copy=[...items];
+ if(!["name-asc","name-desc","hazards-asc","hazards-desc"].includes(mode))return copy;
+ const direction=mode.endsWith("-desc")?-1:1;
+ const byHazard=mode.startsWith("hazards");
+ const label=i=>groupRoadClosureItemsByHazard([i])[0]?.name??"Cause not supplied";
+ const ranked=copy.map(i=>({i,hazard:byHazard?label(i):""}));
+ return ranked.sort((a,b)=>{
+   const names=roadSortCompare(a.i.summary?.roadName,b.i.summary?.roadName);
+   return direction*(byHazard?roadSortCompare(a.hazard,b.hazard):names)||names||roadSortCompare(a.i.id,b.i.id);
+ }).map(x=>x.i);
+}
+export function roadReportGroupCountLabel(group,mode){
+ const n=roadItemCount(group.items),count=n+" closure"+(n===1?"":"s");
+ if(!mode?.startsWith("hazards"))return count;
+ const h=groupRoadClosureItemsByHazard(group.items).length;
+ return count+" · "+h+" hazard type"+(h===1?"":"s");
+}
 export function createRoadOwnershipReport({CesiumRef,mapCamera,councilDialog,
   refresh=()=>Promise.resolve(),getLoadedAt=()=>0,onReturn=()=>{}}={}){
  const dialog=$("roadTypeReport"),trigger=$("openRoadTypeReport"),
    close=$("closeRoadTypeReport"),back=$("backRoadTypeReport"),
    reload=$("refreshRoadTypeReport"),search=$("roadTypeSearch"),
    summary=$("roadTypeSummary"),status=$("roadTypeStatus"),results=$("roadTypeResults"),
-   grouping=$("roadTypeGrouping");
+   grouping=$("roadTypeGrouping"),sort=$("roadTypeSort");
  if(![dialog,trigger,close,back,reload,search,summary,status,results].every(Boolean))
    return {updateFeatures(){},updateStatus(){},destroy(){}};
  let features=[],snapshot=null,lastAt=0,loading=null,destroyed=false;
@@ -86,17 +119,21 @@ export function createRoadOwnershipReport({CesiumRef,mapCamera,councilDialog,
    const counts=HEADINGS.map(([id])=>groups[id].length);
    summary.textContent=counts[0]+" state-controlled / highways · "+
      counts[1]+" local government · "+counts[2]+" unverified";
-   const q=search.value.trim();
-   for(const [key,heading] of HEADINGS){
+   const q=search.value.trim(),mode=sort?.value??"default";
+   const ownershipGroups=HEADINGS.map(([key,name])=>{
+     const councils=searchRoadCouncilGroups(groupRoadClosuresByLga(groups[key]),q);
+     return {key,name,councils,items:councils.flatMap(g=>g.items)};
+   });
+   for(const owner of sortRoadReportGroups(ownershipGroups,mode)){
+     const {key,name:heading,councils}=owner;
      const section=item("details","outage-suburb outage-council");
      section.open=true;
-     const councils=searchRoadCouncilGroups(groupRoadClosuresByLga(groups[key]),q);
-     const sections=grouping?.value==="hazard"?
-       groupRoadClosureItemsByHazard(councils.flatMap(g=>g.items)):councils;
+     const sections=sortRoadReportGroups(grouping?.value==="hazard"?
+       groupRoadClosureItemsByHazard(owner.items):councils,mode);
      const total=sections.reduce((n,g)=>n+g.items.length,0);
      const header=item("summary","outage-suburb-title");
      header.append(item("span","outage-suburb-name",heading),
-       item("span","outage-suburb-count",total+" closure"+(total===1?"":"s")));
+       item("span","outage-suburb-count",roadReportGroupCountLabel(owner,mode)));
      section.append(header);
      if(!total)section.append(item("p","outage-empty",q?"No matches in this section.":"No qualifying closures."));
      for(const council of sections){
@@ -104,10 +141,10 @@ export function createRoadOwnershipReport({CesiumRef,mapCamera,councilDialog,
        sub.open=false;
        const subHead=item("summary","outage-suburb-title");
        subHead.append(item("span","outage-suburb-name",council.name),
-         item("span","outage-suburb-count",council.items.length));
+         item("span","outage-suburb-count",roadReportGroupCountLabel(council,mode)));
        sub.append(subHead);
        const body=item("div","road-closure-list");
-       for(const {summary:s,location} of council.items){
+       for(const {summary:s,location} of sortRoadReportItems(council.items,mode)){
          const row=item("div","road-closure-item");
          const btn=item("button","outage-row-locate",s.roadName||"Unnamed road");
          btn.type="button";btn.disabled=!Array.isArray(location);
@@ -164,15 +201,20 @@ export function createRoadOwnershipReport({CesiumRef,mapCamera,councilDialog,
  const open=()=>{
    const councilSearch=$("roadLgaSearch"),councilGrouping=$("roadLgaGrouping");
    if(councilSearch)search.value=councilSearch.value;
+   if(sort&&$("roadLgaSort"))sort.value=$("roadLgaSort").value;
    if(grouping&&councilGrouping)grouping.value=councilGrouping.value==="hazard"?"hazard":"council";
    if(councilDialog?.open)councilDialog.close();
    if(!dialog.open)dialog.showModal();
    render();void load();search.focus();
  };
- const dismiss=()=>dialog.close();
+ const dismiss=()=>{
+   if(sort&&$("roadLgaSort"))$("roadLgaSort").value=sort.value;
+   dialog.close();
+ };
  const returnToCouncil=()=>{
    const councilSearch=$("roadLgaSearch"),councilGrouping=$("roadLgaGrouping");
    if(councilSearch)councilSearch.value=search.value;
+   if(sort&&$("roadLgaSort"))$("roadLgaSort").value=sort.value;
    if(councilGrouping&&grouping)councilGrouping.value=grouping.value==="hazard"?"hazard":"locality";
    dialog.close();councilDialog?.showModal();onReturn();
  };
@@ -190,6 +232,7 @@ export function createRoadOwnershipReport({CesiumRef,mapCamera,councilDialog,
  reload.addEventListener("click",doRefresh);
  search.addEventListener("input",render);
  grouping?.addEventListener("change",render);
+ sort?.addEventListener("change",render);
  return {updateFeatures(next){features=Array.isArray(next)?next.slice():[];render();},
    updateStatus(next){
      if(next?.kind==="error"&&/source expired|old closure markers removed/i.test(next.message??""))
@@ -201,6 +244,7 @@ export function createRoadOwnershipReport({CesiumRef,mapCamera,councilDialog,
      reload.removeEventListener("click",doRefresh);
      search.removeEventListener("input",render);
      grouping?.removeEventListener("change",render);
+     sort?.removeEventListener("change",render);
      if(dialog.open)dialog.close();
    }};
 }
