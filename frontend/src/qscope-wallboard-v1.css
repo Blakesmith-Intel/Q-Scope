@@ -2,3 +2,13 @@
 .tile[data-active="false"]{background:#173442;border-color:#396475}.tile[data-active="true"]{background:#624522;border-color:#ffd16b}
 
 .view-switch{display:inline-flex;align-items:center;justify-content:center;flex:none;white-space:nowrap;min-height:36px;padding:.55em .9em;border:1px solid #40a7ae;border-radius:6px;background:#0a3948;color:#ddfffc;text-decoration:none;font-size:.85em;font-weight:700;line-height:1.2}.view-switch:hover,.view-switch:focus-visible{background:#145563;outline:2px solid #75eee2;outline-offset:2px}.mast .view-switch{margin-left:auto}.mast .clock{margin-left:0}@media(max-width:610px){.mast .view-switch{margin-left:auto;min-height:36px}.mast .clock{margin-left:0}.mast .identity{flex:1 1 auto}.mast .headtitle{order:3}}
+
+/* Approved wallboard visual polish: local vector artwork, no external assets. */
+.mast .qld{width:clamp(35px,3.6vw,72px);height:clamp(45px,6.5vh,84px);color:#eef9fb;filter:drop-shadow(0 1px 5px #44d9d42b)}
+.panel{border-color:#3a8c99;box-shadow:0 3px 17px #0005,inset 0 0 0 1px #42c8cf0a}
+.panel h2{min-height:3.3em;gap:.65em;background:linear-gradient(115deg,#0a4c5a,#0a293a 85%);border-bottom-color:#3d7988}
+.panel h2 .panel-icon{width:2.4em;height:2.4em;flex:0 0 2.4em;padding-right:.35em;box-sizing:content-box;border-right:1px solid #44bbc585;color:#e4f9fc}
+.panel h2 .panel-icon:where(svg){overflow:visible}
+#cycloneRows .cyclone-clear{color:#d8fffa;background:#0a414d;border:1px solid #319b9f;border-radius:7px;padding:1.1em .5em;font-weight:750;font-size:1.15em;text-align:center}
+#cycloneRows .cyclone-clear::before{content:"✓";margin-right:.5em;color:#35dfd0}
+@media(max-width:610px){.mast .qld{width:34px;height:45px}.panel h2 .panel-icon{width:2.1em;height:2.1em;flex-basis:2.1em}}
