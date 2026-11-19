@@ -3,7 +3,7 @@ import {readFileSync} from "node:fs";
 import {parseOperationalRoadReport,parseStateHighwaysReport,
  buildRoadOwnershipSnapshot,ROAD_OWNERSHIP_SCHEMA}
  from "../../relay/road-ownership-reports-v1.js";
-import {roadOwnershipClass,groupedRoadOwnershipFeatures,groupRoadClosureItemsByHazard}
+import {roadOwnershipClass,groupedRoadOwnershipFeatures,groupRoadClosureItemsByHazard,sortRoadReportGroups,sortRoadReportItems,roadReportGroupCountLabel}
  from "../src/context-layers/road-ownership-report-v1.js";
 import {filterFloodRoadClosures} from "../src/context-layers/flood-road-closure-filter-v1.js";
 
@@ -96,23 +96,52 @@ const candidates=[
 assert.equal(filterFloodRoadClosures({features:candidates}).features.length,candidates.length);
 assert.equal(filterFloodRoadClosures({features:candidates.map(f=>({...f,properties:{...f.properties,
  impact:{impact_type:"Closures",impact_subtype:"Lane closed"}}}))}).features.length,0);
+// Sorting is applied to already-filtered results, not source data, and
+// uses distinct official event IDs and distinct structured hazard keys.
+const sampleRows=[
+ {id:"1",summary:{roadName:"Z Road",eventType:"Hazard",eventSubtype:"Fire"}},
+ {id:"2",summary:{roadName:"A Road",eventType:"Hazard",eventSubtype:"Fire"}},
+ {id:"3",summary:{roadName:"B Road",eventType:"Flooding",eventSubtype:"Flash flooding"}},
+ {id:"4",summary:{roadName:"C Road",eventType:"Hazard",eventSubtype:"Fire"}},
+];
+const sampleGroups=[
+ {key:"a",name:"Alpha",items:[sampleRows[0],sampleRows[1],sampleRows[3]]},
+ {key:"z",name:"Zulu",items:[sampleRows[0],sampleRows[2]]},
+ {key:"b",name:"Bravo",items:[sampleRows[0],sampleRows[0]]},
+];
+const names=(g,mode)=>sortRoadReportGroups(g,mode).map(x=>x.name);
+assert.deepEqual(names(sampleGroups,"closures-desc"),["Alpha","Zulu","Bravo"]);
+assert.deepEqual(names(sampleGroups,"closures-asc"),["Bravo","Zulu","Alpha"]);
+assert.deepEqual(names(sampleGroups,"hazards-desc"),["Zulu","Alpha","Bravo"]);
+assert.deepEqual(names(sampleGroups,"hazards-asc"),["Alpha","Bravo","Zulu"]);
+assert.deepEqual(names(sampleGroups,"name-asc"),["Alpha","Bravo","Zulu"]);
+assert.deepEqual(names(sampleGroups,"name-desc"),["Zulu","Bravo","Alpha"]);
+assert.deepEqual(names(sampleGroups,"default"),["Alpha","Zulu","Bravo"]);
+assert.deepEqual(sampleGroups.map(g=>g.name),["Alpha","Zulu","Bravo"]);
+assert.equal(roadReportGroupCountLabel(sampleGroups[2],"hazards-desc"),"1 closure · 1 hazard type");
+assert.deepEqual(sortRoadReportItems(sampleRows,"name-asc").map(i=>i.summary.roadName),["A Road","B Road","C Road","Z Road"]);
+assert.deepEqual(sortRoadReportItems(sampleRows,"name-desc").map(i=>i.summary.roadName),["Z Road","C Road","B Road","A Road"]);
+assert.deepEqual(sortRoadReportItems(sampleRows,"hazards-desc").map(i=>i.summary.roadName),["B Road","A Road","C Road","Z Road"]);
+assert.equal(sampleRows[0].summary.roadName,"Z Road");
 const html=readFileSync(new URL('../live3d-operational-v9.html',import.meta.url),'utf8');
 for(const id of ['openRoadTypeReport','roadTypeReport','roadTypeSearch',
  'roadTypeResults','roadTypeSummary','backRoadTypeReport','roadTypeGrouping']){
  assert(html.includes('id="'+id+'"'),'Missing report control '+id);
 }
 // Both report types must expose the same fixed control rows in the same order.
-for(const [dialogId,groupId,searchId,refreshId] of [
- ["roadLgaExplorer","roadLgaGrouping","roadLgaSearch","refreshRoadLgaExplorer"],
- ["roadTypeReport","roadTypeGrouping","roadTypeSearch","refreshRoadTypeReport"]]){
+for(const [dialogId,groupId,searchId,sortId,refreshId] of [
+ ["roadLgaExplorer","roadLgaGrouping","roadLgaSearch","roadLgaSort","refreshRoadLgaExplorer"],
+ ["roadTypeReport","roadTypeGrouping","roadTypeSearch","roadTypeSort","refreshRoadTypeReport"]]){
  const start=html.indexOf('<dialog id="'+dialogId+'"');
  const dialog=html.slice(start,html.indexOf("</dialog>",start));
  assert(dialog.includes("qscope-road-report"));
  assert(dialog.includes('aria-pressed="true" disabled'));
- const controls=["qscope-road-tabs",groupId,searchId,refreshId,"outage-explorer-feed-status","outage-explorer-count"];
+ const controls=["qscope-road-tabs",groupId,searchId,sortId,refreshId,"outage-explorer-feed-status","outage-explorer-count"];
  for(let i=1;i<controls.length;i++)
   assert(dialog.indexOf(controls[i])>dialog.indexOf(controls[i-1]),"Report control alignment: "+dialogId+" "+controls[i]);
  assert(dialog.includes('<option value="hazard">Hazard</option>'));
+ for(const value of ["default","closures-asc","closures-desc","hazards-asc","hazards-desc","name-asc","name-desc"])
+  assert(dialog.includes('<option value="'+value+'">'));
 }
 const councilSource=readFileSync(new URL('../src/context-layers/road-closure-lga-explorer-v1.js',import.meta.url),'utf8');
 assert(councilSource.includes("groupRoadClosureItemsByHazard(group.items)"));
@@ -121,6 +150,10 @@ const ownerSource=readFileSync(new URL('../src/context-layers/road-ownership-rep
 assert(ownerSource.includes("search.value=councilSearch.value"));
 assert(ownerSource.includes("councilSearch.value=search.value"));
 assert(ownerSource.includes("onReturn();"));
+assert(councilSource.includes("sortRoadReportGroups(searchRoadCouncilGroups"));
+assert(ownerSource.includes("sortRoadReportGroups(ownershipGroups,mode)"));
+assert(ownerSource.includes('sort.value=$("roadLgaSort").value'));
+assert(ownerSource.includes('$("roadLgaSort").value=sort.value'));
 const build=readFileSync(new URL('../../scripts/build-current-site.sh',import.meta.url),'utf8');
 assert(build.includes('"road-ownership-report-v1.js"'));
 assert(build.includes('road-ownership-report-20261027-v1'));

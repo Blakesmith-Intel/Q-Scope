@@ -1,7 +1,7 @@
 import {formatIncidentRefreshTime} from "./incident-refreshed-time-v1.js?v=20261017-refresh-v1";
 import {groupRoadClosuresByLga,searchRoadCouncilGroups} from "./road-closure-lga-model-v1.js?v=roads-lga-20261017-v1";
 import {roadOfficialUrl} from "./official-source-links-v1.js?v=9.13.2";
-import {createRoadOwnershipReport,groupRoadClosureItemsByHazard} from "./road-ownership-report-v1.js?v=road-ownership-report-20261027-v1";
+import {createRoadOwnershipReport,groupRoadClosureItemsByHazard,sortRoadReportGroups,sortRoadReportItems,roadReportGroupCountLabel} from "./road-ownership-report-v1.js?v=road-ownership-report-20261027-v1";
 export function createRoadClosureLgaExplorer({
  viewer,CesiumRef,mapCamera,refresh=()=>Promise.resolve(),getLoadedAt=()=>0,formatTime=()=>"",
 }={}){
@@ -10,7 +10,7 @@ export function createRoadClosureLgaExplorer({
   closeButton=$("closeRoadLgaExplorer"),input=$("roadLgaSearch"),
   list=$("roadLgaResults"),counter=$("roadLgaSummary"),
   status=$("roadLgaFeedStatus"),refreshButton=$("refreshRoadLgaExplorer"),
-  grouping=$("roadLgaGrouping");
+  grouping=$("roadLgaGrouping"),sort=$("roadLgaSort");
  if(![dialog,openButton,closeButton,input,list,counter,status,refreshButton].every(Boolean))
   throw Error("Road closure LGA explorer controls missing");
  const make=(tag,cls,label)=>{
@@ -68,7 +68,8 @@ export function createRoadClosureLgaExplorer({
  function render(){
   if(!dialog.open||destroyed)return;
   list.replaceChildren();
-  const matching=searchRoadCouncilGroups(groups,input.value);
+  const mode=sort?.value??"default";
+  const matching=sortRoadReportGroups(searchRoadCouncilGroups(groups,input.value),mode);
   counter.textContent=loaded
    ?`${matching.length} council areas · ${new Set(matching.flatMap(g=>g.items.map(i=>i.id))).size} distinct closures`
    :"Waiting for road closure information";
@@ -82,10 +83,10 @@ export function createRoadClosureLgaExplorer({
     parent.addEventListener("toggle",()=>parent.open?openKeys.add("c:"+group.key):openKeys.delete("c:"+group.key));
     const header=make("summary","outage-suburb-title");
     header.append(make("span","outage-suburb-name",group.name),
-      make("span","outage-suburb-count",`${group.items.length} closure${group.items.length===1?"":"s"}`));
+      make("span","outage-suburb-count",roadReportGroupCountLabel(group,mode)));
     parent.append(header);
     const inner=make("div","outage-suburb-inner outage-lga-inner");
-    const sections=grouping?.value==="hazard"?groupRoadClosureItemsByHazard(group.items):group.suburbs;
+    const sections=sortRoadReportGroups(grouping?.value==="hazard"?groupRoadClosureItemsByHazard(group.items):group.suburbs,mode);
     for(const suburb of sections){
       const section=make("details","outage-suburb outage-locality");
       const subKey="s:"+(grouping?.value??"locality")+":"+group.key+":"+suburb.key;
@@ -94,10 +95,10 @@ export function createRoadClosureLgaExplorer({
         openKeys.add(subKey):openKeys.delete(subKey));
       const name=make("summary","outage-suburb-title");
       name.append(make("span","outage-suburb-name",suburb.name),
-        make("span","outage-suburb-count",String(suburb.items.length)));
+        make("span","outage-suburb-count",roadReportGroupCountLabel(suburb,mode)));
       section.append(name);
       const content=make("div","road-closure-list");
-      for(const item of suburb.items){
+      for(const item of sortRoadReportItems(suburb.items,mode)){
         const {summary:s,location}=item;
         const wrap=make("div","road-closure-item");
         const button=make("button","outage-row-locate",s.roadName||"Unnamed road");
@@ -158,6 +159,7 @@ export function createRoadClosureLgaExplorer({
  closeButton.addEventListener("click",close);
  input.addEventListener("input",search);
  grouping?.addEventListener("change",search);
+ sort?.addEventListener("change",search);
  refreshButton.addEventListener("click",reload);
  updateSourceRefreshLabel();
  updateSidebarCount();
@@ -167,6 +169,7 @@ export function createRoadClosureLgaExplorer({
   closeButton.removeEventListener("click",close);
   input.removeEventListener("input",search);
   grouping?.removeEventListener("change",search);
+  sort?.removeEventListener("change",search);
   refreshButton.removeEventListener("click",reload);
   if(dialog.open)dialog.close();
  }};

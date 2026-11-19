@@ -390,6 +390,19 @@
         <input id="roadLgaSearch" type="search" autocomplete="off" placeholder="Council, road or hazard">
       </label>
     </div>
+    <div class="qscope-road-filters qscope-road-sort">
+      <label for="roadLgaSort">Sort by
+        <select id="roadLgaSort" aria-label="Sort road closures">
+          <option value="default">Default order</option>
+          <option value="closures-desc">Closure count · high to low</option>
+          <option value="closures-asc">Closure count · low to high</option>
+          <option value="hazards-desc">Hazard types · most to fewest</option>
+          <option value="hazards-asc">Hazard types · fewest to most</option>
+          <option value="name-asc">Alphabetical · A–Z</option>
+          <option value="name-desc">Alphabetical · Z–A</option>
+        </select>
+      </label>
+    </div>
     <div class="qscope-road-clock"><button id="refreshRoadLgaExplorer" type="button">Refresh</button></div>
   </div>
   <p id="roadLgaFeedStatus" class="outage-explorer-feed-status" role="status">Waiting for live closures…</p>
@@ -407,6 +420,7 @@
 #roadTypeReport .outage-explorer-results,#roadLgaExplorer .outage-explorer-results{overflow:auto;min-height:0;flex:1;}
 .qscope-road-report .qscope-road-toolbar{display:grid!important;grid-template-columns:minmax(0,1fr);gap:8px;align-items:stretch;flex:none;}
 .qscope-road-report .qscope-road-tabs,.qscope-road-report .qscope-road-filters{display:grid;gap:8px;grid-template-columns:repeat(2,minmax(0,1fr));align-items:end;}
+.qscope-road-report .qscope-road-sort{grid-template-columns:minmax(0,1fr);}
 .qscope-road-report .qscope-road-tabs button{width:100%;min-height:36px;margin:0;}
 .qscope-road-report .qscope-road-tabs button[aria-pressed=true]{opacity:1;background:#36596d;color:#fff;border:1px solid #a2d0e4;}
 .qscope-road-report .qscope-road-filters label{display:flex;flex-direction:column;gap:4px;min-width:0;margin:0;}
@@ -435,6 +449,19 @@
       </label>
       <label for="roadTypeSearch">Search closures
         <input id="roadTypeSearch" type="search" autocomplete="off" placeholder="Council, road or hazard">
+      </label>
+    </div>
+    <div class="qscope-road-filters qscope-road-sort">
+      <label for="roadTypeSort">Sort by
+        <select id="roadTypeSort" aria-label="Sort road closures">
+          <option value="default">Default order</option>
+          <option value="closures-desc">Closure count · high to low</option>
+          <option value="closures-asc">Closure count · low to high</option>
+          <option value="hazards-desc">Hazard types · most to fewest</option>
+          <option value="hazards-asc">Hazard types · fewest to most</option>
+          <option value="name-asc">Alphabetical · A–Z</option>
+          <option value="name-desc">Alphabetical · Z–A</option>
+        </select>
       </label>
     </div>
     <div class="qscope-road-clock"><button id="refreshRoadTypeReport" type="button">Refresh</button></div>
