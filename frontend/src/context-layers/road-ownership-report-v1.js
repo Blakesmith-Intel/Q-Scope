@@ -55,7 +55,7 @@ export function groupRoadClosureItemsByHazard(items){
    a.name.localeCompare(b.name,"en-AU"));
 }
 export function createRoadOwnershipReport({CesiumRef,mapCamera,councilDialog,
-  refresh=()=>Promise.resolve(),getLoadedAt=()=>0}={}){
+  refresh=()=>Promise.resolve(),getLoadedAt=()=>0,onReturn=()=>{}}={}){
  const dialog=$("roadTypeReport"),trigger=$("openRoadTypeReport"),
    close=$("closeRoadTypeReport"),back=$("backRoadTypeReport"),
    reload=$("refreshRoadTypeReport"),search=$("roadTypeSearch"),
@@ -162,13 +162,19 @@ export function createRoadOwnershipReport({CesiumRef,mapCamera,councilDialog,
    return loading;
  }
  const open=()=>{
+   const councilSearch=$("roadLgaSearch"),councilGrouping=$("roadLgaGrouping");
+   if(councilSearch)search.value=councilSearch.value;
+   if(grouping&&councilGrouping)grouping.value=councilGrouping.value==="hazard"?"hazard":"council";
    if(councilDialog?.open)councilDialog.close();
    if(!dialog.open)dialog.showModal();
    render();void load();search.focus();
  };
  const dismiss=()=>dialog.close();
  const returnToCouncil=()=>{
-   dialog.close();councilDialog?.showModal();
+   const councilSearch=$("roadLgaSearch"),councilGrouping=$("roadLgaGrouping");
+   if(councilSearch)councilSearch.value=search.value;
+   if(councilGrouping&&grouping)councilGrouping.value=grouping.value==="hazard"?"hazard":"locality";
+   dialog.close();councilDialog?.showModal();onReturn();
  };
  const doRefresh=async()=>{
    reload.disabled=true;
