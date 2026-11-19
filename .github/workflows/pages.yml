@@ -477,6 +477,9 @@ jobs:
           sha256sum -c /tmp/st-frozen-root-before.sha256
           test -s _site/preview/radar-refresh-review/BUILD.txt
 
+      - name: Package and verify Q-SCOPE operations wallboard
+        run: python scripts/package-qscope-wallboard-v1.py
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
@@ -562,6 +565,23 @@ jobs:
           done
           test "$roads_published" -eq 1
           echo "PUBLIC Q-SCOPE COUNCIL AND ROAD TYPE HAZARD REPORTS VERIFIED"
+          board_published=0
+          for attempt in $(seq 1 10); do
+            suffix="?release=$GITHUB_SHA&board=$attempt"
+            board_html="$(curl -fsSL --max-time 20 "$base/dashboard.html$suffix" || true)"
+            board_js="$(curl -fsSL --max-time 20 "$base/src/qscope-wallboard-v1.js$suffix" || true)"
+            board_css="$(curl -fsSL --max-time 20 "$base/src/qscope-wallboard-v1.css$suffix" || true)"
+            if [[ "$(grep -o 'class="panel"' <<< "$board_html" | wc -l)" -eq 8 ]] &&
+               grep -Fq 'Next refresh' <<< "$board_js" &&
+               grep -Fq 'formatCountdown(t.next,at)' <<< "$board_js" &&
+               grep -Fq '.countdown' <<< "$board_css"; then
+              board_published=1
+              break
+            fi
+            sleep 5
+          done
+          test "$board_published" -eq 1
+          echo "PUBLIC Q-SCOPE EIGHT-PANEL WALLBOARD AND REFRESH CLOCKS VERIFIED"
           # GitHub Pages publication can briefly serve the previous CDN copy.
           # Confirm all three actual published flood-legend assets before
           # accepting the release; do not weaken any existing historic QA.
