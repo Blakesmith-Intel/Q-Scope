@@ -23,11 +23,14 @@ const statusMap=new Map();
 for(const id of statusIds){
  const footer=$(id),health=el("span",footer.textContent,"health"),timer=el("span",null,"countdown");
  const value=el("b","—");timer.append(el("small",id==="warningStatus"?"Next check":"Next refresh"),value);
- footer.replaceChildren(health,timer);statusMap.set(id,{health,timer:value,footer});
+ const detail=id==="warningStatus"?el("small","Full update —"):null;
+ if(detail)timer.append(detail);
+ footer.replaceChildren(health,timer);statusMap.set(id,{health,timer:value,footer,detail,last:0});
 }
 function health(id,kind,message,at=0){
  const x=statusMap.get(id);x.health.dataset.kind=kind;
- x.health.textContent=message+(at?" · checked "+stamp(at):"");
+ if(at&&kind!=="error")x.last=at;
+ x.health.textContent=message+(x.last?" · "+(kind==="error"?"last successful ":"checked ")+stamp(x.last):"");
  x.footer.closest(".panel").dataset.stale=String(kind==="error");
 }
 function metrics(id,rows){$(id).replaceChildren(...rows.map(([k,v])=>{const d=el("div");d.append(el("span",k),el("b",v));return d;}));}
@@ -64,7 +67,11 @@ function tick(){
  set("boardDate",new Date(at).toLocaleDateString("en-AU",{timeZone:"Australia/Brisbane",weekday:"short",day:"numeric",month:"short",year:"numeric"})+" AEST");
  for(const t of tasks){
   if(!document.hidden&&!t.busy&&at>=t.next)void execute(t);
-  for(const id of t.ids)statusMap.get(id).timer.textContent=t.busy?"Updating…":formatCountdown(t.next,at);
+  for(const id of t.ids){
+   const display=statusMap.get(id);
+   display.timer.textContent=t.busy?"Updating…":document.hidden?"Paused":formatCountdown(t.next,at);
+   if(display.detail)display.detail.textContent="Full update "+(fullDue?formatCountdown(fullDue,at):"—");
+  }
  }
 }
 function clearPower(){set("powerTotal","—");set("powerEvents","");bars("powerRows",[]);}
