@@ -295,7 +295,7 @@ for relative,needles in chains.items():
             needle in ("flood-road-closures-operational-v1.js?v=",
                        "road-closure-lga-explorer-v1.js?v=",
                        "road-ownership-report-v1.js?v="))
-        version=cache_suffix+("-road-hazard-report-20261120-v1-consistent-controls-v2" if road_report_revision else "")
+        version=cache_suffix+("-road-hazard-report-20261120-v1-consistent-controls-v2-sort-v3" if road_report_revision else "")
         data=data.replace(needle,needle+version,expected)
     file.write_text(data,encoding="utf-8")
 
