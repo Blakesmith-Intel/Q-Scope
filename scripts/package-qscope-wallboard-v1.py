@@ -44,5 +44,25 @@ assert not any(x in html for x in ("<button","<select","<input","<iframe"))
 # Verify the published module graph using the same files the browser imports.
 subprocess.run(["node","--experimental-default-type=module","--input-type=module","-e",
 'import {formatCountdown,summariseRoads,summariseRain,summariseWind,summariseFloods} from "./_site/src/qscope-wallboard-model-v1.js"; if(formatCountdown(61000,0)!=="01:01")throw Error("countdown"); if(summariseRoads([],null).total!==0)throw Error("road count"); if(summariseFloods([],[],null).total!==0)throw Error("flood count"); if(summariseWind([]).total!==0)throw Error("wind count"); const r=summariseRain({observations:{since9am:[],last24Hours:[]}},{}); if(r.total||r.notable)throw Error("rain count");'],check=True)
+# Import the real browser module, including all its transitive dependencies,
+# with a minimal inert DOM. Hidden startup must create all eight clocks
+# without issuing a fetch or requiring Cesium, WebGL, or the operational map.
+subprocess.run(["node","--experimental-default-type=module","--input-type=module","-e",'''
+import assert from "node:assert/strict";
+const nodes=new Map();
+const create=()=>({textContent:"",dataset:{},style:{},children:[],append(...x){this.children.push(...x);},replaceChildren(...x){this.children=x;},closest(){return this;}});
+globalThis.document={hidden:true,createElement:create,getElementById(id){if(!nodes.has(id))nodes.set(id,create());return nodes.get(id);},addEventListener(){}};
+globalThis.window={addEventListener(){}};
+Object.defineProperty(globalThis,"localStorage",{value:{getItem(){return null;},setItem(){}},configurable:true});
+globalThis.fetch=()=>{throw Error("Wallboard must not fetch while hidden");};
+globalThis.setInterval=()=>1;
+await import("./_site/src/qscope-wallboard-v1.js");
+for(const id of ["powerStatus","warningStatus","cycloneStatus","windStatus","floodStatus","rainStatus","aepStatus","roadStatus"]){
+ const f=nodes.get(id);
+ assert.equal(f.children.length,2,id);
+ assert.equal(f.children[1].children[1].textContent,"—",id);
+}
+console.log("PASS wallboard browser module starts headlessly with eight integrated countdowns");
+'''],check=True)
 with (site/"BUILD.txt").open("a") as f:
     f.write("\nQ-SCOPE OPERATIONS WALLBOARD V1 2026-11-20: eight source-backed panels, independent refresh clocks, map unchanged.\n")
