@@ -344,21 +344,21 @@ export function createRiverGaugeLayer({
     () => {},
 
   storage = globalThis.localStorage,
-  now = () => Date.now(),
-  readOnly = false
+  now = () => Date.now()
 } = {}) {
   if (
-    !readOnly && (!viewer || !CesiumRef)
+    !viewer
+    || !CesiumRef
   ) {
     throw new Error(
       "River-gauge layer requires Cesium and a viewer."
     );
   }
 
-  const severityLayers=readOnly?null:createSeverityMarkerLayers({
+  const severityLayers=createSeverityMarkerLayers({
     viewer,CesiumRef,owner:"flood",priorities:[0,1,2,4,6],visible
   });
-  const dataSource=severityLayers?.dataSource??{show:false};
+  const dataSource=severityLayers.dataSource;
 
   const markerImages =
     new Map();
@@ -789,7 +789,6 @@ export function createRiverGaugeLayer({
       payload?.features
       ?? [];
 
-    if(readOnly){onUpdate(currentFeatures.slice(),diagnostics);return;}
     severityLayers.clear();
 
     const drawOrder=[...currentFeatures].sort((a,b)=>{
@@ -1050,7 +1049,6 @@ export function createRiverGaugeLayer({
   function setVisible(
     nextVisible
   ) {
-    if(readOnly)return;
     severityLayers.setVisible(nextVisible);
 
     viewer.scene
@@ -1142,7 +1140,7 @@ export function createRiverGaugeLayer({
 
   return {
     dataSource,
-    severityDataSources:severityLayers?.dataSources??[],
+    severityDataSources:severityLayers.dataSources,
     refresh,
     setCrossingCatalogue(catalogue){
       crossingCatalogue=catalogue?.schema==="StormTrackerBoMQldCrossingHeightsV1"
