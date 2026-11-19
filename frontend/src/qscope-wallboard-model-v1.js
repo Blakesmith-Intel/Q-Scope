@@ -99,3 +99,22 @@ export function formatCountdown(next,now=Date.now()){
  const seconds=Math.max(0,Math.ceil((next-now)/1000));
  return String(Math.floor(seconds/60)).padStart(2,"0")+":"+String(seconds%60).padStart(2,"0");
 }
+
+// Routine optional history and crossing checks are not a live bulletin fault.
+// Keep explicit coverage warnings when the official source is partial or stale.
+export function wallboardFloodHealth(status={},coverage={},summary={}){
+ if(status.kind==="error")return {kind:"error",message:"Latest BoM check failed · retained observations may be stale"};
+ if(status.partial)return {kind:"warning",message:"Partial data coverage · BoM height feed"};
+ const stale=Math.max(Number(status.staleOfficial)||0,Number(summary.staleSignals)||0);
+ if(stale)return {kind:"warning",message:stale+" flood signal"+(stale===1?"":"s")+" with stale observations"};
+ const meta=status.metadataCoverage;
+ if(status.metadataFallback&&meta&&Number.isFinite(meta.total)&&Number.isFinite(meta.matched)&&meta.matched<meta.total)
+  return {kind:"warning",message:"Partial data coverage · station locations "+meta.matched+"/"+meta.total};
+ const affected=Math.max(0,Number(status.historyScreeningAlertsAffected)||0);
+ if(affected)return {kind:"ok",message:"Monitoring active · "+affected+" signal"+(affected===1?"":"s")+" awaiting rise checks"};
+ if(coverage.sourceMissing||status.historySourceMissing)
+  return {kind:"warning",message:"Partial data coverage · some station references unavailable"};
+ if(coverage.pending||coverage.checking||status.screeningIncomplete)
+  return {kind:"ok",message:"Monitoring active · additional station checks underway"};
+ return {kind:"ok",message:"Monitoring active"};
+}

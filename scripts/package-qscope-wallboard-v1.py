@@ -14,6 +14,8 @@ for name in ("dashboard.html","src/qscope-wallboard-v1.css","src/qscope-wallboar
         subprocess.run(["node","--check",str(dest)],check=True)
 html=(site/"dashboard.html").read_text()
 assert html.count('class="panel"')==8
+assert html.count('class="panel-icon"')==8
+assert 'aepDropClip' in html and 'australian-states' in html
 assert 'id="qscopeMapView" class="view-switch" href="./"' in html
 # The production map lives inside the root page's iframe. Navigate the TOP
 # window, not the iframe, so switching does not leave a hidden map polling.
@@ -54,6 +56,16 @@ start=engine.index("  function setVisible(")
 end=engine.index("  function start(",start)
 engine=engine[:start]+"  function setVisible() {}\n\n"+engine[end:]
 once("severityDataSources:severityLayers.dataSources,","severityDataSources:[],")
+# The wallboard scheduler owns the 10-minute observation refresh, so
+# enable the existing bounded station-history queue separately. Do not
+# call layer.start(), which would create a second observation interval.
+once("  let timer = null;", "  let timer = null;\n  let wallboardHistoryRunning=false;")
+once("if(!timer||crossingScanTimer||!latestSourceFeatures.length)return;",
+     "if(!wallboardHistoryRunning||crossingScanTimer||!latestSourceFeatures.length)return;")
+once("      if(!timer)return;", "      if(!wallboardHistoryRunning)return;")
+once("  function stop() {", "  function stop() {\n    wallboardHistoryRunning=false;")
+once("    checkCrossingReferences:finishCrossingReferenceChecks,",
+     "    enableBackgroundHistoryChecks(){wallboardHistoryRunning=true;},\n    checkCrossingReferences:finishCrossingReferenceChecks,")
 headless=map_engine.with_name("river-gauge-wallboard-v1.js")
 headless.write_text(engine)
 assert map_engine.read_text()==original
@@ -61,7 +73,7 @@ subprocess.run(["node","--check",str(headless)],check=True)
 assert not any(x in html for x in ("<button","<select","<input","<iframe"))
 # Verify the published module graph using the same files the browser imports.
 subprocess.run(["node","--input-type=module","-e",
-'import {formatCountdown,summariseRoads,summariseRain,summariseWind,summariseFloods} from "./_site/src/qscope-wallboard-model-v1.js"; if(formatCountdown(61000,0)!=="01:01")throw Error("countdown"); if(summariseRoads([],null).total!==0)throw Error("road count"); if(summariseFloods([],[],null).total!==0)throw Error("flood count"); if(summariseWind([]).total!==0)throw Error("wind count"); const r=summariseRain({observations:{since9am:[],last24Hours:[]}},{}); if(r.total||r.notable)throw Error("rain count");'],check=True)
+'import {formatCountdown,summariseRoads,summariseRain,summariseWind,summariseFloods,wallboardFloodHealth} from "./_site/src/qscope-wallboard-model-v1.js"; if(formatCountdown(61000,0)!=="01:01")throw Error("countdown"); if(summariseRoads([],null).total!==0)throw Error("road count"); if(summariseFloods([],[],null).total!==0)throw Error("flood count"); if(summariseWind([]).total!==0)throw Error("wind count"); const r=summariseRain({observations:{since9am:[],last24Hours:[]}},{}); if(r.total||r.notable)throw Error("rain count"); if(wallboardFloodHealth({}, {pending:12},{}).kind!=="ok")throw Error("routine checks are not a source fault"); if(wallboardFloodHealth({partial:true},{},{}).kind!=="warning")throw Error("partial data"); if(wallboardFloodHealth({kind:"error"},{},{}).kind!=="error")throw Error("actual source failure"); if(wallboardFloodHealth({historyScreeningAlertsAffected:2},{},{notable:4}).message.indexOf("2 signals")<0)throw Error("active signal checks");'],check=True)
 # Exercise the actual entry module without network access. This catches named
 # import errors and proves every panel receives its own real countdown node.
 subprocess.run(["node","--input-type=module","-e",r'''
@@ -79,6 +91,8 @@ globalThis.document={hidden:true,createElement:node,addEventListener(){},
 globalThis.window={addEventListener(){}};
 Object.defineProperty(globalThis,"localStorage",{value:{getItem(){return null;},setItem(){}},configurable:true});
 const realInterval=globalThis.setInterval;
+const {createRiverGaugeLayer}=await import("./_site/src/context-layers/river-gauge-wallboard-v1.js");
+const headless=createRiverGaugeLayer();assert.equal(typeof headless.enableBackgroundHistoryChecks,"function");headless.enableBackgroundHistoryChecks();headless.stop();
 globalThis.setInterval=()=>1;
 globalThis.fetch=()=>{throw Error("Unexpected background or clock-only request");};
 await import("./_site/src/qscope-wallboard-v1.js");
