@@ -275,7 +275,7 @@ chains={
   "bom-warning-operational-v1.js?v=",
   "qscope-bom-wind-observations-operational-v1.js?v="],
  "src/context-layers/river-gauges-operational-v1.js":["river-gauge-layer-v1.js?v="],
- "src/context-layers/flood-road-closures-operational-v1.js":["flood-road-closures-v1.js?v="],
+ "src/context-layers/flood-road-closures-operational-v1.js":["flood-road-closures-v1.js?v=","road-closure-lga-explorer-v1.js?v="],
  "src/context-layers/power-outages-operational-v1.js":["power-outages-v1.js?v="],
  "src/context-layers/road-closure-lga-explorer-v1.js":["road-ownership-report-v1.js?v="]
 }
@@ -289,7 +289,14 @@ for relative,needles in chains.items():
           and needle=="flood-road-closures-v1.js?v=") else 1
         if data.count(needle)!=expected:
             raise AssertionError(f"Cache identity ambiguity {relative}: {needle} x{data.count(needle)}")
-        data=data.replace(needle,needle+cache_suffix,expected)
+        # Invalidate only the road report import path and the entry points.
+        road_report_revision=(
+            relative in ("index.html","live3d-operational-v9.html") or
+            needle in ("flood-road-closures-operational-v1.js?v=",
+                       "road-closure-lga-explorer-v1.js?v=",
+                       "road-ownership-report-v1.js?v="))
+        version=cache_suffix+("-road-hazard-report-20261120-v1" if road_report_revision else "")
+        data=data.replace(needle,needle+version,expected)
     file.write_text(data,encoding="utf-8")
 
 with (SITE/"BUILD.txt").open("a",encoding="utf-8") as log:

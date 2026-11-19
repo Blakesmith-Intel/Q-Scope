@@ -402,7 +402,13 @@
     <button id="closeRoadTypeReport" type="button">Close</button>
   </header>
   <div class="outage-explorer-toolbar">
-    <label for="roadTypeSearch">Find council, locality or road
+    <label for="roadTypeGrouping">Group by
+      <select id="roadTypeGrouping" aria-label="Group road types by council or hazard" style="max-width:100%;min-height:36px;background:#10202b;color:#ecf6fa;border:1px solid #6c94a7;border-radius:6px">
+        <option value="council">Council</option>
+        <option value="hazard">Hazard</option>
+      </select>
+    </label>
+    <label for="roadTypeSearch">Find council, locality, road or hazard
       <input id="roadTypeSearch" type="search" autocomplete="off" placeholder="Search reported closures...">
     </label>
     <button id="refreshRoadTypeReport" type="button">Refresh</button>
