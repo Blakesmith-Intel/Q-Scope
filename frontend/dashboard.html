@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Q-SCOPE | Operations wallboard</title>
+<link rel="stylesheet" href="./src/qscope-wallboard-v1.css?v=20261120-v1">
+<script type="module" src="./src/qscope-wallboard-v1.js?v=20261120-v1"></script>
+</head>
+<body>
+<header class="mast"><div class="identity"><svg class="qld" viewBox="0 0 72 80" aria-hidden="true"><path fill="currentColor" d="M23 3l7 12 1 12 10 9 8 11 10 8 8 1 1 17H5V48h12V28l4-8z"/></svg><div><b>Q-SCOPE</b><small>QUEENSLAND · WEATHER · IMPACTS · RISKS</small></div></div><div class="headtitle"><h1>QLD Situational Awareness</h1><p>OPERATIONS WALLBOARD</p></div><div class="clock"><strong id="boardClock">—</strong><small id="boardDate">AEST</small></div></header>
+<main class="board" aria-label="Queensland live situational awareness">
+<section class="panel" id="power"><h2><span aria-hidden="true">ϟ</span> Power outages</h2><div class="body"><div class="hero"><small>Unplanned customers affected</small><strong id="powerTotal">—</strong><span id="powerEvents"></span></div><div id="powerRows" class="bars"></div></div><footer id="powerStatus">Awaiting provider data</footer></section>
+<section class="panel" id="warnings"><h2><span aria-hidden="true">⚡</span> Severe weather &amp; thunderstorm warnings</h2><div class="body"><div class="tiles"><div class="tile"><strong id="thunderCount">—</strong><span>Thunderstorm products</span></div><div class="tile"><strong id="weatherCount">—</strong><span>Severe weather products</span></div></div><div id="warningRows" class="summary"></div></div><footer id="warningStatus">Awaiting official BoM warnings</footer></section>
+<section class="panel" id="cyclones"><h2><span aria-hidden="true">◉</span> Cyclone summary</h2><div class="body" id="cycloneRows"><div class="empty">Checking official cyclone source…</div></div><footer id="cycloneStatus">Awaiting BoM data</footer></section>
+<section class="panel" id="winds"><h2><span aria-hidden="true">≋</span> Wind summary</h2><div class="body"><div class="hero"><small>Highest gust today · since midnight AEST</small><strong id="windPeak">—</strong><span id="windStation"></span></div><div id="windRows" class="metrics"></div></div><footer id="windStatus">Awaiting BoM station observations</footer></section>
+<section class="panel" id="floods"><h2><span aria-hidden="true">≋</span> Flood gauges</h2><div class="body"><div class="chart"><div id="floodPie" class="pie" role="img" aria-label="Awaiting gauge data"></div><div id="floodLegend" class="legend"></div></div><div class="callout" id="floodTotal">Awaiting flood signals</div></div><footer id="floodStatus">Awaiting BoM river observations</footer></section>
+<section class="panel" id="rain"><h2><span aria-hidden="true">☂</span> Rain gauges</h2><div class="body"><div class="hero"><small>Highest measured rainfall · since 9 am AEST</small><strong id="rainPeak">—</strong><span id="rainStation"></span></div><div id="rainRows" class="metrics"></div></div><footer id="rainStatus">Awaiting BoM rainfall</footer></section>
+<section class="panel" id="aep"><h2><span aria-hidden="true">▰</span> AEP rainfall</h2><div class="body"><div class="chart"><div id="aepPie" class="pie" role="img" aria-label="Awaiting AEP data"></div><div id="aepLegend" class="legend"></div></div><div class="callout" id="aepTotal">50+ mm gauges · since 9 am AEST</div></div><footer id="aepStatus">Awaiting verified IFD references</footer></section>
+<section class="panel" id="roads"><h2><span aria-hidden="true">⫽</span> State-controlled road closures by hazard</h2><div class="body"><div class="hero compact"><small>Verified state-road events · all traffic</small><strong id="roadTotal">—</strong></div><div id="roadRows" class="bars"></div><div id="roadUnverified" class="note"></div></div><footer id="roadStatus">Awaiting QLDTraffic</footer></section>
+</main>
+<div class="bottom"><span>Official sources: BoM · QLDTraffic · electricity distributors</span><span>Live observations are provisional · follow official warnings</span></div>
+<noscript>JavaScript is required for live operational data. No current conditions are verified.</noscript>
+</body>
+</html>
