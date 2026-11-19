@@ -60,7 +60,15 @@ assert fragment.count('id="roadTypeReport"')==1
 old_button='<button id="refreshRoadLgaExplorer" type="button">Refresh</button>'
 assert document.count(old_button)==1 and document.count(ending)==1
 assert 'id="roadTypeReport"' not in document
-document=document.replace(old_button,old_button+"\n    "+button,1)
+# Replace just the two approved road report dialogs, not the dashboard.
+council_start='<dialog id="roadLgaExplorer"'
+assert source_page.count(council_start)==1 and document.count(council_start)==1
+old_start=document.index(council_start)
+old_end=document.index('</dialog>',old_start)+len('</dialog>')
+new_start=source_page.index(council_start)
+new_end=source_page.index('</dialog>',new_start)+len('</dialog>')
+assert old_button in document[old_start:old_end]
+document=document[:old_start]+source_page[new_start:new_end]+document[old_end:]
 document=document.replace(ending,fragment+ending,1)
 # Ship the new provider reporting button into the REAL pinned Pages HTML,
 # not only the mutable frontend template. All other controls remain pinned.

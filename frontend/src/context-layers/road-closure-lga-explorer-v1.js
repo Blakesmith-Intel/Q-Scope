@@ -1,7 +1,7 @@
 import {formatIncidentRefreshTime} from "./incident-refreshed-time-v1.js?v=20261017-refresh-v1";
 import {groupRoadClosuresByLga,searchRoadCouncilGroups} from "./road-closure-lga-model-v1.js?v=roads-lga-20261017-v1";
 import {roadOfficialUrl} from "./official-source-links-v1.js?v=9.13.2";
-import {createRoadOwnershipReport} from "./road-ownership-report-v1.js?v=road-ownership-report-20261027-v1";
+import {createRoadOwnershipReport,groupRoadClosureItemsByHazard} from "./road-ownership-report-v1.js?v=road-ownership-report-20261027-v1";
 export function createRoadClosureLgaExplorer({
  viewer,CesiumRef,mapCamera,refresh=()=>Promise.resolve(),getLoadedAt=()=>0,formatTime=()=>"",
 }={}){
@@ -9,7 +9,8 @@ export function createRoadClosureLgaExplorer({
  const dialog=$("roadLgaExplorer"),openButton=$("openRoadLgaExplorer"),
   closeButton=$("closeRoadLgaExplorer"),input=$("roadLgaSearch"),
   list=$("roadLgaResults"),counter=$("roadLgaSummary"),
-  status=$("roadLgaFeedStatus"),refreshButton=$("refreshRoadLgaExplorer");
+  status=$("roadLgaFeedStatus"),refreshButton=$("refreshRoadLgaExplorer"),
+  grouping=$("roadLgaGrouping");
  if(![dialog,openButton,closeButton,input,list,counter,status,refreshButton].every(Boolean))
   throw Error("Road closure LGA explorer controls missing");
  const make=(tag,cls,label)=>{
@@ -18,7 +19,7 @@ export function createRoadClosureLgaExplorer({
   if(label!==undefined)node.textContent=String(label);
   return node;
  };
- const ownershipReport=createRoadOwnershipReport({CesiumRef,mapCamera,councilDialog:dialog,refresh});
+ const ownershipReport=createRoadOwnershipReport({CesiumRef,mapCamera,councilDialog:dialog,refresh,onReturn:()=>{render();input.focus();}});
  let groups=[],feedStatus={kind:"loading",message:"Waiting for QLDTraffic…"},
    loaded=false,destroyed=false,busy=false;
  const openKeys=new Set();
@@ -74,7 +75,7 @@ export function createRoadClosureLgaExplorer({
   if(!loaded||!matching.length)
    list.append(make("p","outage-empty",!loaded
     ?"Road closure data has not loaded. Press Refresh to retry."
-    :input.value?"No matching council, locality or road.":"No current unplanned all-traffic closures in the available source."));
+    :input.value?"No matching council, locality, road or hazard.":"No current unplanned all-traffic closures in the available source."));
   for(const group of matching){
     const parent=make("details","outage-suburb outage-council");
     parent.open=openKeys.has("c:"+group.key);
@@ -84,12 +85,13 @@ export function createRoadClosureLgaExplorer({
       make("span","outage-suburb-count",`${group.items.length} closure${group.items.length===1?"":"s"}`));
     parent.append(header);
     const inner=make("div","outage-suburb-inner outage-lga-inner");
-    for(const suburb of group.suburbs){
+    const sections=grouping?.value==="hazard"?groupRoadClosureItemsByHazard(group.items):group.suburbs;
+    for(const suburb of sections){
       const section=make("details","outage-suburb outage-locality");
-      section.open=openKeys.has("s:"+group.key+":"+suburb.key);
+      const subKey="s:"+(grouping?.value??"locality")+":"+group.key+":"+suburb.key;
+      section.open=openKeys.has(subKey);
       section.addEventListener("toggle",()=>section.open?
-        openKeys.add("s:"+group.key+":"+suburb.key):
-        openKeys.delete("s:"+group.key+":"+suburb.key));
+        openKeys.add(subKey):openKeys.delete(subKey));
       const name=make("summary","outage-suburb-title");
       name.append(make("span","outage-suburb-name",suburb.name),
         make("span","outage-suburb-count",String(suburb.items.length)));
@@ -104,7 +106,7 @@ export function createRoadClosureLgaExplorer({
         button.title=button.disabled?"Location unavailable":"Jump to this road closure on map";
         button.addEventListener("click",()=>fly(location));
         const subtitle=make("div","road-closure-caption",
-          [s.impactSubtype||s.impactType,s.eventDueTo||s.eventSubtype||s.eventType].filter(Boolean).join(" · "));
+          [s.locality,s.impactSubtype||s.impactType,s.eventDueTo||s.eventSubtype||s.eventType].filter(Boolean).join(" · "));
         wrap.append(button,subtitle);
         const detail=make("details","outage-event");
         detail.append(make("summary","","Details"));
@@ -155,6 +157,7 @@ export function createRoadClosureLgaExplorer({
  openButton.addEventListener("click",open);
  closeButton.addEventListener("click",close);
  input.addEventListener("input",search);
+ grouping?.addEventListener("change",search);
  refreshButton.addEventListener("click",reload);
  updateSourceRefreshLabel();
  updateSidebarCount();
@@ -163,6 +166,7 @@ export function createRoadClosureLgaExplorer({
   openButton.removeEventListener("click",open);
   closeButton.removeEventListener("click",close);
   input.removeEventListener("input",search);
+  grouping?.removeEventListener("change",search);
   refreshButton.removeEventListener("click",reload);
   if(dialog.open)dialog.close();
  }};

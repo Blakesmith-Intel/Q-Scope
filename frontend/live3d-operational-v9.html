@@ -368,18 +368,29 @@
 #officialBomWarningGroupsReport button{min-height:34px}
 
 </style>
-<dialog id="roadLgaExplorer" aria-labelledby="roadLgaExplorerTitle">
+<dialog id="roadLgaExplorer" class="outage-explorer qscope-road-report" aria-labelledby="roadLgaExplorerTitle">
   <header class="outage-explorer-heading">
-    <div><strong id="roadLgaExplorerTitle">Road closures by LGA</strong>
-    <p>Unplanned closures to all traffic · expand a council, then a locality</p></div>
+    <div><strong id="roadLgaExplorerTitle">Road closures</strong>
+    <p>Unplanned closures to all traffic · QLDTraffic</p></div>
     <button id="closeRoadLgaExplorer" type="button">Close</button>
   </header>
-  <div class="outage-explorer-toolbar">
-    <label for="roadLgaSearch">Find council, locality or road
-      <input id="roadLgaSearch" type="search" autocomplete="off" placeholder="Search QLDTraffic closures...">
-    </label>
-    <button id="refreshRoadLgaExplorer" type="button">Refresh</button>
-    <button id="openRoadTypeReport" type="button" aria-haspopup="dialog" aria-controls="roadTypeReport">Road types report</button>
+  <div class="outage-explorer-toolbar qscope-road-toolbar">
+    <div class="qscope-road-tabs" role="group" aria-label="Report type">
+      <button type="button" aria-pressed="true" disabled>Council report</button>
+      <button id="openRoadTypeReport" type="button" aria-haspopup="dialog" aria-controls="roadTypeReport">Road types report</button>
+    </div>
+    <div class="qscope-road-filters">
+      <label for="roadLgaGrouping">Group by
+        <select id="roadLgaGrouping" aria-label="Group council closures by locality or hazard">
+          <option value="locality">Locality</option>
+          <option value="hazard">Hazard</option>
+        </select>
+      </label>
+      <label for="roadLgaSearch">Search closures
+        <input id="roadLgaSearch" type="search" autocomplete="off" placeholder="Council, road or hazard">
+      </label>
+    </div>
+    <div class="qscope-road-clock"><button id="refreshRoadLgaExplorer" type="button">Refresh</button></div>
   </div>
   <p id="roadLgaFeedStatus" class="outage-explorer-feed-status" role="status">Waiting for live closures…</p>
   <p id="roadLgaSummary" class="outage-explorer-count">Waiting for closures…</p>
@@ -388,31 +399,45 @@
 </dialog>
 <style>
 #roadTypeReport:not([open]){display:none!important;}
-#roadTypeReport[open]{position:fixed;inset:0;margin:auto;display:flex;flex-direction:column;gap:0;
+#roadTypeReport[open],#roadLgaExplorer[open]{position:fixed;inset:0;margin:auto;display:flex;flex-direction:column;gap:0;
   box-sizing:border-box;width:min(830px,calc(100vw - 22px));height:min(790px,calc(100dvh - 22px));
   max-height:calc(100dvh - 22px);border:1px solid #6c94a7;border-radius:17px;
   padding:0;background:#10202b;color:#ecf6fa;box-shadow:0 20px 65px #000d;overflow:hidden;}
-#roadTypeReport::backdrop{background:rgba(0,9,18,.74);}
-#roadTypeReport .outage-explorer-results{overflow:auto;min-height:0;flex:1;}
+#roadTypeReport::backdrop,#roadLgaExplorer::backdrop{background:rgba(0,9,18,.74);}
+#roadTypeReport .outage-explorer-results,#roadLgaExplorer .outage-explorer-results{overflow:auto;min-height:0;flex:1;}
+.qscope-road-report .qscope-road-toolbar{display:grid!important;grid-template-columns:minmax(0,1fr);gap:8px;align-items:stretch;flex:none;}
+.qscope-road-report .qscope-road-tabs,.qscope-road-report .qscope-road-filters{display:grid;gap:8px;grid-template-columns:repeat(2,minmax(0,1fr));align-items:end;}
+.qscope-road-report .qscope-road-tabs button{width:100%;min-height:36px;margin:0;}
+.qscope-road-report .qscope-road-tabs button[aria-pressed=true]{opacity:1;background:#36596d;color:#fff;border:1px solid #a2d0e4;}
+.qscope-road-report .qscope-road-filters label{display:flex;flex-direction:column;gap:4px;min-width:0;margin:0;}
+.qscope-road-report .qscope-road-filters select,.qscope-road-report .qscope-road-filters input{box-sizing:border-box;width:100%;min-width:0;max-width:100%;height:36px;margin:0;padding:4px 8px;background:#10202b;color:#ecf6fa;border:1px solid #6c94a7;border-radius:6px;font:inherit;}
+.qscope-road-report .qscope-road-clock{display:flex;align-items:center;min-height:28px;}
+.qscope-road-report .outage-explorer-feed-status{box-sizing:border-box;height:3.2em;min-height:3.2em;overflow:auto;line-height:1.35;}
+.qscope-road-report .outage-explorer-count{box-sizing:border-box;height:2.8em;min-height:2.8em;overflow:auto;line-height:1.3;}
 </style>
-<dialog id="roadTypeReport" class="outage-explorer" aria-labelledby="roadTypeReportTitle">
+<dialog id="roadTypeReport" class="outage-explorer qscope-road-report" aria-labelledby="roadTypeReportTitle">
   <header class="outage-explorer-heading">
-    <div><strong id="roadTypeReportTitle">Road closures by road management</strong>
-    <p>Unplanned closures to all traffic only · verified against QLDTraffic event IDs</p></div>
+    <div><strong id="roadTypeReportTitle">Road closures</strong>
+    <p>Unplanned closures to all traffic · QLDTraffic</p></div>
     <button id="closeRoadTypeReport" type="button">Close</button>
   </header>
-  <div class="outage-explorer-toolbar">
-    <label for="roadTypeGrouping">Group by
-      <select id="roadTypeGrouping" aria-label="Group road types by council or hazard" style="max-width:100%;min-height:36px;background:#10202b;color:#ecf6fa;border:1px solid #6c94a7;border-radius:6px">
-        <option value="council">Council</option>
-        <option value="hazard">Hazard</option>
-      </select>
-    </label>
-    <label for="roadTypeSearch">Find council, locality, road or hazard
-      <input id="roadTypeSearch" type="search" autocomplete="off" placeholder="Search reported closures...">
-    </label>
-    <button id="refreshRoadTypeReport" type="button">Refresh</button>
-    <button id="backRoadTypeReport" type="button">Council report</button>
+  <div class="outage-explorer-toolbar qscope-road-toolbar">
+    <div class="qscope-road-tabs" role="group" aria-label="Report type">
+      <button id="backRoadTypeReport" type="button">Council report</button>
+      <button type="button" aria-pressed="true" disabled>Road types report</button>
+    </div>
+    <div class="qscope-road-filters">
+      <label for="roadTypeGrouping">Group by
+        <select id="roadTypeGrouping" aria-label="Group road types by council or hazard">
+          <option value="council">Council</option>
+          <option value="hazard">Hazard</option>
+        </select>
+      </label>
+      <label for="roadTypeSearch">Search closures
+        <input id="roadTypeSearch" type="search" autocomplete="off" placeholder="Council, road or hazard">
+      </label>
+    </div>
+    <div class="qscope-road-clock"><button id="refreshRoadTypeReport" type="button">Refresh</button></div>
   </div>
   <p id="roadTypeStatus" class="outage-explorer-feed-status" role="status">Official road-management classifications not yet checked.</p>
   <p id="roadTypeSummary" class="outage-explorer-count">Waiting for closure information…</p>
