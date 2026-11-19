@@ -101,6 +101,26 @@ for(const id of ['openRoadTypeReport','roadTypeReport','roadTypeSearch',
  'roadTypeResults','roadTypeSummary','backRoadTypeReport','roadTypeGrouping']){
  assert(html.includes('id="'+id+'"'),'Missing report control '+id);
 }
+// Both report types must expose the same fixed control rows in the same order.
+for(const [dialogId,groupId,searchId,refreshId] of [
+ ["roadLgaExplorer","roadLgaGrouping","roadLgaSearch","refreshRoadLgaExplorer"],
+ ["roadTypeReport","roadTypeGrouping","roadTypeSearch","refreshRoadTypeReport"]]){
+ const start=html.indexOf('<dialog id="'+dialogId+'"');
+ const dialog=html.slice(start,html.indexOf("</dialog>",start));
+ assert(dialog.includes("qscope-road-report"));
+ assert(dialog.includes('aria-pressed="true" disabled'));
+ const controls=["qscope-road-tabs",groupId,searchId,refreshId,"outage-explorer-feed-status","outage-explorer-count"];
+ for(let i=1;i<controls.length;i++)
+  assert(dialog.indexOf(controls[i])>dialog.indexOf(controls[i-1]),"Report control alignment: "+dialogId+" "+controls[i]);
+ assert(dialog.includes('<option value="hazard">Hazard</option>'));
+}
+const councilSource=readFileSync(new URL('../src/context-layers/road-closure-lga-explorer-v1.js',import.meta.url),'utf8');
+assert(councilSource.includes("groupRoadClosureItemsByHazard(group.items)"));
+assert(councilSource.includes('grouping?.addEventListener("change",search)'));
+const ownerSource=readFileSync(new URL('../src/context-layers/road-ownership-report-v1.js',import.meta.url),'utf8');
+assert(ownerSource.includes("search.value=councilSearch.value"));
+assert(ownerSource.includes("councilSearch.value=search.value"));
+assert(ownerSource.includes("onReturn();"));
 const build=readFileSync(new URL('../../scripts/build-current-site.sh',import.meta.url),'utf8');
 assert(build.includes('"road-ownership-report-v1.js"'));
 assert(build.includes('road-ownership-report-20261027-v1'));
