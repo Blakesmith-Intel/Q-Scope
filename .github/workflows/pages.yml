@@ -9,6 +9,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: stormtracker-pages
@@ -479,14 +480,57 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
+      # A rerun retains artifacts from previous attempts. Give each attempt its
+      # own name; deploy-pages requires exactly one artifact matching that name.
       - name: Upload supported site
+        id: pages_artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+          name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+
+      # Upload completion is not proof the artifact is visible to the listing
+      # APIs. Verify the exact ID, name and commit before starting publication.
+      - name: Verify Pages artifact registration
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGES_ARTIFACT_NAME: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+          PAGES_ARTIFACT_ID: ${{ steps.pages_artifact.outputs.artifact_id }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$PAGES_ARTIFACT_ID" =~ ^[0-9]+$ ]]
+          for attempt in $(seq 1 15); do
+            if listing="$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" -f name="$PAGES_ARTIFACT_NAME" -f per_page=100 2>/dev/null)"; then
+              matches="$(jq -c --arg name "$PAGES_ARTIFACT_NAME" '[.artifacts[] | select(.name == $name)]' <<< "$listing")"
+              count="$(jq 'length' <<< "$matches")"
+              if [[ "$count" -gt 1 ]]; then
+                echo "::error::Multiple artifacts match this unique attempt name: $PAGES_ARTIFACT_NAME"
+                exit 1
+              fi
+              if [[ "$count" -eq 1 ]]; then
+                if ! jq -e --arg id "$PAGES_ARTIFACT_ID" --arg sha "$GITHUB_SHA" '
+                  .[0] | ((.id|tostring) == $id and .expired == false and
+                  .size_in_bytes > 0 and .workflow_run.head_sha == $sha)
+                ' <<< "$matches" >/dev/null; then
+                  echo "::error::Artifact registration does not match the uploaded ID, commit or validity"
+                  exit 1
+                fi
+                echo "Verified Pages artifact $PAGES_ARTIFACT_NAME (ID $PAGES_ARTIFACT_ID)"
+                exit 0
+              fi
+            fi
+            echo "Awaiting artifact registration ($attempt/15)"
+            if [[ "$attempt" -lt 15 ]]; then sleep 5; fi
+          done
+          echo "::error::Uploaded Pages artifact never became visible; publication not started"
+          exit 1
 
       - name: Deploy supported site
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Verify published V10.2.0 source and existing historical QA
         shell: bash
@@ -496,6 +540,25 @@ jobs:
           set -Eeuo pipefail
           trap 'echo "::error::Published-site verification failed at command: $BASH_COMMAND (line $LINENO)"' ERR
           base="${PAGES_URL%/}"
+          # Verify the actual new road-report UI and module before accepting
+          # production, with the same bounded CDN propagation allowance.
+          roads_published=0
+          for attempt in $(seq 1 10); do
+            suffix="?release=$GITHUB_SHA&roads=$attempt"
+            road_html="$(curl -fsSL --max-time 20 "$base/live3d-operational-v9.html$suffix" || true)"
+            road_js="$(curl -fsSL --max-time 20 "$base/src/context-layers/road-closure-lga-explorer-v1.js$suffix" || true)"
+            if grep -Fq 'id="roadLgaGrouping"' <<< "$road_html" &&
+               grep -Fq 'id="roadTypeGrouping"' <<< "$road_html" &&
+               grep -Fq 'qscope-road-tabs' <<< "$road_html" &&
+               grep -Fq 'groupRoadClosureItemsByHazard(group.items)' <<< "$road_js"; then
+              roads_published=1
+              break
+            fi
+            echo "Awaiting updated road reports in published assets ($attempt/10)"
+            if [[ "$attempt" -lt 10 ]]; then sleep 5; fi
+          done
+          test "$roads_published" -eq 1
+          echo "PUBLIC Q-SCOPE COUNCIL AND ROAD TYPE HAZARD REPORTS VERIFIED"
           # GitHub Pages publication can briefly serve the previous CDN copy.
           # Confirm all three actual published flood-legend assets before
           # accepting the release; do not weaken any existing historic QA.
