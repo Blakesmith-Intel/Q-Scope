@@ -3,7 +3,7 @@ import {readFileSync} from "node:fs";
 import {parseOperationalRoadReport,parseStateHighwaysReport,
  buildRoadOwnershipSnapshot,ROAD_OWNERSHIP_SCHEMA}
  from "../../relay/road-ownership-reports-v1.js";
-import {roadOwnershipClass,groupedRoadOwnershipFeatures}
+import {roadOwnershipClass,groupedRoadOwnershipFeatures,groupRoadClosureItemsByHazard}
  from "../src/context-layers/road-ownership-report-v1.js";
 import {filterFloodRoadClosures} from "../src/context-layers/flood-road-closure-filter-v1.js";
 
@@ -62,9 +62,43 @@ const filtered=filterFloodRoadClosures({type:'FeatureCollection',
  features:[...live,planned]},Date.parse('2026-10-27T20:00:00+10:00'));
 assert(!filtered.features.some(f=>f.properties.id===834235),
  'Existing unplanned-only filter must reject planned highway works');
+// Group the existing report items, with one event ID only. Source hierarchy
+// and road ownership remain independent; missing causes stay explicit.
+const hazards=groupRoadClosureItemsByHazard([
+ {id:"1",summary:{eventType:"Hazard",eventSubtype:"Poor visibility",eventDueTo:"Smoke"}},
+ {id:"2",summary:{eventType:"hazard",eventSubtype:"poor visibility",eventDueTo:" smoke "}},
+ {id:"1",summary:{eventType:"Hazard",eventSubtype:"Fire"}},
+ {id:"3",summary:{eventType:"Flooding",eventSubtype:"Flash flooding",eventDueTo:"Water over road"}},
+ {id:"4",summary:{eventType:"Flooding",eventSubtype:"Long-term flooding",eventDueTo:"Heavy rain"}},
+ {id:"5",summary:{eventType:"Hazard",eventSubtype:"Fire"}},
+ {id:"6",summary:{}},
+]);
+assert.equal(hazards[0].name,"Poor visibility — Smoke");
+assert.equal(hazards[0].items.length,2);
+assert.equal(hazards.reduce((sum,h)=>sum+h.items.length,0),6);
+assert(hazards.some(h=>h.name==="Flash flooding — Water over road"));
+assert(hazards.some(h=>h.name==="Long-term flooding — Heavy rain"));
+assert(hazards.some(h=>h.name==="Fire"));
+assert(hazards.some(h=>h.name==="Cause not supplied"));
+// All official unplanned hazard categories already pass the same full closure
+// predicate; lane restrictions, expired events, and planned works do not.
+const candidates=[
+ ["Hazard","Fire",""],["Hazard","Debris on road","Fallen vegetation"],
+ ["Hazard","Adverse driving conditions","High winds"],
+ ["Hazard","Bridge or culvert damaged",""],["Hazard","Road damage","Earlier flooding"],
+ ["Hazard","Poor visibility","Smoke"],["Hazard","Debris on road","Spill"],
+ ["Hazard","Signal fault","Lights blacked out"],["Hazard","Emergency roadworks",""],
+ ["Flooding","Flash flooding","Water over road"]
+].map(([event_type,event_subtype,event_due_to],i)=>{
+ const f=feature(850000+i);
+ Object.assign(f.properties,{status:"Published",event_type,event_subtype,event_due_to});return f;
+});
+assert.equal(filterFloodRoadClosures({features:candidates}).features.length,candidates.length);
+assert.equal(filterFloodRoadClosures({features:candidates.map(f=>({...f,properties:{...f.properties,
+ impact:{impact_type:"Closures",impact_subtype:"Lane closed"}}}))}).features.length,0);
 const html=readFileSync(new URL('../live3d-operational-v9.html',import.meta.url),'utf8');
 for(const id of ['openRoadTypeReport','roadTypeReport','roadTypeSearch',
- 'roadTypeResults','roadTypeSummary','backRoadTypeReport']){
+ 'roadTypeResults','roadTypeSummary','backRoadTypeReport','roadTypeGrouping']){
  assert(html.includes('id="'+id+'"'),'Missing report control '+id);
 }
 const build=readFileSync(new URL('../../scripts/build-current-site.sh',import.meta.url),'utf8');
