@@ -132,3 +132,15 @@ assert.deepEqual(parseCurrentQldBoMWarningsIndex(bothActiveSameProduct,{nowMs:no
  "One cancelled regional event must not hide an independently active event for the same product");
 
 console.log("PASS real 30-Oct BoM source scenario: current regional warning and 2 prospective GIS shapes, detailed product no current, observed intense rain not upgraded, independent index all-clear fail-closed");
+
+// Cyclone warning status is derived independently from the same current list.
+assert.equal(index.cycloneWarnings.status,"no-active");
+assert.deepEqual(index.cycloneWarnings.headlines,[]);
+const cycloneActive=parseCurrentQldBoMWarningsIndex(fakePage({indexLinks:'<li><a href="/warning/tropical-cyclone-advice/IDQ20023">Tropical Cyclone Advice for Queensland</a></li>'}),{nowMs:now});
+assert.equal(cycloneActive.cycloneWarnings.status,"active");
+assert.equal(cycloneActive.cycloneWarnings.headlines.length,1);
+assert.deepEqual(cycloneActive.activeCodes,index.activeCodes);
+const cycloneFinal=parseCurrentQldBoMWarningsIndex(fakePage({indexLinks:'<li><a href="/products/IDQ20023.shtml">Final Tropical Cyclone Advice</a></li>'}),{nowMs:now});
+assert.equal(cycloneFinal.cycloneWarnings.status,"no-active");
+const cycloneOutlook=parseCurrentQldBoMWarningsIndex(fakePage({indexLinks:'<li><a href="/products/IDQ20065.shtml">Tropical Cyclone Information Bulletin</a></li>'}),{nowMs:now});
+assert.equal(cycloneOutlook.cycloneWarnings.status,"no-active");
