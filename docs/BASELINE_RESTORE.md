@@ -1,3 +1,17 @@
+# Q-SCOPE — official restore point, 20 November 2026 (AEST)
+
+Operator approval recorded on 20 November 2026. **Exact deployed source: `638b30e429b8a36993fd06ab50455ce808e6a9f7`.** [Frozen branch](https://github.com/Blakesmith-Intel/Q-Scope/tree/restore/qscope-2026-11-20) `restore/qscope-2026-11-20`; annotated tag `qscope-2026-11-20` is sealed by the accompanying one-time workflow, which verifies both refs resolve to this exact SHA without repointing existing refs.
+
+Evidence: [Pages/public asset verification](https://github.com/Blakesmith-Intel/Q-Scope/actions/runs/44605148251) and [production Cloudflare relay deployment](https://github.com/Blakesmith-Intel/Q-Scope/actions/runs/44605148028) both succeeded for the exact SHA; [feature regression](https://github.com/Blakesmith-Intel/Q-Scope/actions/runs/44604953099), [browser regression](https://github.com/Blakesmith-Intel/Q-Scope/actions/runs/44604953092), [live source audit](https://github.com/Blakesmith-Intel/Q-Scope/actions/runs/44604953031) passed before merge.
+
+The source contains the approved seven-scan genuine 30-minute rain loop, independent Doppler, quiet countdowns, official-only wind observations, flood gauge history budget, region-filtered rainfall/AEP reports and local export, state/local road ownership and hazard sorting, provider/council outage reports, eight-panel wallboard with same-tab map switching and real geographic/vector branding, and current warning-index/FWO/GIS2Web reissue handling. Live data remains dynamic. This is a source snapshot, not archived current conditions or a freeze of external services. Relay code is included, but the live Worker must be independently redeployed and verified on rollback.
+
+**Restore protocol:** verify `git rev-parse 'qscope-2026-11-20^{}'` and `git rev-parse origin/restore/qscope-2026-11-20` after fetching refs. Both must equal the exact SHA above. Start future changes from this source/current main with documentation changes only; rollback by reviewed new commit, never reset main or move tags/restore branches. The updated [operator guide](OPERATOR_GUIDE_CURRENT.md) accompanies the snapshot as a documentation-only follow-up; the frozen commit is the exact previously deployed code, not the later documentation commit.
+
+---
+
+## Historical restore records (not current instructions)
+
 # StormTracker — official immutable V10.2.51 restore point (3 November 2026)
 
 **Exact verified production commit:** `a641e0407287c826382bf5e47cf4dee59a97821a`.  
