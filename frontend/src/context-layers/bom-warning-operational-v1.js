@@ -176,7 +176,7 @@ export function missingActiveBoMWarningGeometry(products={},warnings=[]){
  const real=Array.isArray(warnings)?warnings:[];
  return WARNING_CODES.filter(code=>{
   const status=products?.[code]?.status;
-  return status==="geometry-unavailable"||status==="listed-active"||
+  return products?.[code]?.geometryUpdatePending===true||status==="geometry-unavailable"||status==="listed-active"||
    (status==="active"&&!real.some(w=>w?.productCode===code));
  });
 }
@@ -278,6 +278,8 @@ export function describeOfficialBomWarningState({products={},warnings=[],selecte
      " — current in BoM listing; polygon awaiting verification":
      status(code)==="geometry-unavailable"||!count?
      " — active; awaiting updated BoM polygon":
+     products?.[code]?.geometryUpdatePending?
+     " — active ("+count+" last published polygon"+(count===1?"":"s")+"; update pending)":
      " — active ("+count+" polygon"+(count===1?"":"s")+")";
    return warningName(code)+spatial+compact;
   });
@@ -286,7 +288,7 @@ export function describeOfficialBomWarningState({products={},warnings=[],selecte
      " · "+clear.map(code=>code+": none current").join(" · "):"")+
     (uncertain.length?" · Other products not verified":"");
   return {message,kind:uncertain.length||
-    active.some(code=>["geometry-unavailable","listed-active"].includes(status(code))||!countFor(code))?"warning":"normal"};
+    active.some(code=>products?.[code]?.geometryUpdatePending||["geometry-unavailable","listed-active"].includes(status(code))||!countFor(code))?"warning":"normal"};
  }
  if(selected!=="all"&&clear.length)
   return {message:"No current warnings — "+warningName(selected),kind:"normal"};
@@ -396,7 +398,11 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
   textRow(content,"Product",warning.productType==="detailed"?
    "Detailed SEQ thunderstorm (IDQ21035)":warning.productType==="regional"?
    "Regional QLD thunderstorm (IDQ21033)":"BoM severe weather");
-  textRow(content,"Issued",fmt(warning.issuedUtc));
+  textRow(content,"Polygon issued",fmt(warning.issuedUtc));
+  if(warning.geometryUpdatePending){
+   textRow(content,"Geometry status","Last published, still valid GIS outline — updated bulletin polygon pending");
+   textRow(content,"Latest bulletin issued",fmt(warning.latestBulletinIssuedUtc));
+  }
   textRow(content,"Expires",fmt(warning.expiresUtc));
   textRow(content,"Severity / certainty",[warning.severity,warning.certainty].filter(Boolean).join(" · "));
   textRow(content,"Warning area",warning.areaDescription);
@@ -570,8 +576,17 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
        "No current warnings for this product — confirmed by the BoM current warnings index or latest official notice":
      productStatus==="cancelled"?
        "Cancelled by BoM · 0 active polygons":
+       productStatuses[code]?.geometryUpdatePending?
+       result.count+" last published, still valid polygon"+(result.count===1?"":"s")+" — updated bulletin geometry pending":
        result.count+" active verified polygon"+(result.count===1?"":"s");
    section.append(count);
+   if(productStatuses[code]?.geometryUpdatePending){
+    const transition=document.createElement("p");
+    transition.textContent="Polygon issued "+fmt(productStatuses[code].geometryIssuedUtc)+
+      " · valid until "+fmt(productStatuses[code].geometryExpiresUtc)+
+      ". Intersections below refer to the last published geometry, not the revised bulletin footprint.";
+    section.append(transition);
+   }
    const highEnd=productStatuses[code]?.hazardAssessment?.highEnd??[];
    if(highEnd.length){
     const severity=document.createElement("p");
@@ -632,6 +647,7 @@ export function initialiseOfficialBomWarningPolygons({viewer,CesiumRef=globalThi
       productStatus==="no-active"||productStatus==="cancelled"?
       "No affected groups to list — no current warning in this product":
       !complete?"Boundary verification incomplete — affected groups may be missing":
+      productStatuses[code]?.geometryUpdatePending&&result.count?"Last published polygon intersections only — revised footprint pending":
       !result.count?"No currently verified polygon in this product":
       !items.length?"No intersecting Queensland groups reported":"";
     section.append(info);

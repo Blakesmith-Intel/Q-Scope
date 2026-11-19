@@ -296,6 +296,8 @@ for relative,needles in chains.items():
                        "road-closure-lga-explorer-v1.js?v=",
                        "road-ownership-report-v1.js?v="))
         version=cache_suffix+("-road-hazard-report-20261120-v1-consistent-controls-v2-sort-v3" if road_report_revision else "")
+        if relative in ("index.html","live3d-operational-v9.html") or needle=="bom-warning-operational-v1.js?v=":
+            version+="-warning-transition-20261120-v1"
         data=data.replace(needle,needle+version,expected)
     file.write_text(data,encoding="utf-8")
 

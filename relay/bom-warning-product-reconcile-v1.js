@@ -87,6 +87,41 @@ export function reconcileLatestBoMWarnings(messages,{complete=true,nowMs=Date.no
     const authoritative=gisWarnings.length?gisWarnings:latestWarnings;
     const unique=[...new Map(authoritative.map(w=>[w.id,w])).values()];
     if(!unique.length){
+      // A textual bulletin update is not itself proof the independently
+      // published GIS geometry has been withdrawn. Only a FRESH current
+      // product index (at or after the new bulletin) AND a fresh, exact
+      // product GIS read can support the last published geometry. Never
+      // use previous browser data, CAP-only older shapes or expired geometry.
+      const expected=QLD_WARNING_PRODUCTS[code]?.polygonAxfs??[];
+      const confirmed=officialActive?.has(code)&&Number.isFinite(officialIndexAt)&&
+        officialIndexAt>=latest.issued&&officialIndexAt<=nowMs+300000&&
+        nowMs-officialIndexAt<=20*60000&&notice.status==="issued"&&
+        validMs(notice.expiresUtc)>nowMs;
+      const cancelledAfter=options.filter(x=>x.notice.status==="cancelled"||
+        x.notice.status==="expired").map(x=>x.issued);
+      const fallback=confirmed?options.flatMap(x=>x.warnings).filter(w=>{
+        const issued=validMs(w.issuedUtc),geometryEnd=validMs(w.geometryExpiresUtc);
+        return w.productCode===code&&w.official===true&&w.issuer==="Bureau of Meteorology"&&
+          expected.includes(w.sourceProduct)&&
+          w.geometryVerification==="BoM current QLD product index + original current GIS2Web issue"&&
+          Number.isFinite(issued)&&issued<=nowMs&&issued<latest.issued-120000&&
+          validMs(w.expiresUtc)>nowMs&&geometryEnd>nowMs&&
+          !cancelledAfter.some(t=>t>=issued);
+      }):[];
+      if(fallback.length){
+        const lastIssue=Math.max(...fallback.map(w=>validMs(w.issuedUtc)));
+        const retained=[...new Map(fallback.filter(w=>lastIssue-validMs(w.issuedUtc)<=120000)
+          .map(w=>[w.id,{...w,geometryUpdatePending:true,
+            latestBulletinIssuedUtc:notice.issuedUtc,
+            // Original shape and original expiry stay intact.
+            expiresUtc:new Date(Math.min(validMs(w.expiresUtc),validMs(w.geometryExpiresUtc),
+              validMs(notice.expiresUtc))).toISOString()}])).values()];
+        products[code]={...stateRow("active",notice,retained.length),
+          geometryUpdatePending:true,geometryIssuedUtc:new Date(lastIssue).toISOString(),
+          geometryExpiresUtc:new Date(Math.min(...retained.map(w=>validMs(w.expiresUtc)))).toISOString()};
+        warnings.push(...retained);
+        continue;
+      }
       // An explicit live warning without valid geometry is NOT a no-warning
       // response, even when the enclosing RSS request succeeded.
       products[code]=stateRow("geometry-unavailable",notice);
