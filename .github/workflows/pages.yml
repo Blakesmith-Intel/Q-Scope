@@ -477,6 +477,11 @@ jobs:
           sha256sum -c /tmp/st-frozen-root-before.sha256
           test -s _site/preview/radar-refresh-review/BUILD.txt
 
+      - name: Validate and apply narrow rainfall rollover correction
+        run: |
+          node frontend/tests/run-significant-rainfall-source-v1-tests.mjs
+          python scripts/apply-rainfall-rollover-20261126.py
+
       - name: Package and verify Q-SCOPE operations wallboard
         run: python scripts/package-qscope-wallboard-v1.py
 

@@ -66,11 +66,48 @@ export function qldFloodMapCreatedAt(html){
  const d=new Date(Date.UTC(+m[5],month,+m[3],+m[1],+m[2]));
  return d.getUTCFullYear()===+m[5]&&d.getUTCMonth()===month?d.toISOString():null;
 }
+// 09:00 AEST equals 23:00 UTC; Queensland has no DST.
+export function rainfallReportingStart(ms){
+ return Math.floor((ms+3600000)/86400000)*86400000-3600000;
+}
+export function rainfallCacheSeconds(ms=Date.now()){
+ return Math.max(0,Math.min(300,Math.floor((rainfallReportingStart(ms)+86400000-ms)/1000)));
+}
+// A genuine first-hour since-9am total cannot exceed the same station's
+// last-hour total. Compare only the same regional source edition; missing
+// evidence is pending, not zero. No invented station observation timestamp.
+export function validateRainfallRollover(since,hours,previous=[]){
+ const key=r=>String(r.id)+"|"+String(r.region)+"|"+String(r.sourceCreatedAt);
+ const hourly=new Map((hours??[]).map(r=>[key(r),r]));
+ const prior=new Map((previous??[]).filter(r=>r.rolloverPending===true).map(r=>[String(r.id),r]));
+ return (since??[]).map(r=>{
+  const t=Date.parse(r.sourceCreatedAt??"");
+  if(!Number.isFinite(t)||!Number.isFinite(r.mm)||r.mm<=0)return r;
+  const start=rainfallReportingStart(t),elapsed=t-start;
+  const h=hourly.get(key(r));
+  const supported=Number.isFinite(h?.mm)&&h.mm>=0&&r.mm<=h.mm+0.01;
+  const old=prior.get(String(r.id));
+  const held=old&&rainfallReportingStart(Date.parse(old.sourceCreatedAt))===start;
+  const decreased=held&&t>Date.parse(old.sourceCreatedAt)&&r.mm<old.mm;
+  const pending=r.rolloverPending===true||
+   (elapsed<3600000&&(elapsed===0||!supported))||
+   (held&&!supported&&!decreased);
+  return pending?{...r,rolloverPending:true}:r;
+ });
+}
+export function validatedRainfallPayload(data,previous){
+ if(!data?.observations)return data;
+ const obs=data.observations;
+ return {...data,observations:{...obs,since9am:validateRainfallRollover(
+  obs.since9am,obs.lastHour,previous?.observations?.since9am)}};
+}
+
 export function qualifiesRainfallSnapshot(row,period,now=Date.now(),maxAgeMs=90*60000,{minimumMm=50}={}){
  if(!row||row.period!==period||!Number.isFinite(row.mm)||row.mm<minimumMm)return false;
  const t=Date.parse(row.sourceCreatedAt??"");
  if(!Number.isFinite(t)||t>now+5*60000||t<now-maxAgeMs)return false;
  if(period==="since9am"){
+   if(row.rolloverPending===true)return false;
    // AEST has no daylight-saving switch. Never carry yesterday's 9am total
    // into a new reporting day.
    // The REPORT publication date can be today before 09:00 AEST even

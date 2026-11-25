@@ -4,12 +4,13 @@ import {ROAD_OWNERSHIP_SCHEMA} from "./context-layers/road-ownership-report-v1.j
 import {createRiverGaugeLayer} from "./context-layers/river-gauge-wallboard-v1.js?v=20261120-history-v4";
 import {DEFAULT_RIVER_GAUGE_REFRESH_MS} from "./context-layers/river-gauges-v1.js";
 import {loadPersistedIfdCells} from "./context-layers/rainfall-ifd-aep-v1.js";
+import {rainfallReportingStart,validatedRainfallPayload} from "./context-layers/significant-rainfall-source-v1.js?v=20261126-rollover-v1";
 import {SIGNIFICANT_RAINFALL_RELAY,SIGNIFICANT_RAINFALL_REFRESH_MS} from "./context-layers/significant-rainfall-operational-v1.js";
 import {WIND_OBSERVATION_RELAY} from "./context-layers/qscope-bom-wind-observations-operational-v1.js";
 import {WIND_OBS_REFRESH_MS} from "./context-layers/qscope-bom-wind-observation-model-v1.js";
 import {isVerifiedActiveBomWarning,isSourceMatchedOfficialWarningPolygon,officialWarningRefreshInterval,hasNewOfficialBoMWarningEdition,WARNING_EDITION_POLL_MS,WARNING_EDITION_RETRY_MS} from "./context-layers/bom-warning-operational-v1.js?v=20261120-warning-transition-v1";
 import {validateInternalCycloneSnapshot} from "./internal-cyclone-feed-v1.js";
-import {summarisePower,summariseRoads,summariseFloods,wallboardFloodHealth,summariseRain,summariseWind,formatCountdown} from "./qscope-wallboard-model-v1.js?v=20261120-flood-status-v4";
+import {summarisePower,summariseRoads,summariseFloods,wallboardFloodHealth,summariseRain,summariseWind,formatCountdown} from "./qscope-wallboard-model-v1.js?v=20261126-rollover-v1";
 
 const relay="https://stormtracker-bom-relay.stormtracker-bom-relay.workers.dev";
 const $=id=>document.getElementById(id),now=()=>Date.now(),fmt=n=>Number(n).toLocaleString("en-AU");
@@ -63,7 +64,9 @@ async function execute(t){
  try{await t.run(t);}catch(e){t.onError(e);}finally{t.busy=false;}
 }
 function tick(){
- const at=now();set("boardClock",new Date(at).toLocaleTimeString("en-AU",{timeZone:"Australia/Brisbane",hour12:false}));
+ const at=now();
+ if(rainData&&rainRenderedDay!==rainfallReportingStart(at))renderRain();
+ set("boardClock",new Date(at).toLocaleTimeString("en-AU",{timeZone:"Australia/Brisbane",hour12:false}));
  set("boardDate",new Date(at).toLocaleDateString("en-AU",{timeZone:"Australia/Brisbane",weekday:"short",day:"numeric",month:"short",year:"numeric"})+" AEST");
  for(const t of tasks){
   if(!document.hidden&&!t.busy&&at>=t.next)void execute(t);
@@ -101,7 +104,7 @@ task("roads",5*60000,["roadStatus"],async()=>{
  health("roadStatus",!roadOwnership||s.unverified?"warning":"ok",roadOwnership?"QLDTraffic · ownership checked "+time(ownershipAt):"Road ownership unavailable · no state total",now());
 },()=>unavailable(["roadStatus"],clearRoads,"Road closure feed unavailable"));
 
-let grid={schema:"StormTrackerBoM2016IFDCellsV1",source:"BoM verified IFD",cells:loadPersistedIfdCells()},gridAt=0,rainData=null,rainAt=0;
+let grid={schema:"StormTrackerBoM2016IFDCellsV1",source:"BoM verified IFD",cells:loadPersistedIfdCells()},gridAt=0,rainData=null,rainAt=0,rainRenderedDay=null;
 function clearRain(){set("rainPeak","—");set("rainStation","");metrics("rainRows",[]);pie("aepPie","aepLegend",[]);set("aepTotal","50+ mm gauges · since 9 am AEST");}
 async function getGrid(){
  if(gridAt&&now()-gridAt<15*60000)return;
@@ -118,7 +121,8 @@ async function getGrid(){
 }
 function renderRain(){
  if(!rainData)return;
- const s=summariseRain(rainData,grid);
+ rainRenderedDay=rainfallReportingStart(now());
+ const s=summariseRain(rainData,grid,now());
  set("rainPeak",s.peak?s.peak.mm.toFixed(1)+" mm":"—");set("rainStation",s.peak?s.peak.name+" · "+stamp(Date.parse(s.peak.sourceCreatedAt)):"No verified observations");
  metrics("rainRows",[["Gauges reporting",fmt(s.total)],["50+ mm gauges",fmt(s.notable)],["100+ mm gauges",fmt(s.heavy)],["Highest 24h to 9 am",s.peak24?s.peak24.mm.toFixed(1)+" mm":"—"]]);
  pie("aepPie","aepLegend",s.aep);
@@ -130,7 +134,7 @@ function renderRain(){
 task("rain",SIGNIFICANT_RAINFALL_REFRESH_MS,["rainStatus","aepStatus"],async()=>{
  const [data]=await Promise.all([json(SIGNIFICANT_RAINFALL_RELAY),getGrid()]);
  if(data?.format!=="StormTrackerSignificantRainfallV1"||!["since9am","last24Hours","lastHour"].every(k=>Array.isArray(data.observations?.[k])))throw Error("Invalid rainfall source");
- rainData=data;rainAt=now();renderRain();
+ rainData=validatedRainfallPayload(data,rainData);rainAt=now();renderRain();
 },()=>{rainData=null;unavailable(["rainStatus","aepStatus"],clearRain,"BoM rainfall source unavailable");});
 
 let windData=null,windAt=0;

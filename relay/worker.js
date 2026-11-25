@@ -30,7 +30,7 @@ import {inspectBomRecentWaterLevelTable} from "../frontend/src/context-layers/bo
 import {parseBoMStationCrossingHeader} from "../frontend/src/context-layers/river-crossing-state-v1.js";
 import {
   RAINFALL_REGIONS,RAINFALL_SOURCE_BASE,parseBomRainfallMap,
-  qldFloodMapCreatedAt,dedupeSignificantRainfall
+  qldFloodMapCreatedAt,dedupeSignificantRainfall,validateRainfallRollover,rainfallCacheSeconds
 } from "../frontend/src/context-layers/significant-rainfall-source-v1.js";
 
 import {relayOfficialIfdPoint} from "./ifd-on-demand.js";
@@ -1069,7 +1069,7 @@ async function relayQldSignificantRainfall(request,origin){
       const url=RAINFALL_SOURCE_BASE+region+".shtml";
       const result=await fetch(url,{headers:{Accept:"text/html"},
         signal:AbortSignal.timeout(12000),
-        cf:{cacheEverything:true,cacheTtl:300}});
+        cf:{cacheEverything:true,cacheTtl:rainfallCacheSeconds()}});
       if(!result.ok)throw Error("BoM "+region+" HTTP "+result.status);
       const size=Number(result.headers.get("content-length"))||0;
       if(size>3_500_000)throw Error("BoM rainfall HTML excessive");
@@ -1094,7 +1094,9 @@ async function relayQldSignificantRainfall(request,origin){
       }
       if(periodFailures.length===3)
         throw Error("BoM source has no readable rainfall periods");
-      return {region,sourceCreatedAt,observations,periodFailures};
+      const since=validateRainfallRollover(observations.filter(x=>x.period==="since9am"),
+        observations.filter(x=>x.period==="lastHour"));
+      return {region,sourceCreatedAt,observations:[...observations.filter(x=>x.period!=="since9am"),...since],periodFailures};
     }));
     for(let j=0;j<chunk.length;j++){
       const result=settled[j];
@@ -1116,7 +1118,7 @@ async function relayQldSignificantRainfall(request,origin){
   };
   const headers=corsHeaders(origin);
   headers.set("Content-Type","application/json; charset=utf-8");
-  headers.set("Cache-Control","public, max-age=300");
+  headers.set("Cache-Control","public, max-age="+rainfallCacheSeconds());
   return new Response(request.method==="HEAD"?null:JSON.stringify({
     format:"StormTrackerSignificantRainfallV1",
     checkedAt:new Date().toISOString(),regional,failed:failures,

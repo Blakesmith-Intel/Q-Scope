@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - "relay/worker.js"
+      - "frontend/src/context-layers/significant-rainfall-source-v1.js"
       - "relay/qld-bom-gauge-reference-20261110-v1.js"
       - "relay/relay-efficiency-v1.js"
       - "relay/bom-warning-polygons-v1.js"
@@ -39,6 +40,7 @@ jobs:
         run: |
           npm test
           node --check relay/worker.js
+          node frontend/tests/run-significant-rainfall-source-v1-tests.mjs
       - name: Test direct FTP parser and browser source contract
         run: node frontend/tests/run-ftp-direct-v1-tests.mjs
       - name: Deploy the existing production Worker only

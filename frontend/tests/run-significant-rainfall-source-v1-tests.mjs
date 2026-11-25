@@ -173,3 +173,27 @@ assert.match(rainfallCode,/scheduleAepRender\(\)/,
 assert.match(rainfallCode,/void updateIfdCatalogue\(\)/,
  "The remote catalogue must not block the first map render");
 console.log("PASS BoM separate 1hr, since9am and 24hr original station maps, threshold and freshness controls.");
+
+import {validateRainfallRollover,validatedRainfallPayload,rainfallReportingStart,rainfallCacheSeconds}
+ from "../src/context-layers/significant-rainfall-source-v1.js";
+const rolloverAt=Date.parse("2026-11-25T23:00:00Z");
+const rolloverGauge={id:"529090",name:"Four Ways",period:"since9am",region:"gulf",mm:65,
+ sourceCreatedAt:"2026-11-25T23:05:00Z"};
+const hourGauge={...rolloverGauge,period:"lastHour",mm:0};
+const bad=validateRainfallRollover([rolloverGauge],[hourGauge])[0];
+assert.equal(bad.rolloverPending,true);
+assert.equal(qualifiesRainfallSnapshot(bad,"since9am",rolloverAt+6*60000),false);
+assert.equal(validateRainfallRollover([rolloverGauge],[])[0].rolloverPending,true);
+assert.equal(validateRainfallRollover([rolloverGauge],[{...hourGauge,mm:65,region:"other"}])[0].rolloverPending,true);
+assert.equal(validateRainfallRollover([rolloverGauge],[{...hourGauge,mm:65}])[0].rolloverPending,undefined);
+assert.equal(qualifiesRainfallSnapshot({...hourGauge,mm:65},"lastHour",rolloverAt+6*60000),true);
+assert.equal(qualifiesRainfallSnapshot({...rolloverGauge,period:"last24Hours"},"last24Hours",rolloverAt+6*60000),true);
+const late={...rolloverGauge,sourceCreatedAt:"2026-11-26T00:05:00Z"};
+assert.equal(validateRainfallRollover([late],[],[bad])[0].rolloverPending,true);
+assert.equal(validateRainfallRollover([{...late,mm:4}],[],[bad])[0].rolloverPending,undefined);
+assert.equal(validatedRainfallPayload({observations:{since9am:[rolloverGauge],lastHour:[hourGauge]}}).observations.since9am[0].rolloverPending,true);
+assert.equal(rainfallReportingStart(rolloverAt-1),rolloverAt-86400000);
+assert.equal(rainfallReportingStart(rolloverAt),rolloverAt);
+assert.equal(rainfallCacheSeconds(rolloverAt-30000),30);
+assert.equal(rainfallCacheSeconds(rolloverAt),300);
+console.log("PASS 529090 rollover regression, genuine short-duration rain, delayed reset and cache boundary.");

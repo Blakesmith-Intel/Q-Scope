@@ -5,7 +5,7 @@ import {groupRoadClosuresByLga} from "./context-layers/road-closure-lga-model-v1
 import {stationFloodLevels,observedFloodClass} from "./context-layers/river-flood-thresholds-v1.js";
 import {parseQueenslandObservationTime,FLOOD_SIGNAL_MAX_AGE_MS} from "./context-layers/river-flood-signals-v1.js";
 import {publishedCrossingForFeature} from "./context-layers/river-crossing-state-v1.js";
-import {qualifiesRainfallSnapshot,dedupeSignificantRainfall} from "./context-layers/significant-rainfall-source-v1.js";
+import {qualifiesRainfallSnapshot,dedupeSignificantRainfall,validatedRainfallPayload} from "./context-layers/significant-rainfall-source-v1.js?v=20261126-rollover-v1";
 import {classifyRainfallAep} from "./context-layers/rainfall-ifd-aep-v1.js";
 import {windStationSeverity,WIND_OBS_VALID_AGE_MS} from "./context-layers/qscope-bom-wind-observation-model-v1.js";
 
@@ -68,7 +68,7 @@ export function summariseFloods(source,alerts,catalogue,now=Date.now()){
 }
 export function summariseRain(data,grid,now=Date.now()){
  const period="since9am";
- const raw=dedupeSignificantRainfall(data.observations[period],period,{minimumMm:0});
+ const raw=dedupeSignificantRainfall(validatedRainfallPayload(data).observations[period],period,{minimumMm:0});
  const rows=raw.filter(x=>qualifiesRainfallSnapshot(x,period,now,90*60000,{minimumMm:0}));
  const notable=rows.filter(x=>x.mm>=50),counts={};
  for(const row of notable){

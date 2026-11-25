@@ -1,5 +1,5 @@
 import {formatAgencyTimestamp} from "./agency-source-time-v1.js?v=20261027-agency-panels-v1";
-import {qualifiesAepRainfallSnapshot,rainfallBand} from "./significant-rainfall-source-v1.js?v=aest-9am-rollover-20261020";
+import {qualifiesAepRainfallSnapshot,rainfallBand,rainfallReportingStart,validatedRainfallPayload} from "./significant-rainfall-source-v1.js?v=20261126-rollover-v1";
 import {createSeverityMarkerLayers,rainfallIconPriority} from "./severity-marker-layer-v1.js?v=20261024-flood-recovery-severity-v1-single-flood-path-v10.2.21-final-pixel-size";
 import {classifyRainfallAep,ifdCellKey,ifdCellSupportsDuration,
  rainfallWindowMinutes,IFD_LOOKUP_CONCURRENCY,
@@ -85,6 +85,15 @@ export function initialiseOperationalSignificantRainfall({
  const collection=severityLayers.dataSource;
  let lastLoadedAt=0,lastError=null,waiting=null,timer=null,selectedId="";
  let source=null,visibleRows=[],period="since9am",started=false;
+ let rolloverTimer=null;
+ function scheduleRollover(){
+  if(rolloverTimer!==null)clearTimeout(rolloverTimer);
+  const at=now();
+  rolloverTimer=setTimeout(()=>{
+   if(period==="since9am"&&(collection.show||reportDialog?.open))render();
+   scheduleRollover();
+  },Math.max(1,rainfallReportingStart(at)+86400000-at));
+ }
  let ifdGrid={schema:"StormTrackerBoM2016IFDCellsV1",
   source:"Official BoM IFD verified saved point references",cells:loadPersistedIfdCells()};
  let ifdLoadedAt=0,catalogueLoading=null,renderTimer=null;
@@ -278,7 +287,7 @@ export function initialiseOperationalSignificantRainfall({
   if(!reportDialog||!["amount","aep"].includes(mode))return;
   reportMode=mode;
   if(!reportDialog.open)reportDialog.showModal();
-  renderReport();
+  render();
   if(!lastLoadedAt||now()-lastLoadedAt>=refreshMs)
    refresh(true).catch(error=>{
     reportStatus.textContent="BoM refresh unavailable: "+String(error?.message??error).slice(0,120);
@@ -370,6 +379,7 @@ export function initialiseOperationalSignificantRainfall({
  }
  async function refresh(force=false){
   if(!collection.show&&!force)return visibleRows.slice();
+  if(period==="since9am"&&visibleRows.some(r=>!qualifiesAepRainfallSnapshot(r,period,now())))render();
   if(waiting)return waiting;
   say("Checking BoM significant rainfall…");
   waiting=(async()=>{
@@ -383,7 +393,7 @@ export function initialiseOperationalSignificantRainfall({
      !Array.isArray(incoming?.observations?.lastHour)||
      !Array.isArray(incoming?.observations?.last24Hours))
       throw Error("Unexpected BoM rainfall source response");
-   source=incoming;lastLoadedAt=now();lastError=null;
+   source=validatedRainfallPayload(incoming,source);lastLoadedAt=now();lastError=null;
    void loadCatchments();
    // Show persisted classifications immediately; the shared catalogue loads
    // independently and is never a prerequisite for the first map paint.
@@ -397,7 +407,7 @@ export function initialiseOperationalSignificantRainfall({
    // Do not leave old qualifying rainfall markers indefinitely visible.
    if(lastLoadedAt && now()-lastLoadedAt>=90*60000){
      source=null;render();
-   }
+   }else if(period==="since9am")render();
    say("Significant rainfall unavailable · "+String(error?.message??error).slice(0,125)+
      (lastLoadedAt?" · previous valid observations retained until stale":""),
      "warning");
@@ -496,6 +506,7 @@ export function initialiseOperationalSignificantRainfall({
   window.addEventListener("pointermove",pointerMove,{capture:true,passive:true});
   window.addEventListener("pointerup",pointerUp,{capture:true,passive:true});
   window.addEventListener("pointercancel",clearTap,{capture:true,passive:true});
+  scheduleRollover();
   timer=setInterval(()=>{
    if(!document.hidden&&collection.show)refresh().catch(()=>{});
   },refreshMs);
@@ -503,6 +514,7 @@ export function initialiseOperationalSignificantRainfall({
  }
  function stop(){
   if(timer!==null)clearInterval(timer);timer=null;
+  if(rolloverTimer!==null)clearTimeout(rolloverTimer);rolloverTimer=null;
   if(renderTimer!==null)clearTimeout(renderTimer);renderTimer=null;
   queue.length=0;
   window.removeEventListener("pointerdown",pointerDown,true);
