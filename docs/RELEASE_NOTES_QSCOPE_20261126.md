@@ -6,6 +6,9 @@ Operator approved the narrow rainfall rollover correction and a new complete res
 
 **Guard repair:** the FTP/AEP packager already copies current rainfall modules; the final overlay must verify rather than duplicate them. Preserve forecast district and SES report anchors until their overlays finish, then revalidate at report open. The real Cesium guard instruments the staged canonical /Q-Scope/ entry, not retired /StormTracker/. Do not weaken the real marker, pointer, rarity, camera, source and error assertions.
 
+
+**Browser guard follow-up:** [45738080493](https://github.com/Blakesmith-Intel/Q-Scope/actions/runs/45738080493) passed live WMTS mosaics, Richmond, local IFD comparisons and actual Cesium rainfall marker creation, but timed out during the projected marker pick. The test now restores the existing per-tab camera record, verifies a genuine operator pan (a click does not mark navigation), and projects the terrain-clamped, bottom-origin billboard before checking the actual Cesium hit and real pointer interaction. No production camera, rainfall, AEP or radar behavior is changed. Previous Pages [45738080551](https://github.com/Blakesmith-Intel/Q-Scope/actions/runs/45738080551) and live relay [45738080313](https://github.com/Blakesmith-Intel/Q-Scope/actions/runs/45738080313) passed; new exact-source runs and seal remain required.
+
 **Restore protocol:** fetch refs and compare `git rev-parse 'qscope-2026-11-26^{}'` and `git rev-parse origin/restore/qscope-2026-11-26`; both must match the seal workflow's verified commit. Use a reviewed new rollback commit, never reset main or repoint a seal. Re-deploy and verify the independently running relay; dynamic agency feeds are not frozen. Read [operator guide](OPERATOR_GUIDE_CURRENT.md) and [release record](RELEASE_NOTES_QSCOPE_20261126.md). Older records below are historical only.
 
 ---

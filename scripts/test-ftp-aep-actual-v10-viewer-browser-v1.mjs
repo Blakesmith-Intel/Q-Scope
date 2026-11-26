@@ -30,6 +30,15 @@ await page.route("https://blakesmith-intel.github.io/Q-Scope/**",async route=>{
    contentType:res.headers.get("content-type")||"application/octet-stream"});
  }catch(e){localErrors.push(String(e));await route.abort("failed")}
 });
+// Exercise the production saved-camera restoration path so asynchronous
+// startup cannot overwrite the operator-selected viewport.
+await page.addInitScript(()=>{
+ sessionStorage.setItem("StormTracker.operatorRadarViewport.v1",JSON.stringify({
+  radarSiteId:"66",savedAt:Date.now(),
+  camera:{longitude:144.6,latitude:-25.91,targetHeight:0,range:115000,
+   heading:0,pitch:-Math.PI/2+0.01}
+ }));
+});
 const at=new Date().toISOString();
 const station=(id,name,latitude,longitude,period)=>({
  id,name,latitude,longitude,region:"seast",period,mm:50,band:"orange",sourceCreatedAt:at});
@@ -64,10 +73,21 @@ try{
   return markers.length===2 &&
     markers.some(x=>x.stormTrackerRainGaugeId==="QA19501");
  },null,{timeout:40000});
- // A real map gesture cancels StormTracker camera handover/navigation before
- // following a station away from the currently selected radar location.
- await page.mouse.click(1210,430);
- await page.waitForTimeout(250);
+ // A click does not invoke camera onInteraction. Verify a real pan.
+ const bounds=await page.locator("#cesiumContainer .cesium-widget canvas").boundingBox();
+ assert(bounds&&bounds.width>100&&bounds.height>100);
+ const dragX=bounds.x+bounds.width*0.72,dragY=bounds.y+bounds.height*0.55;
+ const beforeDrag=await page.evaluate(()=>window.__STORMTRACKER_QA_CAMERA.getState());
+ await page.mouse.move(dragX,dragY);
+ await page.mouse.down();
+ await page.mouse.move(dragX+36,dragY+12,{steps:5});
+ await page.mouse.up();
+ await page.waitForFunction(before=>{
+  const state=window.__STORMTRACKER_QA_CAMERA.getState();
+  return Math.abs(state.longitude-before.longitude)>1e-6||
+   Math.abs(state.latitude-before.latitude)>1e-6;
+ },beforeDrag,{timeout:15000});
+ console.log("AEP_REAL_OPERATOR_DRAG_PASS");
  const atXY=await page.evaluate(()=>{
   const v=window.__STORMTRACKER_QA_VIEWER,C=window.Cesium;
   const controller=window.__STORMTRACKER_QA_CAMERA;
@@ -87,31 +107,61 @@ try{
   return e.id;
  });
  assert(/QA19501/.test(atXY));
- await page.waitForFunction(()=>{
-  const v=window.__STORMTRACKER_QA_VIEWER,C=window.Cesium;
-  const marker=v.dataSources._dataSources
+ // Locate the actual terrain-clamped, bottom-origin billboard using
+ // real Cesium drillPick; no injected hits, fake entities or bypassed assertions.
+ let pos;
+ try{
+  const handle=await page.waitForFunction(()=>{
+   const v=window.__STORMTRACKER_QA_VIEWER,C=window.Cesium;
+   const state=window.__STORMTRACKER_QA_CAMERA.getState();
+   if(Math.abs(state.longitude-144.6)>0.01||Math.abs(state.latitude+25.91)>0.01)return false;
+   const e=v.dataSources._dataSources
     .filter(s=>String(s.name).startsWith("rainfall-severity-"))
-    .flatMap(s=>s.entities.values)
+    .flatMap(s=>s.entities.values).find(e=>e.stormTrackerRainGaugeId==="QA19501");
+   if(!e)return false;
+   const original=e.position.getValue(C.JulianDate.now());
+   const carto=C.Cartographic.fromCartesian(original);
+   const height=v.scene.globe.getHeight(carto);
+   const positions=[original];
+   if(Number.isFinite(height))positions.unshift(C.Cartesian3.fromRadians(carto.longitude,carto.latitude,height));
+   const b=v.scene.canvas.getBoundingClientRect();
+   v.scene.requestRender();
+   for(const point of positions){
+    const p=v.scene.cartesianToCanvasCoordinates(point);
+    if(!p)continue;
+    for(const dy of [-20,-10,-30,0,10]){
+     const x=p.x,y=p.y+dy;
+     if(x<25||y<25||x>b.width-25||y>b.height-25)continue;
+     if(document.elementFromPoint(b.left+x,b.top+y)!==v.scene.canvas)continue;
+     const hits=v.scene.drillPick(new C.Cartesian2(x,y),24,28,28);
+     if(hits.some(hit=>hit?.id?.stormTrackerRainGaugeId==="QA19501"))
+      return {x:b.left+x,y:b.top+y,localX:x,localY:y,
+       hits:hits.map(z=>z?.id?.id??z?.id??"").slice(0,9),
+       canvas:{left:b.left,top:b.top,right:b.right,bottom:b.bottom},terrainHeight:height};
+    }
+   }
+   return false;
+  },null,{timeout:45000,polling:250});
+  pos=await handle.jsonValue();
+  await handle.dispose();
+ }catch(error){
+  const diagnostic=await page.evaluate(()=>{
+   const v=window.__STORMTRACKER_QA_VIEWER,C=window.Cesium;
+   const e=v.dataSources._dataSources.flatMap(s=>s.entities.values)
     .find(e=>e.stormTrackerRainGaugeId==="QA19501");
-  if(!marker)return false;
-  const p=v.scene.cartesianToCanvasCoordinates(marker.position.getValue(C.JulianDate.now()));
-  const b=v.scene.canvas.getBoundingClientRect();
-  if(!p||p.x<25||p.y<25||p.x>b.width-25||p.y>b.height-25)return false;
-  return v.scene.drillPick(new C.Cartesian2(p.x,p.y),24,42,42)
-   .some(hit=>hit?.id?.stormTrackerRainGaugeId==="QA19501");
- },null,{timeout:30000});
- const pos=await page.evaluate(()=>{
-  const v=window.__STORMTRACKER_QA_VIEWER,C=window.Cesium;
-  const e=v.dataSources._dataSources
-    .filter(s=>String(s.name).startsWith("rainfall-severity-"))
-    .flatMap(s=>s.entities.values)
-    .find(e=>e.stormTrackerRainGaugeId==="QA19501");
-  const p=v.scene.cartesianToCanvasCoordinates(e.position.getValue(C.JulianDate.now()));
-  const b=v.scene.canvas.getBoundingClientRect();
-  return p?{x:b.left+p.x,y:b.top+p.y,localX:p.x,localY:p.y,
-   hits:v.scene.drillPick(new C.Cartesian2(p.x,p.y),24,42,42).map(z=>z?.id?.id??z?.id??"").slice(0,9),
-   canvas:{left:b.left,top:b.top,right:b.right,bottom:b.bottom}}:null;
- });
+   const original=e?.position.getValue(C.JulianDate.now());
+   const carto=original&&C.Cartographic.fromCartesian(original);
+   return {controller:window.__STORMTRACKER_QA_CAMERA.getState(),
+    camera:C.Cartographic.fromCartesian(v.camera.positionWC),
+    projected:original&&v.scene.cartesianToCanvasCoordinates(original),
+    terrainHeight:carto&&v.scene.globe.getHeight(carto),
+    canvas:v.scene.canvas.getBoundingClientRect().toJSON(),
+    rainfallStatus:document.getElementById("significantRainfallStatus")?.textContent,
+    markerShow:e?.isShowing,markerName:e?.name,globeTilesLoaded:v.scene.globe.tilesLoaded};
+  }).catch(e=>({diagnosticError:String(e)}));
+  console.log("AEP_RENDERED_MARKER_PICK_FAIL",JSON.stringify(diagnostic));
+  throw error;
+ }
  assert(pos);
  assert(pos.x>=pos.canvas.left&&pos.x<pos.canvas.right&&
   pos.y>=pos.canvas.top&&pos.y<pos.canvas.bottom,
@@ -174,9 +224,9 @@ try{
  assert.deepEqual(failedModules,[],"Missing source module after staged Pages build");
  assert.deepEqual(errors,[],"Uncaught production app JS errors");
  console.log("FTP_AEP_ACTUAL_V10_CESIUM_MAP_PASS",JSON.stringify({actual,position:pos}));
- await page.screenshot({path:"/tmp/v10-ftp-aep-cesium-qa.png"}).catch(()=>{});
+ await page.screenshot({path:"/tmp/v10-ftp-aep-cesium-qa.png",timeout:10000}).catch(()=>{});
 }catch(error){
  console.log("FTP_AEP_ACTUAL_V10_CESIUM_MAP_FAIL",JSON.stringify({error:String(error),errors:errors.slice(0,8),failedModules,localErrors,instrumented}));
- await page.screenshot({path:"/tmp/v10-ftp-aep-cesium-qa.png"}).catch(()=>{});
+ await page.screenshot({path:"/tmp/v10-ftp-aep-cesium-qa.png",timeout:10000}).catch(()=>{});
  throw error;
 }finally{await browser.close()}

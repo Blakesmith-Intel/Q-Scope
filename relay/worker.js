@@ -1056,7 +1056,7 @@ async function relayRiverRecentHistory(request,incoming,origin){
   }),{status:200,headers});
 }
 
-// 2026-11-26 release guard recovery: rerun the unchanged rainfall relay on the exact release SHA.
+// 2026-11-26 final browser guard recovery: rerun the unchanged rainfall relay on the exact release SHA.
 // One additional read-only route on the existing relay. The source publishes
 // station ID/coordinates and BOTH rainfall periods in original map tooltips.
 // Preserve dry-site coordinates for preregistering official local rainfall IFDs.
