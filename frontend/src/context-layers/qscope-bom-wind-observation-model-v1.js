@@ -62,11 +62,11 @@ function attrs(tag){
   out[m[1].toLowerCase()]=m[2];
  return out;
 }
-function valueOf(xml,type){
+function valueOf(xml,type,attribute=null){
  const re=new RegExp("<element\\b([^>]*)>([^<]*)<\\/element>","gi");
  for(const m of xml.matchAll(re)){
   const a=attrs(m[1]);
-  if((a.type??a.name)===(type))return m[2].trim();
+  if((a.type??a.name)===(type))return attribute===null?m[2].trim():a[attribute]??null;
  }
  return null;
 }
@@ -93,6 +93,10 @@ export function parseQueenslandWindXml(xml,{now=Date.now()}={}){
   const sustainedKmh=numeric(valueOf(p[2],"wind_spd_kmh"));
   const gust=numeric(valueOf(p[2],"gust_kmh"));
   const today=numeric(valueOf(p[2],"maximum_gust_kmh"));
+  // The maximum element has its own measurement time, distinct from the period time.
+  const todayMaximumGustUtc=today===null?null:
+   parseUtc(valueOf(p[2],"maximum_gust_kmh","time-utc"))??
+   parseUtc(valueOf(p[2],"maximum_gust_kmh","time-local"));
   if(gust===null&&sustainedKmh===null&&today===null)continue;
   seen.add(wmo);
   records.push({
@@ -104,7 +108,7 @@ export function parseQueenslandWindXml(xml,{now=Date.now()}={}){
    // shown as context only, never as a confirmed ten-minute gale.
    windAveragingMinutes:["metar_10","synop","mdf","tmd"].includes(String(pa["wind-src"]??"").toLowerCase())?10:
      String(pa["wind-src"]??"").toLowerCase()==="omd"?1:null,
-   todayMaximumGustKmh:today,
+   todayMaximumGustKmh:today,todayMaximumGustUtc,
    source:"BoM IDQ60920",provisional:true,
    current:now-age<=WIND_OBS_VALID_AGE_MS
   });

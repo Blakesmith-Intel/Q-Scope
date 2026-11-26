@@ -10,7 +10,7 @@ from pathlib import Path
 import re
 import shutil
 
-VERSION = "20261111-bom-wind-observations-v1-station-links-20261117"
+VERSION = "20261111-bom-wind-observations-v1-station-links-20261117-gust-time-20261126"
 SOURCE = Path("frontend")
 SITE = Path("_site")
 MODULES = (

@@ -33,7 +33,7 @@ const fixture=`<?xml version="1.0" encoding="UTF-8"?>
 <station wmo-id="94576" bom-id="040913" name="Brisbane" lat="-27.48" lon="153.04">
 <period time-utc="2026-11-11T12:20:00Z" wind-src="TMD">
 <level><element type="wind_spd_kmh">68</element><element type="gust_kmh">125</element>
-<element type="maximum_gust_kmh">131</element></level></period></station>
+<element type="maximum_gust_kmh" time-utc="2026-11-11T05:42:00+00:00" time-local="2026-11-11T15:42:00+10:00">131</element></level></period></station>
 <station wmo-id="94578" bom-id="040120" name="Other" lat="-27.5" lon="153.1">
 <period time-utc="2026-11-11T12:20:00Z" wind-src="omd">
 <level><element type="wind_spd_kmh">71</element><element type="gust_kmh"></element>
@@ -42,6 +42,16 @@ const rows=parseQueenslandWindXml(fixture,{now:NOW});
 assert.equal(rows.length,2);
 assert.equal(rows[0].gustKmh,125);
 assert.equal(rows[0].todayMaximumGustKmh,131);
+assert.equal(rows[0].todayMaximumGustUtc,"2026-11-11T05:42:00.000Z");
+assert.notEqual(rows[0].todayMaximumGustUtc,rows[0].observedUtc,"Use peak element time, never latest observation time");
+assert.equal(rows[1].todayMaximumGustUtc,null);
+const missingTime=fixture.replace(' time-utc="2026-11-11T05:42:00+00:00" time-local="2026-11-11T15:42:00+10:00"','');
+assert.equal(parseQueenslandWindXml(missingTime,{now:NOW})[0].todayMaximumGustKmh,131);
+assert.equal(parseQueenslandWindXml(missingTime,{now:NOW})[0].todayMaximumGustUtc,null,"Missing time is never inferred");
+const localOnly=fixture.replace(' time-utc="2026-11-11T05:42:00+00:00"','');
+assert.equal(parseQueenslandWindXml(localOnly,{now:NOW})[0].todayMaximumGustUtc,"2026-11-11T05:42:00.000Z");
+const invalidTime=missingTime.replace('type="maximum_gust_kmh"','type="maximum_gust_kmh" time-utc="invalid"');
+assert.equal(parseQueenslandWindXml(invalidTime,{now:NOW})[0].todayMaximumGustUtc,null);
 assert.equal(rows[1].todayMaximumGustKmh,null,"Missing BoM daily maximum is unavailable, never inferred");
 assert.equal(rows[0].windAveragingMinutes,10);
 assert.equal(windStationSeverity(rows[0]),"destructive");
@@ -67,6 +77,9 @@ assert.match(relayFile,/IDQ60920\.xml/,"One BoM statewide source remains authori
 assert.doesNotMatch(relayFile,/IDQ60801|sampledWindPeak24h|CACHE_HISTORY_SECONDS/,"No station history peak queries");
 assert.doesNotMatch(operatorFile,/fetchHistory|loadReportPeaks|sampleCount|24.hour|\?wmo=/i,"Report never generates 24h peaks");
 assert.match(operatorFile,/BoM highest wind gust today/);
+assert.match(operatorFile,/asTime\(station\.todayMaximumGustUtc\)/);
+const wallboard=readFileSync(fileURLToPath(new URL("../src/qscope-wallboard-v1.js",import.meta.url)),"utf8");
+assert.match(wallboard,/time\(Date\.parse\(s\.peak\.todayMaximumGustUtc\)\)/);
 assert.match(operatorFile,/Measured at this station only/);
 assert.match(operatorFile,/refreshMs=WIND_OBS_REFRESH_MS/);
 assert.match(operatorFile,/stations\.slice\(\)/,"Report includes all source-published stations");

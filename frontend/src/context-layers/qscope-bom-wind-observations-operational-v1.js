@@ -136,7 +136,9 @@ export function initialiseOperationalBomWindObservations({
    if(stationUrl){const link=document.createElement("a");link.href=stationUrl;link.target="_blank";link.rel="noopener noreferrer";link.textContent=station.name;name.append(link);}
    else name.textContent=station.name;
    value.className="rainfall-report-mm";
-   value.textContent=gustKmh(station.todayMaximumGustKmh);
+   value.textContent=gustKmh(station.todayMaximumGustKmh)+
+    (station.todayMaximumGustKmh==null?"":station.todayMaximumGustUtc&&Number.isFinite(Date.parse(station.todayMaximumGustUtc))?
+     " · "+asTime(station.todayMaximumGustUtc):" · Time unavailable");
    top.append(name,value);
    const meta=document.createElement("div");
    meta.className="rainfall-report-meta";

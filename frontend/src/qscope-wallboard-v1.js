@@ -142,7 +142,8 @@ function clearWind(){set("windPeak","—");set("windStation","");metrics("windRo
 function renderWind(){
  if(!windData)return;const s=summariseWind(windData);
  set("windPeak",s.peak?Math.round(s.peak.todayMaximumGustKmh)+" km/h":"—");
- set("windStation",s.peak?s.peak.name+" · latest observation "+stamp(Date.parse(s.peak.observedUtc)):"No verified peak reported");
+ set("windStation",s.peak?s.peak.name+" · "+(s.peak.todayMaximumGustUtc&&Number.isFinite(Date.parse(s.peak.todayMaximumGustUtc))?
+  "peak at "+time(Date.parse(s.peak.todayMaximumGustUtc)):"peak time unavailable"):"No verified peak reported");
  metrics("windRows",[["Qualifying stations",fmt(s.qualifying)],["Destructive",fmt(s.counts.destructive)],["Damaging",fmt(s.counts.damaging)],["Sustained gale",fmt(s.counts.gale)]]);
  health("windStatus",s.total?"ok":"warning",s.total?fmt(s.total)+" current stations · measured values, not forecasts":"No current station measurements",windAt);
 }
