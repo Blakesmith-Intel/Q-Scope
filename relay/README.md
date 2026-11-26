@@ -26,3 +26,7 @@ The Worker does **not** perform storm segmentation, tracking, modelling, inferen
 ## One production Doppler transport
 
 All approved Queensland BoM Doppler sites and Brewarrina NSW `IDR93I` use the existing Worker `stormtracker-bom-relay` through `/radar`, `/radar-history` and `/radar-frame`. The product allowlist stays strict and UTC comes from the genuine BoM source. Moree and Grafton are rain-only. **No separate NSW preview Worker is required.** The sealed V10 production UI remains independently source-pinned.
+
+## Official Queensland wind observations (26 November 2026)
+
+`/qld-wind-observations` continues to serve `QScopeBoMWindObservationsV1` from the single official BoM IDQ60920 XML product. `todayMaximumGustKmh` is the source-published maximum since midnight AEST; the additive nullable `todayMaximumGustUtc` is parsed from that maximum element's own timestamp and normalized to UTC, separately from `observedUtc` (latest observation). Missing peak timestamps are null; no station-history requests, synthetic peaks, new endpoints or cache policy changes. The existing production relay workflow includes changes to the shared wind parser in its push path filter.
