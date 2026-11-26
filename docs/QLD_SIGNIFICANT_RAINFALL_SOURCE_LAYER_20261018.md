@@ -1,5 +1,10 @@
 # Queensland Significant Rainfall — source-verified layer (18 October 2026)
 
+## 26 November 2026 — rainfall reporting-day correction
+
+At 09:00 AEST (23:00 UTC), yesterday's Since 9 am readings expire even on refresh failure. Positive first-hour accumulations need same-station, same-region, same-edition last-hour corroboration; inconsistent or unavailable evidence is withheld from map, reports, export and wallboard instead of falsely labelled Exceptional or zero. This is not a station timestamp and cannot confirm every delayed reset. Independent completed 24hrs to 9am totals, AEP thresholds, SES/forecast-district filters and five-minute polling remain unchanged. See [current operator guide](OPERATOR_GUIDE_CURRENT.md).
+
+
 ## Operational scope
 A separate, **off-by-default** Cesium data layer showing only BoM rain-gauge observations **≥50.0 mm** in Queensland, with two operator-selectable filters:
 - **Since 9 am AEST** — exact BoM regional map `Rainfalls Since 9am` station values, not rainfall forecast or a rolling 24-hour total

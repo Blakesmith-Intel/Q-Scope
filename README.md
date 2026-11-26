@@ -4,9 +4,9 @@
 
 **Production website:** https://blakesmith-intel.github.io/Q-Scope/ — the repository and GitHub Pages project path were renamed on 10 November 2026. Historical source tags, cloud relay routes and internally persistent identifiers are not renamed.
 
-**Operator-accepted technical restore point:** [V10.2.53](https://github.com/Blakesmith-Intel/Q-Scope/releases/tag/v10.2.53), annotated tag `v10.2.53` and branch `restore/v10.2.53` at `1466851327584b62e06172b3aa2c279afd27870e`. Never modify or repoint an existing restore reference. Q-SCOPE's initial branding change is a separate presentation-only enhancement on top of that source.
+**Current release:** 26 November rainfall rollover correction and release guard recovery. [Operator guide](docs/OPERATOR_GUIDE_CURRENT.md) · [Developer handover](docs/DEVELOPMENT_HANDOVER_CURRENT.md) · [Restore instructions](docs/BASELINE_RESTORE.md) · [Release record](docs/RELEASE_NOTES_QSCOPE_20261126.md). The [26 November seal](https://github.com/Blakesmith-Intel/Q-Scope/actions/workflows/seal-qscope-20261126.yml) creates a new annotated tag and same-commit restore branch only after successful exact-source Pages, browser and relay checks. Until sealed, use the verified 20 November restore point. Do not move previous refs. Official wind observations replaced experimental intrusive wind alerts in the operational root; historical QA previews remain isolated.
 
-**Branding rules and future name migration:** [Q-SCOPE identity and legacy compatibility](docs/Q_SCOPE_BRAND_IDENTITY.md). The V10.3 hook-echo and straight-line-wind alert science remains a separately pinned, **experimental** QA preview; this name change does not promote those alerts.
+**Branding rules and legacy compatibility:** [Q-SCOPE identity](docs/Q_SCOPE_BRAND_IDENTITY.md).
 
 ---
 

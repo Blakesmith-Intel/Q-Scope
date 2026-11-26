@@ -5,9 +5,9 @@ const page=await browser.newPage({viewport:{width:1200,height:850}});
 const errors=[];
 page.on("pageerror",e=>errors.push(String(e)));
 page.on("console",m=>{if(/CORS|disallowed MIME|404|Failed to fetch/i.test(m.text()))errors.push(m.text().slice(0,380))});
-await page.route("https://blakesmith-intel.github.io/StormTracker/**",async route=>{
+await page.route("https://blakesmith-intel.github.io/Q-Scope/**",async route=>{
  const u=new URL(route.request().url());
- const local="http://127.0.0.1:8137"+u.pathname.replace("/StormTracker","")+u.search;
+ const local="http://127.0.0.1:8137"+u.pathname.replace("/Q-Scope","")+u.search;
  try{
   const response=await fetch(local);
   await route.fulfill({status:response.status,
@@ -16,7 +16,7 @@ await page.route("https://blakesmith-intel.github.io/StormTracker/**",async rout
  }catch(e){await route.abort("failed")}
 });
 try{
- await page.goto("https://blakesmith-intel.github.io/StormTracker/ftp-aep-smoke.html",
+ await page.goto("https://blakesmith-intel.github.io/Q-Scope/ftp-aep-smoke.html",
   {waitUntil:"domcontentloaded",timeout:35000});
  const result=await page.evaluate(async()=>{
   globalThis.__STORMTRACKER_NATIONAL_MOSAIC_PRIMARY=true;

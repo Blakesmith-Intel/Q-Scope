@@ -6,26 +6,29 @@ const errors=[],failedModules=[];
 page.on("pageerror",e=>errors.push(String(e)));
 page.on("response",r=>{if(r.status()>=400&&/\.js(?:\?|$)/.test(r.url()))
  failedModules.push({status:r.status(),url:r.url()})});
+// Serve and instrument the SAME staged Q-Scope build, not the obsolete
+// /StormTracker/ public origin. The original real Cesium and marker checks remain.
+let instrumented=false;
+const localErrors=[];
 await page.route("https://blakesmith-intel.github.io/Q-Scope/**",async route=>{
  const url=new URL(route.request().url());
  const local="http://127.0.0.1:8137"+url.pathname.replace("/Q-Scope","")+url.search;
  try{
   const res=await fetch(local);
-  await route.fulfill({status:res.status,body:Buffer.from(await res.arrayBuffer()),
+  let body=Buffer.from(await res.arrayBuffer());
+  if(url.pathname.endsWith("/src/live3d-operational-v9.js")){
+   const text=body.toString("utf8");
+   const scene="const scene = viewer.scene;";
+   const camera="// The verified browser-source QA viewer must never call Cesium.camera.flyTo;";
+   if(!res.ok||!text.includes(scene)||!text.includes(camera))
+    throw Error("Staged Cesium camera/controller instrumentation drift");
+   body=Buffer.from(text.replace(scene,scene+" globalThis.__STORMTRACKER_QA_VIEWER=viewer;")
+    .replace(camera,"globalThis.__STORMTRACKER_QA_CAMERA=mapCamera;\n"+camera));
+   instrumented=true;
+  }
+  await route.fulfill({status:res.status,body,
    contentType:res.headers.get("content-type")||"application/octet-stream"});
- }catch(e){await route.abort("failed")}
-});
-await page.route(/\/StormTracker\/src\/live3d-operational-v9\.js/,async route=>{
- const resp=await route.fetch(),text=(await resp.text());
- if(!text.includes("const scene = viewer.scene;")||
-    !text.includes("// The verified browser-source QA viewer must never call Cesium.camera.flyTo;"))
-  throw Error("Cesium camera/controller instrumentation drift");
- await route.fulfill({response:resp,
-  body:text.replace("const scene = viewer.scene;",
-    "const scene = viewer.scene; globalThis.__STORMTRACKER_QA_VIEWER=viewer;")
-   .replace("// The verified browser-source QA viewer must never call Cesium.camera.flyTo;",
-    "globalThis.__STORMTRACKER_QA_CAMERA=mapCamera;\n// The verified browser-source QA viewer must never call Cesium.camera.flyTo;"),
-  contentType:"application/javascript"});
+ }catch(e){localErrors.push(String(e));await route.abort("failed")}
 });
 const at=new Date().toISOString();
 const station=(id,name,latitude,longitude,period)=>({
@@ -41,6 +44,8 @@ try{
  await page.goto("https://blakesmith-intel.github.io/Q-Scope/live3d-operational-v9.html?qaFtpAep=20261019",
   {waitUntil:"domcontentloaded",timeout:45000});
  await page.waitForSelector("#cesiumContainer .cesium-widget canvas",{state:"attached",timeout:45000});
+  assert(instrumented,"Staged Q-Scope entry must be instrumented, never the old public origin");
+  await page.waitForFunction(()=>!!window.__STORMTRACKER_QA_VIEWER&&!!window.__STORMTRACKER_QA_CAMERA,null,{timeout:15000});
  // The approved four-section operator layout starts collapsed. Navigate
  // to the existing Rainfall Observations section like an actual operator;
  // never make operational controls permanently visible just for CI.
@@ -171,7 +176,7 @@ try{
  console.log("FTP_AEP_ACTUAL_V10_CESIUM_MAP_PASS",JSON.stringify({actual,position:pos}));
  await page.screenshot({path:"/tmp/v10-ftp-aep-cesium-qa.png"}).catch(()=>{});
 }catch(error){
- console.log("FTP_AEP_ACTUAL_V10_CESIUM_MAP_FAIL",JSON.stringify({error:String(error),errors:errors.slice(0,8),failedModules}));
+ console.log("FTP_AEP_ACTUAL_V10_CESIUM_MAP_FAIL",JSON.stringify({error:String(error),errors:errors.slice(0,8),failedModules,localErrors,instrumented}));
  await page.screenshot({path:"/tmp/v10-ftp-aep-cesium-qa.png"}).catch(()=>{});
  throw error;
 }finally{await browser.close()}

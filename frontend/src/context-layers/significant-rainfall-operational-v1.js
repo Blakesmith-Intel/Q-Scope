@@ -287,7 +287,7 @@ export function initialiseOperationalSignificantRainfall({
   if(!reportDialog||!["amount","aep"].includes(mode))return;
   reportMode=mode;
   if(!reportDialog.open)reportDialog.showModal();
-  render();
+  renderReport();
   if(!lastLoadedAt||now()-lastLoadedAt>=refreshMs)
    refresh(true).catch(error=>{
     reportStatus.textContent="BoM refresh unavailable: "+String(error?.message??error).slice(0,120);

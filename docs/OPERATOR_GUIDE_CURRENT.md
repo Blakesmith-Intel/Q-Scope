@@ -2,9 +2,9 @@
 
 **Platform:** Q-SCOPE — *Queensland Situational Awareness*. Formerly StormTracker. Following the repository rename, the public application now lives at `https://blakesmith-intel.github.io/Q-Scope/`. The historical StormTracker repository name, old documentation titles, existing relay endpoints and service identifiers remain in archived technical records as appropriate. Q-SCOPE is an independent situational-awareness viewer, **not** an official Queensland Government, BoM or emergency-service warning authority.
 
-**Edition:** 20 November 2026 AEST | **Applies to:** Q-SCOPE production release of 20 November 2026.
+**Edition:** 26 November 2026 AEST | **Applies to:** the 20 November interface plus the 26 November rainfall rollover release once its publication checks pass.
 **Open:** [Operational map](https://blakesmith-intel.github.io/Q-Scope/) · [Operations wallboard](https://blakesmith-intel.github.io/Q-Scope/dashboard.html)  
-**Accepted recovery source:** [restore/qscope-2026-11-20](https://github.com/Blakesmith-Intel/Q-Scope/tree/restore/qscope-2026-11-20) · exact deployed commit `638b30e429b8a36993fd06ab50455ce808e6a9f7`.
+**Recovery source:** [26 November restore](https://github.com/Blakesmith-Intel/Q-Scope/tree/restore/qscope-2026-11-26) once the [seal workflow](https://github.com/Blakesmith-Intel/Q-Scope/actions/workflows/seal-qscope-20261126.yml) succeeds. Until then use [20 November restore](https://github.com/Blakesmith-Intel/Q-Scope/tree/restore/qscope-2026-11-20), commit `638b30e429b8a36993fd06ab50455ce808e6a9f7`.
 **Technical handover:** [DEVELOPMENT_HANDOVER_CURRENT.md](DEVELOPMENT_HANDOVER_CURRENT.md) · [Restore instructions](BASELINE_RESTORE.md). Older quick references and print PDFs are historical; this edition is authoritative for the current interface.
 
 > **Purpose and safety:** Q-SCOPE brings together official source observations and selected public incident information for situational awareness. It is **not** a Bureau of Meteorology (BoM) warning service, an incident dispatch system, or a replacement for agency procedures. For warnings, evacuation advice and operational decisions, consult the original issuing authority. Some displays (3-D clouds, storm tracks, projected cones and rapid-rise arrows) are estimates and **not official warnings**.
@@ -12,6 +12,10 @@
 **Finding this guide from the map:** select the small **Operator guide ↗** text link in the existing Q-SCOPE sidebar heading. It opens this up-to-date guide in a separate browser tab and leaves the active weather map, controls and information panels unchanged.
 
 **Public information sheet:** [StormTracker — layers and features (PDF)](STORMTRACKER_LAYERS_INFORMATION.pdf) — a concise shareable overview for new users. This is a guide to features, not a live weather bulletin.
+
+## Rainfall rollover — 26 November correction
+
+At 09:00 AEST, **Since 9 am AEST** starts a new reporting day. Previous-day readings and AEP tags are removed even if the next source refresh fails. During the first hour, an unsupported positive accumulation is withheld rather than carried into the new period or shown as Exceptional. A gauge may temporarily disappear from the rainfall map, AEP/amount reports, export and wallboard: this means coverage or verification is incomplete, not zero rainfall. A corroborated extreme event can still be classified. The independent **24hrs to 9am** total remains the completed reporting-day total. The existing five-minute refresh and local IFD thresholds are unchanged. A source-map issue time is not an individual gauge reading time; cross-check unusual observations with the official BoM gauge information. The consistency screen cannot establish every delayed station reset.
 
 ## What's new in the 20 November release
 
