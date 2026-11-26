@@ -1,0 +1,36 @@
+name: "One-off audit of SES rainfall unmatched station geography"
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/audit-ses-35-unmatched-20261113.py'
+      - '.github/workflows/audit-ses-35-unmatched-20261113.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-unmatched:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install release GIS dependency
+        run: python -m pip install --disable-pip-version-check 'shapely==2.1.2'
+      - name: Produce exact unmatched station list from official BoM and SES sources
+        run: |
+          set -euo pipefail
+          python scripts/build-bom-rainfall-basins.py --out /tmp/qscope-ses-source-stations.json
+          python scripts/audit-ses-35-unmatched-20261113.py \
+            --stations /tmp/qscope-ses-source-stations.json \
+            --json-out /tmp/ses-unmatched-audit.json
+      - name: Upload audit source and individual unmatched coordinates
+        uses: actions/upload-artifact@v4
+        with:
+          name: ses-unmatched-gauge-audit
+          path: /tmp/ses-unmatched-audit.json
+          retention-days: 30
