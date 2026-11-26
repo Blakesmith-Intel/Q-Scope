@@ -4,7 +4,7 @@ import {bomCapRssLinks,parseBomCapProductNotice,parseOfficialBomCap}
   from "../frontend/src/context-layers/bom-warning-cap-source-v1.js";
 import {fetchCurrentQldBoMWarningsIndex}
   from "../relay/bom-warning-qld-current-index-v1.js";
-import {sourceExactQldBomWfsFeatures,QLD_BOM_GIS_WARNING_REPLICA}
+import {sourceExactQldBomWfsFeatures,indexVerifiedQldBomWfsFeatures,QLD_BOM_GIS_WARNING_REPLICA}
   from "../relay/bom-warning-gis2web-replica-v1.js";
 
 const NOW=Date.now(),CODES={IDQ21033:"IDQ65654",IDQ21035:"IDQ65650"};
@@ -24,8 +24,9 @@ function iso(value){
  return Number.isFinite(m)?new Date(m).toISOString():String(value??"");
 }
 const notices=new Map();
+let currentIndex=null;
 try{
- const index=await fetchCurrentQldBoMWarningsIndex({nowMs:NOW});
+ const index=await fetchCurrentQldBoMWarningsIndex({nowMs:NOW});currentIndex=index;
  console.log("OFFICIAL_CURRENT_QSIGNAL",JSON.stringify(index));
 }catch(error){console.log("OFFICIAL_CURRENT_QSIGNAL_ERROR",String(error));}
 try{
@@ -88,6 +89,13 @@ for(const [code,axf] of Object.entries(CODES)){
       sourceId:String(p.gml_id??p.OBJECTID??f.id??"").slice(0,65)};
   });
   const n=notices.get(code);
+  const indexed=indexVerifiedQldBomWfsFeatures(features,code,currentIndex,{nowMs:NOW});
+  console.log("INDEX_GEOMETRY_EVIDENCE",JSON.stringify({code,count:indexed?.warnings?.length??0,issue:indexed?.notice?.issuedUtc??null,expires:indexed?.notice?.expiresUtc??null}));
+  try{
+   const fwo=await getText("https://www.bom.gov.au/fwo/"+code+".cap.xml","original-fwo-"+code,15000);
+   const notice=parseBomCapProductNotice(fwo,{nowMs:NOW});
+   console.log("FWO_GEOMETRY_EDITION",JSON.stringify({code,notice:notice?{status:notice.status,issued:notice.issuedUtc,expires:notice.expiresUtc}:null,polygonCount:parseOfficialBomCap(fwo,{nowMs:NOW}).length,deltaSeconds:notice&&indexed?Math.round((Date.parse(notice.issuedUtc)-Date.parse(indexed.notice.issuedUtc))/1000):null}));
+  }catch(e){console.log("FWO_PROBE_ERROR",JSON.stringify({code,error:String(e)}));}
   const joined=n?sourceExactQldBomWfsFeatures(features,n,{nowMs:NOW}):[];
   console.log("SOURCE_GIS_POLYGON_EVIDENCE",JSON.stringify({
    code,requestedAxF:axf,serverCount:rows.length,mostRecent:rows.slice(0,12),
